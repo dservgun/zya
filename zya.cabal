@@ -73,6 +73,7 @@ library
     , binary >= 0.8.1.0 && < 0.9
     , exceptions >= 0.8 && < 0.9
     , template-haskell >= 2.9 && < 2.10
+    , stm >= 2.4 && < 2.5
   -- Directories containing source files.
   hs-source-dirs:      src
   

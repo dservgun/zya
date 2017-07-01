@@ -12,6 +12,7 @@ import Data.Typeable
 
 
 
+
 subscribe :: Subscription -> Reader 
 subscribe = undefined
 
@@ -39,31 +40,29 @@ data WriteAudit = WriteAudit {
   writeLocation :: Location
   , lastWrite :: UTCTime
   , subscription :: Subscription
-
-}
+} deriving Show
 
 data ReaderAudit = ReaderAudit {
   messages :: [Message]
   , pageSize :: PageSize
   , lastAccess :: UTCTime
-}
-newtype PersistentStream = PersistentStream {uFP :: FilePath} 
-newtype ReaderStream = ReaderStream {un :: (ReaderLocation, [Message])}
-newtype WriteStream = WriterStream {unW :: WriterLocation}
+} deriving Show
+newtype PersistentStream = PersistentStream {uFP :: FilePath} deriving Show 
+newtype ReaderStream = ReaderStream {un :: (ReaderLocation, [Message])} deriving Show 
+newtype WriteStream = WriterStream {unW :: WriterLocation} deriving Show
 data Reader = Reader {
   readStream :: ReaderStream
   , position :: ReaderLocation
   , fileName :: PersistentStream
   , audit :: ReaderAudit
-}
+} deriving Show 
 
 data Writer = Writer {
     writeStream :: WriteStream
     , wFileName :: PersistentStream
     , writePosition :: WriterLocation
     , waudit :: WriteAudit
-
-}
+} deriving Show
 
 
 
