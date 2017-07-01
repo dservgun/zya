@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module Data.Zya.Core.Types where
+module Data.Zya.Core.Subscription where
 import Data.Text
 import Data.Time(UTCTime, getCurrentTime)
 
@@ -31,7 +31,7 @@ data Subscription =
     topic :: Topic
     , reader :: Reader
     , writer :: Writer
-}
+} deriving (Show)
 
 type ReaderLocation = Integer -- for larger files
 type WriterLocation = Integer
