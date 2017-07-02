@@ -27,42 +27,28 @@ writeMessage w m = do
 
 
 --------------Application types ---
-data Subscription = 
-  Subscription {
-    topic :: Topic
-    , reader :: Reader
-    , writer :: Writer
+data OpenIdProvider = Google | Yahoo | Facebook | LinkedIn deriving (Show)
+{- | Email needs to be validated. TODO
+-}
+type Email = Text 
+{- | Support for login based on the email id and the open id. 
+-}
+data Login = Login {
+    email :: Email 
+    , openId :: OpenIdProvider
 } deriving (Show)
 
-type ReaderLocation = Integer -- for larger files
-type WriterLocation = Integer
-data WriteAudit = WriteAudit {
-  writeLocation :: Location
-  , lastWrite :: UTCTime
-  , subscription :: Subscription
-} deriving Show
 
-data ReaderAudit = ReaderAudit {
-  messages :: [Message]
-  , pageSize :: PageSize
-  , lastAccess :: UTCTime
-} deriving Show
-newtype PersistentStream = PersistentStream {uFP :: FilePath} deriving Show 
-newtype ReaderStream = ReaderStream {un :: (ReaderLocation, [Message])} deriving Show 
-newtype WriteStream = WriterStream {unW :: WriterLocation} deriving Show
-data Reader = Reader {
-  readStream :: ReaderStream
-  , position :: ReaderLocation
-  , fileName :: PersistentStream
-  , audit :: ReaderAudit
-} deriving Show 
+type Start = Integer
+type End = Integer
+data OffsetHint = Beginning | Latest | MessageRange of (Start , End)
+data Subscribe = 
+  Subscribe {
+    topic :: Topic
+    user :: User
+    , reader :: OffsetHint
+} deriving (Show)
 
-data Writer = Writer {
-    writeStream :: WriteStream
-    , wFileName :: PersistentStream
-    , writePosition :: WriterLocation
-    , waudit :: WriteAudit
-} deriving Show
 
 
 
