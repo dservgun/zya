@@ -5,7 +5,9 @@ Clients  connect on a well known port to query for a service map.
 A service map contains the services offered with the service names (for example port number the)
 give service is running on. For example, 
 	```haskell  
-	WebServer : ["host1:port1", "host2:port2", "host1:port3"].
+		
+		WebServer : ["host1:port1", "host2:port2", "host1:port3"].
+	
 	```. 
 
 ## Query and commands
