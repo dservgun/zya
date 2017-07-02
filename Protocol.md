@@ -4,10 +4,10 @@ Clients  connect on a well known port to query for a service map.
 ## Service map
 A service map contains the services offered with the service names (for example port number the)
 give service is running on. For example, 
-	```haskell  
-		
+	```
+		Database : ["conn1", "conn2", "conn3"]
 		WebServer : ["host1:port1", "host2:port2", "host1:port3"].
-	
+		ComputeServer : ["host10", "host11"]
 	```. 
 
 ## Query and commands
