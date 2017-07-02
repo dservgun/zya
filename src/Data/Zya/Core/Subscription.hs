@@ -13,20 +13,15 @@ import Data.Typeable
 
 
 
-subscribe :: Subscription -> Reader 
-subscribe = undefined
 
-publish :: Subscription -> Writer
-publish = undefined
-
-
-writeMessage :: Writer -> Message -> IO Message
-writeMessage w m = do
-  ct <- liftIO $ (getCurrentTime :: IO UTCTime)
-  throwM $ Error (pack "001", pack "error")
 
 
 --------------Application types ---
+type CommitOffset = Integer
+data User = User {
+  login :: Login
+  , topics :: [(Topic, CommitOffset)]
+} deriving Show
 data OpenIdProvider = Google | Yahoo | Facebook | LinkedIn deriving (Show)
 {- | Email needs to be validated. TODO
 -}
@@ -41,11 +36,11 @@ data Login = Login {
 
 type Start = Integer
 type End = Integer
-data OffsetHint = Beginning | Latest | MessageRange of (Start , End)
+data OffsetHint = Beginning | Latest | MessageRange (Start , End) deriving (Show)
 data Subscribe = 
   Subscribe {
     topic :: Topic
-    user :: User
+    , user :: User
     , reader :: OffsetHint
 } deriving (Show)
 
