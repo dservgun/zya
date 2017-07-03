@@ -80,3 +80,13 @@ library
   -- Base language which the package is written in.
   default-language:    Haskell2010
   
+test-suite Tasty 
+  type:   exitcode-stdio-1.0
+  build-depends: 
+    base >= 4.7 && < 4.8
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , tasty-smallcheck
+  hs-source-dirs: test
+  main-is : Tasty.hs
