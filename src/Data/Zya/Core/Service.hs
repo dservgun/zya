@@ -3,7 +3,7 @@ module Data.Zya.Core.Service
 		-- * The main service 
 		service
 		-- * The supported service profiles
-		, ServiceProfile 
+		, ServiceProfile(..)
 		-- **
 
 	)
