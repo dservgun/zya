@@ -69,10 +69,10 @@ data Subscribe =
 
 ### Commit
 	* Request to commit message(s), usually a batch size.
-	* There are 2 parts to commit: 
+	* There are 2 cases to commit: 
 		** Client sending a commit successfully. 
-			- Failure in client sending leaves the messages uncommitted and will be sent to 
-			the client upon reconnect.
+			- Failure in client sending leaves the messages uncommitted and will be re-sent to 
+			the client upon reconnect. This implies that the client has to be able to test 
 		** The two phase commit.
 			- Need to handle this gracefully.
 
