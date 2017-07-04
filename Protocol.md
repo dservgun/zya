@@ -34,10 +34,17 @@ data Login = Login {
 ### AllTopics - Query
 	* Returns all topics with a message count in a default page size.
 	* Can return invalid authorization error.
+
+### TopicAllocator - Global
+	* A service that routes a CreateTopic request. Checks the load of topics on each processId and selects one of the processIds and sends the selected ``` CreateTopic ``` request.
+	** This will start a local timeout waiting for an acknowledgment from the processid.
+	** A timeout or an error will result in a round robin allocation process.
+
 ### CreateTopic - Global
 	* Creates a new topic with admin rights to the current user. The topic is by default part of a 
 	global namespace.
 	* Returns an error when the topic already exists or user is not authorized to creating topics
+	** Failure/tolerance
 
 ### CreateTopic - Local 
 	* Creates a new topic local to the current user with admin rights.
