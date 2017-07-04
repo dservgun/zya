@@ -50,6 +50,7 @@ data Login = Login {
 ###  Subscribe to a topic - Global 
 	* Subscribe to a topic with an offset request.
 		```haskell
+			
 			type Start = Integer
 			type End = Integer
 			data OffsetHint = Beginning | Latest | MessageRange of (Start , End)

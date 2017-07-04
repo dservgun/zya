@@ -40,20 +40,16 @@ data Server = Server {
 	, statistics :: TVar (Map ProcessId ([Request], [Response]))
 }
 
-{- |
- We like to define a service as a distributed process that can as part of the cloud.
--}
-
 type ServiceRange = (Int, Int) 
 
-{- | 
-	A simple configuration to setup the service, showing some typical defaults.
+{- | A typical default configuration.
 -}
 defaultSimpleConfiguration :: [(ServiceProfile, ServiceRange)]
 defaultSimpleConfiguration = [(WebServer, (3, 10)), (DatabaseServer, (3, 10)), 
 						(Reader, (3, 10)), 
 						(Writer, (3, 10))]
 
+{- | Services that can be started on a cloud. -}
 data ServiceProfile = 
 	WebServer | DatabaseServer | Reader | Writer
 	deriving(Show)
