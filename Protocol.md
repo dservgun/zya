@@ -49,19 +49,19 @@ data Login = Login {
 
 ###  Subscribe to a topic - Global 
 	* Subscribe to a topic with an offset request.
-		```haskell
-			
-			type Start = Integer
-			type End = Integer
-			data OffsetHint = Beginning | Latest | MessageRange of (Start , End)
-			data Subscribe = 
-			  Subscribe {
-			    topic :: Topic
-			    user :: User
-			    , reader :: OffsetHint
-			}
+```haskell
 
-		```
+type Start = Integer
+type End = Integer
+data OffsetHint = Beginning | Latest | MessageRange of (Start , End)
+data Subscribe = 
+  Subscribe {
+    topic :: Topic
+    user :: User
+    , reader :: OffsetHint
+}
+
+```
 	** Successful subscription sends a batch of messages about the size of the batch size. New messages are sent to the client upon receiving commit for a percentage of messages. A poorman's flow control.
 
 ### Subscribe to a topic - Local 
