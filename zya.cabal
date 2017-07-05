@@ -85,9 +85,9 @@ test-suite Tasty
   type:   exitcode-stdio-1.0
   build-depends: 
     base >= 4.7 && <  5
-    , tasty
-    , tasty-hunit
-    , tasty-quickcheck
-    , tasty-smallcheck
+    , tasty >= 0.11.2 && < 0.12
+    , tasty-hunit >= 0.9.1 && < 0.10
+    , tasty-quickcheck >= 0.9.1 && < 0.10
+    , tasty-smallcheck >= 0.8.1 && < 0.10
   hs-source-dirs: test
   main-is : Tasty.hs
