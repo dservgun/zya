@@ -6,7 +6,7 @@ sudo: false
 
 matrix:
   include:
-  - env: CABAL_INSTALL_VER=1.24 GHCVER=8.0.2 BUILD=cabal
+  - env: CABAL_INSTALL_VER=1.24 GHCVER=8.0.1 BUILD=cabal
     addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
 
 
