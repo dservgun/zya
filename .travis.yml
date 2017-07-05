@@ -31,23 +31,15 @@ before_install:
 install:
 - case "$BUILD" in
     cabal)
-      cabal install --jobs=2 --enable-tests --only-dependencies -ftcp . 
+      cabal install --jobs=2 --enable-tests --only-dependencies
       ;;
   esac
 
 script:
 - case "$BUILD" in
     cabal)
-      cabal install --jobs=2 --enable-tests -ftcp .
-      cabal configure -ftcp --enable-tests;
+      cabal install --jobs=2 --enable-tests
       cabal build --jobs=2;
-      export ARG='--test-options'
       export TEST_PACKAGE=""
       ;;
    esac
-- $BUILD ${ARGS} test $ARG='--plain -t "!Flaky"' ${TEST_PACKAGE}TestCHInMemory
-- $BUILD ${ARGS} test $ARG='--plain -t "!Flaky"' ${TEST_PACKAGE}TestCHInTCP
-- $BUILD ${ARGS} test $ARG='--plain -t "!SpawnReconnect"' ${TEST_PACKAGE}TestClosure
-- $BUILD ${ARGS} test $ARG='--plain' ${TEST_PACKAGE}TestStats
-- $BUILD ${ARGS} test $ARG='--plain' ${TEST_PACKAGE}TestMx
-- $BUILD ${ARGS} test $ARG='--plain' ${TEST_PACKAGE}TestTracing
