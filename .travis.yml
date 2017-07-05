@@ -24,22 +24,20 @@ before_install:
       ghc --version;
       cabal --version;
       travis_retry cabal update;
-      sed -i 's/^jobs:/-- jobs:/' $HOME/.cabal/config
       ;;
   esac
 
 install:
 - case "$BUILD" in
     cabal)
-      cabal install --jobs=2 --enable-tests --only-dependencies
+      cabal install --enable-tests --only-dependencies
       ;;
   esac
 
 script:
 - case "$BUILD" in
     cabal)
-      cabal install --jobs=2 --enable-tests
-      cabal build --jobs=2;
-      export TEST_PACKAGE=""
+      cabal install --enable-tests
+      cabal build
       ;;
    esac
