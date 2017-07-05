@@ -30,14 +30,13 @@ before_install:
 install:
 - case "$BUILD" in
     cabal)
-        cabal update && cabal install cabal-install && cabal install --enable-tests --only-dependencies
+        cabal install --enable-tests --only-dependencies && cabal build
       ;;
   esac
 
 script:
 - case "$BUILD" in
     cabal)
-      cabal install --enable-tests
-      cabal build
+      cabal install --enable-tests --only-dependencies && cabal build
       ;;
    esac
