@@ -6,21 +6,12 @@ sudo: false
 
 matrix:
   include:
-  - env: CABAL_INSTALL_VER=1.22 GHCVER=7.6.3 BUILD=cabal
+  - env: CABAL_INSTALL_VER=1.24 GHCVER=8.0.2 BUILD=cabal
     addons: {apt: {packages: [cabal-install-1.22,ghc-7.6.3], sources: [hvr-ghc]}}
 
-  - env: ARGS="--stack-yaml stack-ghc-7.8.4.yaml" BUILD=stack
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: ARGS="--stack-yaml stack-ghc-7.10.3.yaml" BUILD=stack
-    addons: {apt: {packages: [libgmp-dev]}}
-
-  - env: ARGS= BUILD=stack GHCVER=8.0.1
-    addons: {apt: {packages: [libgmp-dev]}}
 
 cache:
   directories:
-  - $HOME/.stack
   - $HOME/.cabal/packages
 
 before_install:
@@ -28,12 +19,6 @@ before_install:
 # workaround for https://ghc.haskell.org/trac/ghc/ticket/9221
 # taken from https://github.com/hvr/multi-ghc-travis/blob/0fa68f78c2b1b059f904c9abc85510a3bb4f57e2/README.md
 - case "$BUILD" in
-    stack)
-      export PATH=$HOME/.local/bin:$HOME/.cabal/bin:$PATH;
-      mkdir -p ~/.local/bin;
-      travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
-      stack --version
-      ;;
     cabal)
       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABAL_INSTALL_VER/bin:$HOME/.cabal/bin:$PATH;
       ghc --version;
@@ -45,10 +30,6 @@ before_install:
 
 install:
 - case "$BUILD" in
-    stack)
-      stack $ARGS setup --no-terminal;
-      stack $ARGS build --no-terminal --only-snapshot --test --no-run-tests;
-      ;;
     cabal)
       cabal install --jobs=2 --enable-tests --only-dependencies -ftcp . distributed-process-tests/
       ;;
@@ -56,10 +37,6 @@ install:
 
 script:
 - case "$BUILD" in
-    stack)
-      export ARG='--test-arguments'
-      export TEST_PACKAGE="distributed-process-tests:"
-      ;;
     cabal)
       cabal install --jobs=2 --enable-tests -ftcp .
       cd distributed-process-tests;
