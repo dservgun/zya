@@ -31,7 +31,7 @@ before_install:
 install:
 - case "$BUILD" in
     cabal)
-      cabal install --jobs=2 --enable-tests --only-dependencies -ftcp . distributed-process-tests/
+      cabal install --jobs=2 --enable-tests --only-dependencies -ftcp . 
       ;;
   esac
 
@@ -39,7 +39,6 @@ script:
 - case "$BUILD" in
     cabal)
       cabal install --jobs=2 --enable-tests -ftcp .
-      cd distributed-process-tests;
       cabal configure -ftcp --enable-tests;
       cabal build --jobs=2;
       export ARG='--test-options'
