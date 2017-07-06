@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
 module Data.Zya.Core.Subscription where
-import Data.Text
+import Data.Text(pack, unpack, Text)
 import Data.Monoid((<>))
 import Data.Time(UTCTime, getCurrentTime)
 import System.Environment(getArgs)
@@ -11,6 +11,7 @@ import Control.Applicative((<$>))
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans
+import Control.Exception
 import Data.Data
 import Data.Typeable
 import Data.Zya.Core.Service
@@ -64,22 +65,52 @@ data Message = Message (UTCTime, Text) deriving (Typeable, Show)
 data Error =  Error (ErrorCode, Text) deriving (Typeable, Show) 
 instance Exception Error
 
-
-{- | Given a service profile and its parameters, manage subscriptions.
--}
-
+data StartUpException = StartUpException Text deriving (Typeable, Show)
+instance Exception StartUpException
 subscriptionService :: String -> Process () 
 subscriptionService aPort = do 
-  -- do something here.
   return ()
 
-subscription :: Backend -> (ServiceProfile, String) -> Process ()
-subscription aBackend (sP, port) = do 
-  --subscriptionService port
-  --runReaderT $ subscriptionMTL (aBackend, sP, port)
+type ServerReaderT = ReaderT (Server, ServiceProfile, String) Process
+writerService :: Server -> ServiceProfile -> String -> Process () 
+writerService = undefined 
+
+readerService :: Server -> ServiceProfile -> String -> Process () 
+readerService = undefined 
+
+databaseService :: Server -> ServiceProfile -> String -> Process () 
+databaseService = undefined 
+
+webservice :: Server -> ServiceProfile -> String -> Process ()
+webservice = undefined
+
+topicAllocator :: ServerReaderT ()
+topicAllocator = do 
+  (server, profile, params) <- ask
+  
   return ()
+subscription :: Backend -> (ServiceProfile, String) -> Process ()
+subscription aBackend (sP, params) = do
+  newServer <- newServer
+  case sP of
+    Writer -> writerService newServer sP params 
+    Reader -> readerService newServer sP params
+    DatabaseServer -> databaseService newServer sP params
+    WebServer -> webservice newServer sP params 
+    TopicAllocator -> runReaderT topicAllocator (newServer, sP, params)
+
+
 parseArgs :: IO (ServiceProfile, String)
-parseArgs = return (Writer, "test")
+parseArgs = do
+  [serviceName, params] <- getArgs
+  return $ 
+    case serviceName of 
+      "Writer" -> (Writer, params)
+      "Reader" -> (Reader, params)
+      "Database" -> (DatabaseServer, params) 
+      "Webserver" -> (WebServer, params)
+      "TopicAllocator" -> (TopicAllocator, params)
+      _  -> throw $ StartUpException $ pack $ serviceName <> "->" <> params
 
 remotable ['subscriptionService]
 

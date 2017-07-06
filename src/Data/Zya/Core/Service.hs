@@ -1,10 +1,10 @@
 module Data.Zya.Core.Service
     (
-        -- * The main service 
-        service
         -- * The supported service profiles
-        , ServiceProfile(..)
-        -- **
+        ServiceProfile(..)
+        -- New server
+        , newServer
+        , Server
 
     )
 where 
@@ -23,22 +23,40 @@ data ClientState = ClientState {
 }
 
 {- | The server unifies remote and local processes to manage logging messages.
-    * localClientMap - For each client identifier, list of topics and their read positions.
-    * remoteClientMap - For each process id the state of the topics.
-    * localWriterMap - Write position for a topic.
-    * remoteWriterMap - Write position for a topic. 
-    * serviceMap - A map of the services running on the network.
+    * localClients - For each client identifier, list of topics and their read positions.
+    * remoteClients - For each process id the state of the topics.
+    * localWriters - Write position for a topic.
+    * remoteWriters - Write position for a topic. 
+    * services - A map of the services running on the network.
     ** Note: There should exist only one write position per topic.
 
  -}
 data Server = Server {
-    localClientMap :: TVar (Map ClientIdentifier [ClientState])
-    , remoteClientMap :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
-    , localWriterMap :: TVar (Map Topic Integer)
-    , remoteWriterMap :: TVar (Map (ProcessId, Topic) Integer)
-    ,  serviceMap :: TVar (Map (ProcessId, ServiceProfile) Integer)
+    localClients :: TVar (Map ClientIdentifier [ClientState])
+    , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
+    , localWriters :: TVar (Map Topic Integer)
+    , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
+    ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
 }
+
+newServer :: Process Server 
+newServer =  
+    liftIO $ do 
+        localClients <- newTVarIO (Map.empty) 
+        remoteClientMap <- newTVarIO (Map.empty) 
+        localWriterMap <- newTVarIO (Map.empty) 
+        remoteWriterMap <- newTVarIO (Map.empty)
+        serviceMap <- newTVarIO (Map.empty) 
+        statistics <- newTVarIO (Map.empty)
+        return $ Server {
+            localClients = localClients
+            , remoteClients = remoteClientMap 
+            , localWriters = localWriterMap 
+            , remoteWriters = remoteWriterMap
+            , services = serviceMap 
+            , statistics = statistics
+    }
 
 type ServiceRange = (Int, Int) 
 
@@ -49,12 +67,13 @@ defaultSimpleConfiguration = [(WebServer, (3, 10)), (DatabaseServer, (3, 10)),
                         (Reader, (3, 10)), 
                         (Writer, (3, 10))]
 
-{- | Services that can be started on a cloud. -}
+{- | Supported services -}
 data ServiceProfile = 
-    WebServer | DatabaseServer | Reader | Writer
+    WebServer 
+    | DatabaseServer 
+    | Reader 
+    | Writer 
+    | TopicAllocator
     deriving(Show)
 
-newtype Service = Service {unService :: ServiceProfile -> [NodeId] -> Process[NodeId]}
 
-service :: Service -> Process[NodeId]
-service = undefined

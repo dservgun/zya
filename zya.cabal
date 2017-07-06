@@ -66,7 +66,7 @@ library
     , time >= 1.5 && < 1.6
     , mtl >= 2.2 && < 2.3
     , containers >= 0.5 && < 0.6
-    , distributed-process >=0.6 && <0.7
+    , distributed-process >=0.6.6 && <0.7
     , distributed-process-simplelocalnet >= 0.2  && < 0.3
     , distributed-static >= 0.3 && < 0.4
     , network >= 2.6 && < 2.7
