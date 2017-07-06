@@ -38,6 +38,7 @@ data Server = Server {
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
+    , proxyChannel :: TChan(Process())
 }
 
 newServer :: Process Server 
@@ -49,6 +50,7 @@ newServer =
         remoteWriterMap <- newTVarIO (Map.empty)
         serviceMap <- newTVarIO (Map.empty) 
         statistics <- newTVarIO (Map.empty)
+        proxyChannel <- newTChanIO
         return $ Server {
             localClients = localClients
             , remoteClients = remoteClientMap 
@@ -56,6 +58,7 @@ newServer =
             , remoteWriters = remoteWriterMap
             , services = serviceMap 
             , statistics = statistics
+            , proxyChannel = proxyChannel
     }
 
 type ServiceRange = (Int, Int) 
