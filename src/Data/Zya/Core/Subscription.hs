@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Data.Zya.Core.Subscription where
 import Data.Text(pack, unpack, Text)
 import Data.Monoid((<>))
@@ -7,6 +8,8 @@ import System.Environment(getArgs)
 import Control.Distributed.Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
+import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+
 import Control.Applicative((<$>))
 import Control.Monad
 import Control.Monad.Catch
@@ -71,38 +74,54 @@ subscriptionService :: String -> Process ()
 subscriptionService aPort = do 
   return ()
 
-type ServerReaderT = ReaderT (Server, ServiceProfile, String) Process
-writerService :: Server -> ServiceProfile -> String -> Process () 
+type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, Text) Process
+writerService :: ServerReaderT ()
 writerService = undefined 
 
-readerService :: Server -> ServiceProfile -> String -> Process () 
+readerService :: ServerReaderT ()
 readerService = undefined 
 
-databaseService :: Server -> ServiceProfile -> String -> Process () 
+databaseService :: ServerReaderT ()
 databaseService = undefined 
 
-webservice :: Server -> ServiceProfile -> String -> Process ()
+webservice :: ServerReaderT ()
 webservice = undefined
 
+
+-- TODO: Change it to using MonadReader: fundep issue.
+{- | 
+  What does the allocator do: 
+  It comes up and updates its local cache with its own
+  process id as an allocator and starts a topic allocator event loop
+  that listens to the any peers announcing themselves as allocators. If there is a 
+  conflict, the allocator will switch itself as a backup and publish a message 
+  announcing that. Will this work?
+-}
 topicAllocator :: ServerReaderT ()
 topicAllocator = do 
-  (server, profile, params) <- ask
-  
+  (server, backend, profile, params) <- ask
+  mynode <- lift getSelfNode
+  pid <- lift getSelfPid
+  peers0 <- liftIO $ findPeers backend 1000000
+  let peers = filter (/= mynode) peers0
+
   return ()
-subscription :: Backend -> (ServiceProfile, String) -> Process ()
-subscription aBackend (sP, params) = do
+subscription :: Backend -> (ServiceProfile, Text) -> Process ()
+subscription backend (sP, params) = do
   newServer <- newServer
+  let readerParams = (newServer, backend, sP, params) 
   case sP of
-    Writer -> writerService newServer sP params 
-    Reader -> readerService newServer sP params
-    DatabaseServer -> databaseService newServer sP params
-    WebServer -> webservice newServer sP params 
-    TopicAllocator -> runReaderT topicAllocator (newServer, sP, params)
+    Writer -> runReaderT writerService readerParams
+    Reader -> runReaderT readerService readerParams
+    DatabaseServer -> runReaderT databaseService readerParams
+    WebServer ->  runReaderT webservice readerParams
+    TopicAllocator -> runReaderT topicAllocator readerParams
 
 
-parseArgs :: IO (ServiceProfile, String)
+parseArgs :: IO (ServiceProfile, Text)
 parseArgs = do
-  [serviceName, params] <- getArgs
+  [serviceName, lparams] <- getArgs
+  let params = pack lparams
   return $ 
     case serviceName of 
       "Writer" -> (Writer, params)
@@ -110,15 +129,14 @@ parseArgs = do
       "Database" -> (DatabaseServer, params) 
       "Webserver" -> (WebServer, params)
       "TopicAllocator" -> (TopicAllocator, params)
-      _  -> throw $ StartUpException $ pack $ serviceName <> "->" <> params
+      _  -> throw $ StartUpException $ pack $ serviceName <> "->" <> (unpack params)
 
 remotable ['subscriptionService]
 
--- Will look something like something
 cloudMain :: IO () 
 cloudMain = do 
  (sProfile, aPort) <- parseArgs
- backend <- initializeBackend "localhost" aPort
+ backend <- initializeBackend "localhost" (unpack aPort)
                               ( __remoteTable initRemoteTable)
  node <- newLocalNode backend
  Node.runProcess node (subscription backend (sProfile, aPort))
