@@ -6,6 +6,7 @@ import Data.Monoid((<>))
 import Data.Time(UTCTime, getCurrentTime)
 import System.Environment(getArgs)
 import Control.Distributed.Process
+import Control.Concurrent.STM
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
@@ -60,6 +61,7 @@ data Subscribe =
 ---------- Basic types  ----
 type PageSize = Integer
 
+type ServiceName = Text
 type Topic = Text 
 type Location = Integer
 type ErrorCode = Text
@@ -74,7 +76,8 @@ subscriptionService :: String -> Process ()
 subscriptionService aPort = do 
   return ()
 
-type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, Text) Process
+type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, ServiceName) Process
+
 writerService :: ServerReaderT ()
 writerService = undefined 
 
@@ -88,22 +91,58 @@ webservice :: ServerReaderT ()
 webservice = undefined
 
 
--- TODO: Change it to using MonadReader: fundep issue.
+proxyProcess :: Server -> Process ()
+proxyProcess (Server _ _ _ _ _ _ proxychan) =  forever $ join $ liftIO $ atomically $ readTChan proxychan
+
+handleRemoteMessage = undefined
+handleMonitorNotification = undefined
+handleWhereIsReply = undefined
+
+topicAllocationEventLoop :: ServerReaderT ()
+topicAllocationEventLoop = do
+  (server, backend, profile, serviceName) <- ask
+
+  lift $ spawnLocal (proxyProcess server)
+  forever $
+    lift $
+      receiveWait
+        [ 
+{-        match $ handleRemoteMessage server
+        , match $ handleMonitorNotification server
+        , matchIf (\(WhereIsReply l _) -> l == "chatServer") $
+                  handleWhereIsReply server
+-}        
+        matchAny $ \_ -> return ()      -- discard unknown messages
+        ]
+
 {- | 
   What does the allocator do: 
   It comes up and updates its local cache with its own
   process id as an allocator and starts a topic allocator event loop
   that listens to the any peers announcing themselves as allocators. If there is a 
   conflict, the allocator will switch itself as a backup and publish a message 
-  announcing that. Will this work?
+  announcing that. Will this work? 
+  Note about failure and reliability: there is probably a need to implemmenting
+  some form of consensus : raft seems the less daunting option. Implement the 
+  c-interface to a reference implementation or complete the implementation using
+  CH convenience functions. In our current implementation, we will skip this to 
+  get a basic understanding of the overall interactions with the system. 
+
 -}
+
 topicAllocator :: ServerReaderT ()
 topicAllocator = do 
-  (server, backend, profile, params) <- ask
+  (server, backend, profile, serviceName) <- ask
+  -- Convert a text to string.
+  let serviceNameS = unpack serviceName
   mynode <- lift getSelfNode
   pid <- lift getSelfPid
   peers0 <- liftIO $ findPeers backend 1000000
   let peers = filter (/= mynode) peers0
+  mypid <- lift getSelfPid
+  lift $ register serviceNameS mypid
+  forM_ peers $ \peer -> do
+    lift $ whereisRemoteAsync peer serviceNameS
 
   return ()
 subscription :: Backend -> (ServiceProfile, Text) -> Process ()
@@ -118,26 +157,31 @@ subscription backend (sP, params) = do
     TopicAllocator -> runReaderT topicAllocator readerParams
 
 
-parseArgs :: IO (ServiceProfile, Text)
+parseArgs :: IO (ServiceProfile, Text, String)
 parseArgs = do
-  [serviceName, lparams] <- getArgs
+  [serviceName, lparams, portNumber] <- getArgs
   let params = pack lparams
   return $ 
     case serviceName of 
-      "Writer" -> (Writer, params)
-      "Reader" -> (Reader, params)
-      "Database" -> (DatabaseServer, params) 
-      "Webserver" -> (WebServer, params)
-      "TopicAllocator" -> (TopicAllocator, params)
-      _  -> throw $ StartUpException $ pack $ serviceName <> "->" <> (unpack params)
+      "Writer" -> (Writer, params, portNumber)
+      "Reader" -> (Reader, params, portNumber)
+      "Database" -> (DatabaseServer, params, portNumber) 
+      "Webserver" -> (WebServer, params, portNumber)
+      "TopicAllocator" -> (TopicAllocator, params, portNumber)
+      _  -> throw $ StartUpException $ pack $ "Invalid arguments " <> (serviceName) <> ":" <> lparams
 
 remotable ['subscriptionService]
 
+
+cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
+cloudEntryPoint backend (sP, sName) = do
+  node <- newLocalNode backend 
+  Node.runProcess node (subscription backend (sP, sName))
+
+
 cloudMain :: IO () 
 cloudMain = do 
- (sProfile, aPort) <- parseArgs
- backend <- initializeBackend "localhost" (unpack aPort)
+ (sProfile, sName, aPort) <- parseArgs
+ backend <- initializeBackend "localhost" aPort
                               ( __remoteTable initRemoteTable)
- node <- newLocalNode backend
- Node.runProcess node (subscription backend (sProfile, aPort))
-
+ cloudEntryPoint backend (sProfile, sName)

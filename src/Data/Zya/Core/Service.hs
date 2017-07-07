@@ -4,7 +4,7 @@ module Data.Zya.Core.Service
         ServiceProfile(..)
         -- New server
         , newServer
-        , Server
+        , Server(..) -- todo: How to deal with exposing types..need to review rwh.
 
     )
 where 
