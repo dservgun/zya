@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Data.Zya.Core.Service
     (
         -- * The supported service profiles
@@ -12,6 +13,10 @@ import Data.Map as Map
 import Control.Concurrent.STM
 import Control.Distributed.Process
 import Data.Text 
+import GHC.Generics (Generic)
+import Data.Binary
+import Data.Typeable
+
 
 newtype Request = Request {unRequest :: Text} deriving Show 
 newtype Response = Response {unResponse :: Text} deriving Show
@@ -29,7 +34,6 @@ data ClientState = ClientState {
     * remoteWriters - Write position for a topic. 
     * services - A map of the services running on the network.
     ** Note: There should exist only one write position per topic.
-
  -}
 data Server = Server {
     localClients :: TVar (Map ClientIdentifier [ClientState])
@@ -39,6 +43,7 @@ data Server = Server {
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
     , proxyChannel :: TChan(Process())
+    , myProcessId :: TVar (Maybe ProcessId)
 }
 
 newServer :: Process Server 
@@ -51,6 +56,7 @@ newServer =
         serviceMap <- newTVarIO (Map.empty) 
         statistics <- newTVarIO (Map.empty)
         proxyChannel <- newTChanIO
+        initProcessId <- newTVarIO (Nothing)
         return $ Server {
             localClients = localClients
             , remoteClients = remoteClientMap 
@@ -59,8 +65,16 @@ newServer =
             , services = serviceMap 
             , statistics = statistics
             , proxyChannel = proxyChannel
+            , myProcessId = initProcessId 
     }
 
+
+allRemoteProcesses :: Server -> STM [ProcessId] 
+allRemoteProcesses aServer = do 
+    myProcessId <- readTVar (myProcessId aServer)
+    case myProcessId of
+        Nothing -> return []
+        Just pyd -> return [pyd]
 type ServiceRange = (Int, Int) 
 
 {- | A typical default configuration.
@@ -77,6 +91,7 @@ data ServiceProfile =
     | Reader 
     | Writer 
     | TopicAllocator
-    deriving(Show)
+    deriving(Show, Generic, Typeable)
 
+instance Binary ServiceProfile
 

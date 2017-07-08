@@ -1,8 +1,11 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell #-}
+{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Data.Zya.Core.Subscription where
 import Data.Text(pack, unpack, Text)
 import Data.Monoid((<>))
+import GHC.Generics (Generic)
+import Data.Binary
+import Data.Typeable
 import Data.Time(UTCTime, getCurrentTime)
 import System.Environment(getArgs)
 import Control.Distributed.Process
@@ -29,12 +32,12 @@ import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
 
 --------------Application types ---
-type CommitOffset = Integer
+type CommitOffset = Integer 
 data User = User {
   login :: Login
   , topics :: [(Topic, CommitOffset)]
-} deriving Show
-data OpenIdProvider = Google | Yahoo | Facebook | LinkedIn deriving (Show)
+} deriving (Show, Typeable, Generic)
+data OpenIdProvider = Google | Yahoo | Facebook | LinkedIn deriving (Show, Typeable, Generic)
 {- | Email needs to be validated. TODO
 -}
 type Email = Text 
@@ -43,18 +46,32 @@ type Email = Text
 data Login = Login {
     email :: Email 
     , openId :: OpenIdProvider
-} deriving (Show)
+} deriving (Show, Typeable, Generic)
 
 
 type Start = Integer
-type End = Integer
-data OffsetHint = Beginning | Latest | MessageRange (Start , End) deriving (Show)
+type End = Integer 
+data OffsetHint = Beginning | Latest | MessageRange (Start , End) deriving (Show, Typeable, Generic)
+
 data Subscribe = 
   Subscribe {
     topic :: Topic
     , user :: User
     , reader :: OffsetHint
-} deriving (Show)
+} deriving (Show, Typeable, Generic)
+
+data PMessage
+  = MsgServerInfo         Bool ProcessId [Subscribe]
+  | MsgSend               Subscribe Text -- make this json.
+  | ServiceAvailable ServiceProfile ProcessId -- Announce that the service is available on the said process id.
+  deriving (Typeable, Generic)
+
+instance Binary Login 
+instance Binary OpenIdProvider
+instance Binary User
+instance Binary OffsetHint
+instance Binary Subscribe
+instance Binary PMessage
 
 
 
@@ -92,27 +109,35 @@ webservice = undefined
 
 
 proxyProcess :: Server -> Process ()
-proxyProcess (Server _ _ _ _ _ _ proxychan) =  forever $ join $ liftIO $ atomically $ readTChan proxychan
+proxyProcess (Server _ _ _ _ _ _ proxychan mProcessId) =  forever $ join $ liftIO $ atomically $ readTChan proxychan
 
+handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage = undefined
-handleMonitorNotification = undefined
-handleWhereIsReply = undefined
 
+handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
+handleMonitorNotification = undefined
+
+
+handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
+handleWhereIsReply server (WhereIsReply _ (Just pid)) =
+  liftIO $ atomically $ do
+    --clientmap <- readTVar clients
+    -- send our own server info,and request a response:
+    return ()
 topicAllocationEventLoop :: ServerReaderT ()
 topicAllocationEventLoop = do
   (server, backend, profile, serviceName) <- ask
-
-  lift $ spawnLocal (proxyProcess server)
-  forever $
-    lift $
+  lift $ do 
+    let sName = unpack serviceName
+    spawnLocal (proxyProcess server)
+    forever $
       receiveWait
         [ 
-{-        match $ handleRemoteMessage server
+        match $ handleRemoteMessage server
         , match $ handleMonitorNotification server
-        , matchIf (\(WhereIsReply l _) -> l == "chatServer") $
-                  handleWhereIsReply server
--}        
-        matchAny $ \_ -> return ()      -- discard unknown messages
+        , matchIf (\(WhereIsReply l _) -> l == sName) $
+                handleWhereIsReply server
+        , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 
 {- | 
@@ -143,7 +168,7 @@ topicAllocator = do
   lift $ register serviceNameS mypid
   forM_ peers $ \peer -> do
     lift $ whereisRemoteAsync peer serviceNameS
-
+  topicAllocationEventLoop
   return ()
 subscription :: Backend -> (ServiceProfile, Text) -> Process ()
 subscription backend (sP, params) = do
