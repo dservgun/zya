@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Zya.Utils.DistribUtils ( distribMain ) where
 
 import Control.Distributed.Process

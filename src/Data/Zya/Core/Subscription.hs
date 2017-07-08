@@ -1,30 +1,32 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Data.Zya.Core.Subscription where
-import Data.Text(pack, unpack, Text)
-import Data.Monoid((<>))
+
 import GHC.Generics (Generic)
-import Data.Binary
-import Data.Typeable
-import Data.Time(UTCTime, getCurrentTime)
 import System.Environment(getArgs)
-import Control.Distributed.Process
+
 import Control.Concurrent.STM
+import Control.Applicative((<$>))
+import Control.Exception
+
+import Control.Monad
+import Control.Monad.Catch
+import Control.Monad.Trans
+import Control.Monad.Reader
+
+import Control.Distributed.Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
-import Control.Applicative((<$>))
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.Trans
-import Control.Exception
+import Data.Binary
 import Data.Data
+import Data.Monoid((<>))
+import Data.Text(pack, unpack, Text)
+import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
-import Control.Monad.Reader
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+
 
 
 
@@ -83,15 +85,14 @@ type Topic = Text
 type Location = Integer
 type ErrorCode = Text
 
-data Message = Message (UTCTime, Text) deriving (Typeable, Show)
-data Error =  Error (ErrorCode, Text) deriving (Typeable, Show) 
+newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
+newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show) 
 instance Exception Error
 
-data StartUpException = StartUpException Text deriving (Typeable, Show)
+newtype StartUpException = StartUpException Text deriving (Typeable, Show)
 instance Exception StartUpException
 subscriptionService :: String -> Process () 
-subscriptionService aPort = do 
-  return ()
+subscriptionService aPort = return ()
 
 type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, ServiceName) Process
 
@@ -166,8 +167,7 @@ topicAllocator = do
   let peers = filter (/= mynode) peers0
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid
-  forM_ peers $ \peer -> do
-    lift $ whereisRemoteAsync peer serviceNameS
+  forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   topicAllocationEventLoop
   return ()
 subscription :: Backend -> (ServiceProfile, Text) -> Process ()
@@ -193,7 +193,7 @@ parseArgs = do
       "Database" -> (DatabaseServer, params, portNumber) 
       "Webserver" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
-      _  -> throw $ StartUpException $ pack $ "Invalid arguments " <> (serviceName) <> ":" <> lparams
+      _  -> throw $ StartUpException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
 
 remotable ['subscriptionService]
 
