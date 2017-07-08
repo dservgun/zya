@@ -30,9 +30,6 @@ import Data.Zya.Core.Service
 
 
 
-
-
-
 --------------Application types ---
 type CommitOffset = Integer 
 data User = User {
@@ -110,7 +107,8 @@ webservice = undefined
 
 
 proxyProcess :: Server -> Process ()
-proxyProcess (Server _ _ _ _ _ _ proxychan mProcessId) =  forever $ join $ liftIO $ atomically $ readTChan proxychan
+proxyProcess server 
+  =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage = undefined
@@ -131,6 +129,11 @@ topicAllocationEventLoop = do
   lift $ do 
     let sName = unpack serviceName
     spawnLocal (proxyProcess server)
+    liftIO $ atomically $ do 
+      selfPid <- readTVar $ myProcessId server
+      case selfPid of 
+        Just x -> updateTopicAllocator server x TopicAllocator
+        Nothing -> return ()
     forever $
       receiveWait
         [ 
@@ -162,12 +165,12 @@ topicAllocator = do
   -- Convert a text to string.
   let serviceNameS = unpack serviceName
   mynode <- lift getSelfNode
-  pid <- lift getSelfPid
   peers0 <- liftIO $ findPeers backend 1000000
   let peers = filter (/= mynode) peers0
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
+  liftIO $ atomically $ updateSelfPid server mypid
   topicAllocationEventLoop
   return ()
 subscription :: Backend -> (ServiceProfile, Text) -> Process ()
@@ -195,8 +198,12 @@ parseArgs = do
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       _  -> throw $ StartUpException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
 
+
 remotable ['subscriptionService]
 
+
+simpleBackend :: String -> String -> IO Backend 
+simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
 cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
 cloudEntryPoint backend (sP, sName) = do
@@ -207,6 +214,5 @@ cloudEntryPoint backend (sP, sName) = do
 cloudMain :: IO () 
 cloudMain = do 
  (sProfile, sName, aPort) <- parseArgs
- backend <- initializeBackend "localhost" aPort
-                              ( __remoteTable initRemoteTable)
+ backend <- simpleBackend "localhost" aPort
  cloudEntryPoint backend (sProfile, sName)

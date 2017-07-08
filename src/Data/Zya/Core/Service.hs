@@ -5,7 +5,14 @@ module Data.Zya.Core.Service
         ServiceProfile(..)
         -- New server
         , newServer
-        , Server(..) -- todo: How to deal with exposing types..need to review rwh.
+        , Server
+        , proxyChannel
+        , myProcessId
+        , updateTopicAllocator
+        , updateSelfPid
+        , remoteProcesses
+        , defaultSimpleConfiguration
+        , isSingleton
 
     )
 where 
@@ -45,10 +52,18 @@ data Server = Server {
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
-    , proxyChannel :: TChan(Process())
-    , myProcessId :: TVar (Maybe ProcessId)
+    , _proxyChannel :: TChan(Process())
+    , _myProcessId :: TVar (Maybe ProcessId)
 }
 
+updateSelfPid :: Server -> ProcessId -> STM () 
+updateSelfPid server processId = writeTVar (myProcessId server) (Just processId)
+
+proxyChannel :: Server -> TChan(Process()) 
+proxyChannel = proxyChannel
+
+myProcessId :: Server -> TVar (Maybe ProcessId) 
+myProcessId = _myProcessId
 newServer :: Process Server 
 newServer =  
     liftIO $ do 
@@ -67,12 +82,23 @@ newServer =
             , remoteWriters = remoteWriterMap
             , services = serviceMap 
             , statistics = statistics
-            , proxyChannel = proxyChannel
-            , myProcessId = initProcessId 
+            , _proxyChannel = proxyChannel
+            , _myProcessId = initProcessId 
         }
 
 
 
+{- | Update the service map with the topic allocator. We really need a reliable 
+   | consensus to deal with this class of problems.
+-}
+updateTopicAllocator :: Server -> ProcessId -> ServiceProfile -> STM () 
+updateTopicAllocator server processId TopicAllocator = do 
+  lServices <- readTVar $ services server 
+  let nElement = ((processId, TopicAllocator), 1)
+  let updateServices = uncurry Map.insert nElement lServices
+  -- Clever code alert: though, using flip takes away the need to 
+  -- parenthesize.
+  flip writeTVar updateServices $ services server
 
 {- | 
   Given a service profile, return the count of services and the ProcessId for the service.
@@ -120,7 +146,7 @@ data ServiceProfile =
     | Reader 
     | Writer 
     | TopicAllocator
-    deriving(Show, Generic, Typeable, Eq)
+    deriving(Show, Generic, Typeable, Eq, Ord)
 
 instance Binary ServiceProfile
 
