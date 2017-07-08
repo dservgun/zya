@@ -76,9 +76,14 @@ newServer =
 
 {- | 
   Given a service profile, return the count of services and the ProcessId for the service.
-
 -}
 queryService :: Server -> ServiceProfile -> STM[(ProcessId, ServiceProfile, Integer)]
+queryService server aProfile = do 
+  services <- readTVar $ services server 
+  let result = List.filter (\((x, y), z) -> y == aProfile) $ Map.assocs services
+  let r = List.map (\((x, y), z) -> (x, y, z)) result
+  return r
+
 {- | 
   Merge all the remote processes collecting ` remoteClients `
   `remoteWriters` and `services`. The remote client list 
@@ -115,7 +120,7 @@ data ServiceProfile =
     | Reader 
     | Writer 
     | TopicAllocator
-    deriving(Show, Generic, Typeable)
+    deriving(Show, Generic, Typeable, Eq)
 
 instance Binary ServiceProfile
 
