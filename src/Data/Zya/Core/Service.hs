@@ -5,6 +5,7 @@ module Data.Zya.Core.Service
         ServiceProfile(..)
         -- New server
         , newServer
+        , newServerIO
         , Server
         , proxyChannel
         , myProcessId
@@ -64,27 +65,31 @@ proxyChannel = proxyChannel
 
 myProcessId :: Server -> TVar (Maybe ProcessId) 
 myProcessId = _myProcessId
+
+newServerIO :: IO Server 
+newServerIO = do
+    localClients <- newTVarIO Map.empty
+    remoteClientMap <- newTVarIO Map.empty
+    localWriterMap <- newTVarIO Map.empty 
+    remoteWriterMap <- newTVarIO Map.empty
+    serviceMap <- newTVarIO Map.empty
+    statistics <- newTVarIO Map.empty
+    proxyChannel <- newTChanIO
+    initProcessId <- newTVarIO Nothing
+    return Server {
+        localClients = localClients
+        , remoteClients = remoteClientMap 
+        , localWriters = localWriterMap 
+        , remoteWriters = remoteWriterMap
+        , services = serviceMap 
+        , statistics = statistics
+        , _proxyChannel = proxyChannel
+        , _myProcessId = initProcessId 
+    }
 newServer :: Process Server 
 newServer =  
-    liftIO $ do 
-        localClients <- newTVarIO Map.empty
-        remoteClientMap <- newTVarIO Map.empty
-        localWriterMap <- newTVarIO Map.empty 
-        remoteWriterMap <- newTVarIO Map.empty
-        serviceMap <- newTVarIO Map.empty
-        statistics <- newTVarIO Map.empty
-        proxyChannel <- newTChanIO
-        initProcessId <- newTVarIO Nothing
-        return Server {
-            localClients = localClients
-            , remoteClients = remoteClientMap 
-            , localWriters = localWriterMap 
-            , remoteWriters = remoteWriterMap
-            , services = serviceMap 
-            , statistics = statistics
-            , _proxyChannel = proxyChannel
-            , _myProcessId = initProcessId 
-        }
+    liftIO newServerIO
+
 
 
 

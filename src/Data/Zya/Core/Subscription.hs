@@ -173,10 +173,10 @@ topicAllocator = do
   liftIO $ atomically $ updateSelfPid server mypid
   topicAllocationEventLoop
   return ()
-subscription :: Backend -> (ServiceProfile, Text) -> Process ()
-subscription backend (sP, params) = do
-  newServer <- newServer
+subscription :: Backend -> (ServiceProfile, Text) -> Server -> Process ()
+subscription backend (sP, params) newServer = do
   let readerParams = (newServer, backend, sP, params) 
+  say $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
     Writer -> runReaderT writerService readerParams
     Reader -> runReaderT readerService readerParams
@@ -205,14 +205,16 @@ remotable ['subscriptionService]
 simpleBackend :: String -> String -> IO Backend 
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
-cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
-cloudEntryPoint backend (sP, sName) = do
+-- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
+cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> Server -> IO ()
+cloudEntryPoint backend (sP, sName) server = do
   node <- newLocalNode backend 
-  Node.runProcess node (subscription backend (sP, sName))
+  Node.runProcess node (subscription backend (sP, sName) server)
 
 
 cloudMain :: IO () 
 cloudMain = do 
  (sProfile, sName, aPort) <- parseArgs
  backend <- simpleBackend "localhost" aPort
- cloudEntryPoint backend (sProfile, sName)
+ server <- newServerIO
+ cloudEntryPoint backend (sProfile, sName) server
