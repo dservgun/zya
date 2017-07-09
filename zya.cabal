@@ -52,7 +52,9 @@ library
   exposed-modules: 
     Data.Zya.Core.Subscription
     Data.Zya.Core.Service
-  
+    Data.Zya.Core.ServiceTypes
+    Data.Zya.Core.TopicAllocator  
+    Data.Zya.Core.TopicCreator
   -- Modules included in this library but not exported.
   -- other-modules:       
   
