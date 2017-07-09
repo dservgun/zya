@@ -27,6 +27,8 @@ import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
 
+import Text.Printf
+
 
 
 
@@ -64,7 +66,7 @@ data PMessage
   | MsgSend               Subscribe Text -- make this json.
   | ServiceAvailable ServiceProfile ProcessId -- Announce that the service is available on the said process id.
   | TerminateProcess Text
-  deriving (Typeable, Generic)
+  deriving (Typeable, Generic, Show)
 
 instance Binary Login 
 instance Binary OpenIdProvider
@@ -112,10 +114,12 @@ proxyProcess server
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
-handleRemoteMessage = undefined
+handleRemoteMessage server aMessage = 
+  say $ printf ("Received message " <> (show aMessage))
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification = undefined
+handleMonitorNotification server notificationMessage = 
+  say $ printf ("Monitor notification " <> (show notificationMessage))
 
 
 handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
@@ -130,11 +134,15 @@ topicAllocationEventLoop = do
   lift $ do 
     let sName = unpack serviceName
     spawnLocal (proxyProcess server)
+    say $ 
+      printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
+        (show profile) 
     liftIO $ atomically $ do 
       selfPid <- readTVar $ myProcessId server
       case selfPid of 
         Just x -> updateTopicAllocator server x TopicAllocator
         Nothing -> return ()
+
     forever $
       receiveWait
         [ 
@@ -152,7 +160,7 @@ topicAllocationEventLoop = do
   that listens to the any peers announcing themselves as allocators. If there is a 
   conflict, the allocator will switch itself as a backup and publish a message 
   announcing that. Will this work? 
-  Note about failure and reliability: there is probably a need to implemmenting
+  Note about failure and reliability: there is probably a need to implementing
   some form of consensus : raft seems the less daunting option. Implement the 
   c-interface to a reference implementation or complete the implementation using
   CH convenience functions. In our current implementation, we will skip this to 
@@ -183,6 +191,7 @@ terminator = do
   (server, backend, profile, serviceName) <- ask
   remoteProcesses <- liftIO $ atomically $ remoteProcesses server
   lift $ do
+    say $ printf "Terminator %s %s " (show profile) (show serviceName)
     forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
@@ -191,7 +200,7 @@ subscription :: Backend -> (ServiceProfile, Text) -> Process ()
 subscription backend (sP, params) = do
   n <- newServer -- shadowing the one from io
   let readerParams = (n, backend, sP, params) 
-  say $ "Starting subscrpition " <> (show sP) <> (show params)
+  say $ printf $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
     Writer -> runReaderT writerService readerParams
     Reader -> runReaderT readerService readerParams
