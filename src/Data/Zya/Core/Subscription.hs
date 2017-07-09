@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.Subscription where
 
 import GHC.Generics (Generic)
@@ -63,6 +63,7 @@ data PMessage
   = MsgServerInfo         Bool ProcessId [Subscribe]
   | MsgSend               Subscribe Text -- make this json.
   | ServiceAvailable ServiceProfile ProcessId -- Announce that the service is available on the said process id.
+  | TerminateProcess Text
   deriving (Typeable, Generic)
 
 instance Binary Login 
@@ -170,12 +171,26 @@ topicAllocator = do
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
-  liftIO $ atomically $ updateSelfPid server mypid
+  liftIO $ atomically $ do 
+    updateSelfPid server mypid
+    updateTopicAllocator server mypid TopicAllocator
   topicAllocationEventLoop
   return ()
-subscription :: Backend -> (ServiceProfile, Text) -> Server -> Process ()
-subscription backend (sP, params) newServer = do
-  let readerParams = (newServer, backend, sP, params) 
+
+{- | Terminate all processes calling exit on each -}
+terminator :: ServerReaderT () 
+terminator = do 
+  (server, backend, profile, serviceName) <- ask
+  remoteProcesses <- liftIO $ atomically $ remoteProcesses server
+  lift $ do
+    forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
+    pid <- getSelfPid -- the state is not update in the terminator, at least for now.
+    exit pid $ TerminateProcess "Shutting down self"
+
+subscription :: Backend -> (ServiceProfile, Text) -> Process ()
+subscription backend (sP, params) = do
+  n <- newServer -- shadowing the one from io
+  let readerParams = (n, backend, sP, params) 
   say $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
     Writer -> runReaderT writerService readerParams
@@ -183,6 +198,7 @@ subscription backend (sP, params) newServer = do
     DatabaseServer -> runReaderT databaseService readerParams
     WebServer ->  runReaderT webservice readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
+    Terminator -> runReaderT terminator readerParams
 
 
 parseArgs :: IO (ServiceProfile, Text, String)
@@ -196,6 +212,7 @@ parseArgs = do
       "Database" -> (DatabaseServer, params, portNumber) 
       "Webserver" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
+      "Terminator" -> (Terminator, params, portNumber)
       _  -> throw $ StartUpException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
 
 
@@ -206,15 +223,14 @@ simpleBackend :: String -> String -> IO Backend
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
-cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> Server -> IO ()
-cloudEntryPoint backend (sP, sName) server = do
+cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
+cloudEntryPoint backend (sP, sName)= do
   node <- newLocalNode backend 
-  Node.runProcess node (subscription backend (sP, sName) server)
+  Node.runProcess node (subscription backend (sP, sName))
 
 
 cloudMain :: IO () 
 cloudMain = do 
  (sProfile, sName, aPort) <- parseArgs
  backend <- simpleBackend "localhost" aPort
- server <- newServerIO
- cloudEntryPoint backend (sProfile, sName) server
+ cloudEntryPoint backend (sProfile, sName)

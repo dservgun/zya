@@ -151,6 +151,7 @@ data ServiceProfile =
     | Reader 
     | Writer 
     | TopicAllocator
+    | Terminator
     deriving(Show, Generic, Typeable, Eq, Ord)
 
 instance Binary ServiceProfile
