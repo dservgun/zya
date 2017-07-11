@@ -69,6 +69,7 @@ data PMessage
   | MsgSend               Subscribe Text -- make this json.
   | ServiceAvailable ServiceProfile ProcessId -- Announce that the service is available on the said process id.
   | TerminateProcess Text
+  | CreateTopic Text 
   deriving (Typeable, Generic, Show)
 
 instance Binary Login 
@@ -98,3 +99,7 @@ subscriptionService :: String -> Process ()
 subscriptionService aPort = return ()
 
 type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, ServiceName) Process
+
+
+sendRemote :: Server -> ProcessId -> PMessage -> STM ()
+sendRemote aServer pid pmsg = writeTChan (proxyChannel aServer) (send pid pmsg)

@@ -14,6 +14,7 @@ module Data.Zya.Core.Service
         , remoteProcesses
         , defaultSimpleConfiguration
         , isSingleton
+        , findAvailableWriter
 
     )
 where 
@@ -61,7 +62,7 @@ updateSelfPid :: Server -> ProcessId -> STM ()
 updateSelfPid server processId = writeTVar (myProcessId server) (Just processId)
 
 proxyChannel :: Server -> TChan(Process()) 
-proxyChannel = proxyChannel
+proxyChannel = _proxyChannel
 
 myProcessId :: Server -> TVar (Maybe ProcessId) 
 myProcessId = _myProcessId
@@ -163,3 +164,15 @@ instance Binary ServiceProfile
 isSingleton :: ServiceProfile -> Bool
 isSingleton TopicAllocator = True
 isSingleton _ = False
+
+{- | Find an available writer or return None. Find the first writer
+  , though find the one with the least number of topics or messages or both.
+-}
+findAvailableWriter :: Server -> STM (Maybe ProcessId)
+findAvailableWriter server = do 
+  writers <- readTVar $ remoteClients server 
+  let keys = Map.keys writers 
+  return $ 
+    case keys of
+      h : t -> Just $ fst h
+      _ ->  Nothing

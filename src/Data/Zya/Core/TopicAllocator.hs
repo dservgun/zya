@@ -38,9 +38,19 @@ proxyProcess :: Server -> Process ()
 proxyProcess server 
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
 
+
+
 handleRemoteMessage :: Server -> PMessage -> Process ()
-handleRemoteMessage server aMessage = 
+handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
+  -- Check for writers and then send a message to the writer.
+  availableWriter <- liftIO $ atomically $ findAvailableWriter server 
+  case availableWriter of
+    Just a -> liftIO $ atomically $ sendRemote server a aMessage
+    Nothing -> say $ printf $
+                      "No writer found. Dropping this message " <> (show aMessage)
+handleRemoteMessage server unhandledMessage = 
+  say $ printf ("Received unhandled message  " <> (show unhandledMessage))
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage = 
@@ -109,6 +119,6 @@ topicAllocator = do
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   liftIO $ atomically $ do 
     updateSelfPid server mypid
-    updateTopicAllocator server mypid TopicAllocator
+    updateTopicAllocator server mypid TopicAllocator    
   topicAllocationEventLoop
   return ()

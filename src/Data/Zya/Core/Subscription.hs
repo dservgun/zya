@@ -121,5 +121,5 @@ cloudEntryPoint backend (sP, sName)= do
 cloudMain :: IO () 
 cloudMain = do 
  (sProfile, sName, aPort) <- parseArgs
- backend <- simpleBackend "localhost" aPort
+ backend <- simpleBackend "127.0.0.1" aPort
  cloudEntryPoint backend (sProfile, sName)
