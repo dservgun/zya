@@ -1,6 +1,22 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
-module Data.Zya.Core.ServiceTypes where
+module Data.Zya.Core.ServiceTypes(
+    -- * server reader 
+    ServerReaderT
+    -- * Message types.
+    , PMessage(..)
+    -- ** Some constants.
+    , peerTimeout
+    -- * Sending and receiving messages
+    , sendRemote
+    -- * Initializing the cloud process
+    , initializeProcess
+    , subscriptionService
+    , ServiceName
+    -- ** Exceptions and constructors
+    , StartUpException
+    , startupException
+  ) where
 
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
@@ -95,11 +111,29 @@ instance Exception Error
 
 newtype StartUpException = StartUpException Text deriving (Typeable, Show)
 instance Exception StartUpException
-subscriptionService :: String -> Process () 
-subscriptionService aPort = return ()
+
+startupException :: Text -> StartUpException
+startupException = StartUpException
 
 type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, ServiceName) Process
 
+subscriptionService :: String -> Process () 
+subscriptionService aPort = return ()
 
 sendRemote :: Server -> ProcessId -> PMessage -> STM ()
 sendRemote aServer pid pmsg = writeTChan (proxyChannel aServer) (send pid pmsg)
+
+initializeProcess :: ServerReaderT()
+initializeProcess = do 
+  (server, backend, profile, serviceName) <- ask
+  let serviceNameS = unpack serviceName
+  mynode <- lift getSelfNode
+  peers0 <- liftIO $ findPeers backend peerTimeout
+  let peers = filter (/= mynode) peers0
+  mypid <- lift getSelfPid
+  lift $ register serviceNameS mypid
+  forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
+  liftIO $ atomically $ do 
+    updateMyPid server mypid
+
+

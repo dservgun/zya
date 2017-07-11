@@ -102,7 +102,7 @@ parseArgs = do
       "Webserver" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)
-      _  -> throw $ StartUpException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
+      _  -> throw $ startupException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
 
 
 remotable ['subscriptionService]

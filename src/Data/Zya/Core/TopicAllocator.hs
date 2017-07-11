@@ -76,10 +76,7 @@ topicAllocationEventLoop = do
         (show profile) 
     liftIO $ atomically $ do 
       selfPid <- readTVar $ myProcessId server
-      case selfPid of 
-        Just x -> updateTopicAllocator server x TopicAllocator
-        Nothing -> return ()
-
+      updateTopicAllocator server selfPid TopicAllocator
     forever $
       receiveWait
         [ 
@@ -109,16 +106,9 @@ topicAllocationEventLoop = do
 topicAllocator :: ServerReaderT ()
 topicAllocator = do 
   (server, backend, profile, serviceName) <- ask
-  -- Convert a text to string.
-  let serviceNameS = unpack serviceName
-  mynode <- lift getSelfNode
-  peers0 <- liftIO $ findPeers backend peerTimeout
-  let peers = filter (/= mynode) peers0
-  mypid <- lift getSelfPid
-  lift $ register serviceNameS mypid
-  forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
+  myPid <- liftIO $ atomically $ getMyPid server  
+  initializeProcess 
   liftIO $ atomically $ do 
-    updateSelfPid server mypid
-    updateTopicAllocator server mypid TopicAllocator    
+    updateTopicAllocator server myPid TopicAllocator    
   topicAllocationEventLoop
   return ()

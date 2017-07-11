@@ -10,25 +10,26 @@ module Data.Zya.Core.Service
         , proxyChannel
         , myProcessId
         , updateTopicAllocator
-        , updateSelfPid
+        , updateMyPid
         , remoteProcesses
         , defaultSimpleConfiguration
         , isSingleton
         , findAvailableWriter
-
+        , getMyPid
     )
 where 
 import Data.Monoid((<>))
 import Data.Map as Map
 import Data.List as List
 import Control.Monad
+import Control.Monad.Reader
 import Control.Concurrent.STM
 import Control.Distributed.Process
 import Data.Text 
+import Text.Printf
 import GHC.Generics (Generic)
 import Data.Binary
 import Data.Typeable
-
 
 newtype Request = Request {unRequest :: Text} deriving Show 
 newtype Response = Response {unResponse :: Text} deriving Show
@@ -58,8 +59,13 @@ data Server = Server {
     , _myProcessId :: TVar (Maybe ProcessId)
 }
 
-updateSelfPid :: Server -> ProcessId -> STM () 
-updateSelfPid server processId = writeTVar (myProcessId server) (Just processId)
+-- Accessors. TODO: Use lenses. At times, possessives in method names
+-- works.
+getMyPid :: Server -> STM (Maybe ProcessId)
+getMyPid server = readTVar $ myProcessId server
+
+updateMyPid :: Server -> ProcessId -> STM () 
+updateMyPid server processId = writeTVar (myProcessId server) (Just processId)
 
 proxyChannel :: Server -> TChan(Process()) 
 proxyChannel = _proxyChannel
@@ -94,18 +100,19 @@ newServer =
 
 
 
+
 {- | Update the service map with the topic allocator. We really need a reliable 
    | consensus to deal with this class of problems.
 -}
-updateTopicAllocator :: Server -> ProcessId -> ServiceProfile -> STM () 
-updateTopicAllocator server processId TopicAllocator = do 
+updateTopicAllocator :: Server -> Maybe ProcessId -> ServiceProfile -> STM () 
+updateTopicAllocator server (Just processId) TopicAllocator = do 
   lServices <- readTVar $ services server 
   let nElement = ((processId, TopicAllocator), 1)
   let updateServices = uncurry Map.insert nElement lServices
   -- Clever code alert: though, using flip takes away the need to 
   -- parenthesize.
   flip writeTVar updateServices $ services server
-
+updateTopicAllocator server _ _ = return () -- Error, we need to tell it somewhere.
 {- | 
   Given a service profile, return the count of services and the ProcessId for the service.
 -}
@@ -176,3 +183,4 @@ findAvailableWriter server = do
     case keys of
       h : t -> Just $ fst h
       _ ->  Nothing
+
