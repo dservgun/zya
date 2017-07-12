@@ -12,6 +12,7 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 testBackend :: IO Backend
 testBackend = simpleBackend "localhost" "5000"
 
+-- change backend to using inmemory for tests.
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 

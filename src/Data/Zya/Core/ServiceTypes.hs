@@ -16,6 +16,8 @@ module Data.Zya.Core.ServiceTypes(
     -- ** Exceptions and constructors
     , StartUpException
     , startupException
+    -- ** Some utility functions
+    , proxyProcess
   ) where
 
 import GHC.Generics (Generic)
@@ -112,6 +114,8 @@ instance Exception Error
 newtype StartUpException = StartUpException Text deriving (Typeable, Show)
 instance Exception StartUpException
 
+
+
 startupException :: Text -> StartUpException
 startupException = StartUpException
 
@@ -136,4 +140,6 @@ initializeProcess = do
   liftIO $ atomically $ do 
     updateMyPid server mypid
 
-
+proxyProcess :: Server -> Process ()
+proxyProcess server 
+  =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server

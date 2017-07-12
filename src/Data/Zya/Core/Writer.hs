@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
-module Data.Zya.Core.TopicAllocator(
-  -- * The cloud service allocating topics to writers and readers.
-  topicAllocator
+module Data.Zya.Core.Writer(
+  -- * Writers that handle log events
+  writer
   ) where
 
 import GHC.Generics (Generic)
@@ -29,22 +29,15 @@ import Data.Text(pack, unpack, Text)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
-
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
-
 
 
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
-  -- Check for writers and then send a message to the writer.
-  availableWriter <- liftIO $ atomically $ findAvailableWriter server 
-  case availableWriter of
-    Just a -> liftIO $ atomically $ sendRemote server a aMessage
-    Nothing -> say $ printf $
-                      "No writer found. Dropping this message " <> (show aMessage)
+
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
 
@@ -56,13 +49,11 @@ handleMonitorNotification server notificationMessage =
 handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
 handleWhereIsReply server (WhereIsReply _ (Just pid)) =
   liftIO $ atomically $ do
-    --clientmap <- readTVar clients
-    -- send our own server info,and request a response:
     return ()
 
 
-topicAllocationEventLoop :: ServerReaderT ()
-topicAllocationEventLoop = do
+eventLoop :: ServerReaderT ()
+eventLoop = do
   (server, backend, profile, serviceName) <- ask
   lift $ do 
     let sName = unpack serviceName
@@ -83,28 +74,8 @@ topicAllocationEventLoop = do
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 
-{- | 
-  What does the allocator do: 
-  It comes up and updates its local cache with its own
-  process id as an allocator and starts a topic allocator event loop
-  that listens to the any peers announcing themselves as allocators. If there is a 
-  conflict, the allocator will switch itself as a backup and publish a message 
-  announcing that. Will this work? 
-  Note about failure and reliability: there is probably a need to implementing
-  some form of consensus : raft seems the less daunting option. Implement the 
-  c-interface to a reference implementation or complete the implementation using
-  CH convenience functions. In our current implementation, we will skip this to 
-  get a basic understanding of the overall interactions with the system. 
-
--}
-
-
-topicAllocator :: ServerReaderT ()
-topicAllocator = do 
-  (server, backend, profile, serviceName) <- ask
-  initializeProcess 
-  liftIO $ atomically $ do 
-    myPid <- getMyPid server  
-    updateTopicAllocator server myPid TopicAllocator    
-  topicAllocationEventLoop
-  return ()
+writer :: ServerReaderT () 
+writer = do
+  initializeProcess
+  eventLoop
+  return()

@@ -30,7 +30,7 @@ import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
-import Data.Zya.Core.TopicCreator
+import Data.Zya.Core.Writer
 
 writerService :: ServerReaderT ()
 writerService = undefined 
@@ -45,9 +45,6 @@ webservice :: ServerReaderT ()
 webservice = undefined
 
 
-proxyProcess :: Server -> Process ()
-proxyProcess server 
-  =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage = 
