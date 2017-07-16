@@ -33,10 +33,27 @@ import Text.Printf
 import Data.Zya.Core.ServiceTypes
 
 
+-- File path to actually do the logging.
+-- Use conduits.
+rootLocation :: FilePath 
+rootLocation = "./tmp" 
+
+newtype CreateStatus = CreateStatus {_un :: Text}
+
+type MessageT = ReaderT PMessage IO CreateStatus
+createTopic :: MessageT
+createTopic = do 
+  message <- ask
+  -- Insert the topic into persistent store.
+  -- return the status. Send the status to 
+  -- some peers (need to decide that, could be all).
+  return $ CreateStatus $ pack . show $ message
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
+  status <- liftIO $ runReaderT createTopic aMessage
+  return ()
 
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
