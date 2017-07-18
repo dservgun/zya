@@ -59,11 +59,11 @@ createTopic = do
   return $ mapError p
 
 
-handleRemoteMessage :: Server -> PMessage -> Process ()
+handleRemoteMessage :: Server -> PMessage -> Process CreateStatus
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
   status <- liftIO $ runReaderT createTopic (defaultPostgres, aMessage)
-  return ()
+  return status
 
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
