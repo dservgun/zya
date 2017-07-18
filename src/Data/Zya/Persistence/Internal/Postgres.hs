@@ -1,7 +1,6 @@
-module Data.Zya.Persistence.Internal.Postgres 
-	(
-		persist 
-	) where 
+module Data.Zya.Persistence.Internal.Postgres where 
+import Data.Zya.Persistence.PersistZ
 
 
-persist  = undefined
+instance PersistZ DBType where 
+	persistZ = undefined

@@ -31,7 +31,7 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
-import Data.Zya.Persistence.Persistence(DBType, defaultPostgres, persistZ)
+import Data.Zya.Persistence.Persistence(DBType, defaultPostgres, persist)
 
 
 -- File path to actually do the logging.
@@ -42,13 +42,14 @@ rootLocation = "./tmp"
 newtype CreateStatus = CreateStatus {_un :: Text}
 
 type MessageT = ReaderT (DBType, PMessage) IO CreateStatus
+
 createTopic :: MessageT
 createTopic = do 
   (dbType, message) <- ask
   -- Insert the topic into persistent store.
   -- return the status. Send the status to 
   -- some peers (need to decide that, could be all).
-  liftIO $ persistZ dbType message 
+  persist
   return $ CreateStatus $ pack . show $ message
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
