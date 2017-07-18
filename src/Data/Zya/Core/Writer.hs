@@ -43,14 +43,21 @@ newtype CreateStatus = CreateStatus {_un :: Text}
 
 type MessageT = ReaderT (DBType, PMessage) IO CreateStatus
 
+
+{-| Transform the database error into a writer error. -}
+mapError :: Either Text PMessage -> CreateStatus
+mapError (Right e) = CreateStatus success
+mapError (Left e) = CreateStatus e
+
+
 createTopic :: MessageT
 createTopic = do 
-  (dbType, message) <- ask
   -- Insert the topic into persistent store.
   -- return the status. Send the status to 
   -- some peers (need to decide that, could be all).
-  persist
-  return $ CreateStatus $ pack . show $ message
+  p <- persist
+  return $ mapError p
+
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
@@ -99,3 +106,9 @@ writer = do
   initializeProcess
   eventLoop
   return()
+
+
+-- Some synonyms
+
+success :: Text 
+success = "Success"
