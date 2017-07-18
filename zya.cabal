@@ -55,6 +55,9 @@ library
     Data.Zya.Core.ServiceTypes
     Data.Zya.Core.TopicAllocator  
     Data.Zya.Core.Writer
+    Data.Zya.Persistence.Persistence
+    Data.Zya.Persistence.Internal.FileSystem
+    Data.Zya.Persistence.Internal.Postgres
   -- Modules included in this library but not exported.
   -- other-modules:       
   
