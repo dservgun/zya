@@ -41,8 +41,9 @@ rootLocation = "./tmp"
 
 newtype CreateStatus = CreateStatus {_un :: Text}
 
+type RemoteT = ReaderT (Server, PMessage) Process ()
+{-| Internal type for persisting process messages-}
 type MessageT = ReaderT (DBType, PMessage) IO CreateStatus
-
 
 {-| Transform the database error into a writer error. -}
 mapError :: Either Text PMessage -> CreateStatus
@@ -59,11 +60,16 @@ createTopic = do
   return $ mapError p
 
 
-handleRemoteMessage :: Server -> PMessage -> Process CreateStatus
+inform :: CreateStatus -> Process () 
+inform = undefined
+
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
   status <- liftIO $ runReaderT createTopic (defaultPostgres, aMessage)
-  return status
+  -- Check the status and send a success or a failure to a group of 
+  -- listeners: we need to set that up.
+  inform status
+  return ()
 
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
