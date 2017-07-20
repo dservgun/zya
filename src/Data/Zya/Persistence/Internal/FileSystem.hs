@@ -1,5 +1,5 @@
 module Data.Zya.Persistence.Internal.FileSystem 
-	(persist)
+  (persist)
 where
 
 persist = undefined

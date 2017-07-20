@@ -127,11 +127,13 @@ subscriptionService aPort = return ()
 sendRemote :: Server -> ProcessId -> PMessage -> STM ()
 sendRemote aServer pid pmsg = writeTChan (proxyChannel aServer) (send pid pmsg)
 
+
 initializeProcess :: ServerReaderT()
 initializeProcess = do 
   (server, backend, profile, serviceName) <- ask
   let serviceNameS = unpack serviceName
   mynode <- lift getSelfNode
+
   peers0 <- liftIO $ findPeers backend peerTimeout
   let peers = filter (/= mynode) peers0
   mypid <- lift getSelfPid
