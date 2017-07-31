@@ -12,6 +12,10 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 testBackend :: IO Backend
 testBackend = simpleBackend "localhost" "5000"
 
+data Version = [Int] deriving Eq, Ord
+isRecent :: (Eq a, Ord a) => a -> a -> Bool
+isRecent = (<)
+
 -- change backend to using inmemory for tests.
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
