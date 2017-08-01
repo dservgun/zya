@@ -9,6 +9,7 @@ tokens :-
   $white+           ;
   "--".*            ;
   let               {\s -> Let}
+  
 
 
 {
@@ -17,5 +18,5 @@ data Token =  Let  | In deriving(Eq, Show)
 
 
 lexer aString = do 
-  print (alexScanTokens aString)
+  return (alexScanTokens aString)
 }

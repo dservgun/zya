@@ -3,4 +3,4 @@ import Data.Zya.Persistence.PersistZ
 
 
 instance PersistZ DBType where 
-	persistZ = undefined
+  persistZ = undefined
