@@ -31,6 +31,7 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
+import Data.Zya.Persistence.PersistZ
 import Data.Zya.Persistence.Persistence(DBType, defaultPostgres, persist)
 
 
@@ -43,7 +44,7 @@ newtype CreateStatus = CreateStatus {_un :: Text}
 
 type RemoteT = ReaderT (Server, PMessage) Process ()
 {-| Internal type for persisting process messages-}
-type MessageT = ReaderT (DBType, PMessage) IO CreateStatus
+type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 {-| Transform the database error into a writer error. -}
 mapError :: Either Text PMessage -> CreateStatus
@@ -63,9 +64,13 @@ createTopic = do
 inform :: CreateStatus -> Process () 
 inform = undefined
 
+
+debugConnStr :: ConnectionDetails
+debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432"
+
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
-  status <- liftIO $ runReaderT createTopic (defaultPostgres, aMessage)
+  status <- liftIO $ runReaderT createTopic (defaultPostgres, debugConnStr, aMessage)
   -- Check the status and send a success or a failure to a group of 
   -- listeners: we need to set that up.
   inform status

@@ -15,7 +15,7 @@ import Data.Zya.Persistence.Internal.Postgres
   Persist a process message to the appropriate database.
 -}
 
-type MessageT = ReaderT (DBType, PMessage) IO (Either Text PMessage)
+type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO (Either Text PMessage)
 
 persist :: MessageT 
 persist = PersistZ.persistZ 

@@ -40,7 +40,7 @@ import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 import Data.Binary
 import Data.Data
 import Data.Monoid((<>))
-import Data.Text(pack, unpack, Text)
+import Data.Text(pack, unpack, take, Text)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
@@ -88,7 +88,21 @@ data PMessage
   | ServiceAvailable ServiceProfile ProcessId -- Announce that the service is available on the said process id.
   | TerminateProcess Text
   | CreateTopic Text 
-  deriving (Typeable, Generic, Show)
+  deriving (Typeable, Generic)
+
+--MAX_BYTES :: Integer 
+maxBYTES = 10 * 1024 * 1024 * 1024 -- 
+
+trim :: Int -> Text -> Text 
+trim = Data.Text.take
+instance Show PMessage where 
+  show pMessage = 
+      case pMessage of 
+        MsgServerInfo a b l -> printf "MsgServerInfo %s %s %s" (show a) (show b) (show l)
+        MsgSend s t         -> printf "MsgSend %s %s" (show s) (unpack $ trim maxBYTES t)
+        ServiceAvailable s p -> printf "ServiceAvailable %s %s" (show s) (show p) 
+        TerminateProcess s  -> printf "TerminateProcess %s" (show s) 
+        CreateTopic t -> printf "CreateTopic %s" (show . unpack $ trim maxBYTES t)
 
 instance Binary Login 
 instance Binary OpenIdProvider

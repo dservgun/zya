@@ -94,8 +94,7 @@ newServerIO = do
         , _myProcessId = initProcessId 
     }
 newServer :: Process Server 
-newServer =  
-    liftIO newServerIO
+newServer =  liftIO newServerIO
 
 
 
