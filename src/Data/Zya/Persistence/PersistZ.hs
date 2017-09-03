@@ -10,8 +10,9 @@ data DBType = FileSystem | RDBMS DBVendor
 newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
 
 
-defaultPostgres :: DBType 
-defaultPostgres = RDBMS Postgres
+
+defaultDb :: DBType 
+defaultDb = RDBMS Postgres
 
 
 class PersistZ dbType where 

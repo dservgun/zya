@@ -34,12 +34,6 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"]
 
 c8Pack :: String -> ByteString
 c8Pack = Data.ByteString.Char8.pack
-initialize :: ConnectionDetails -> IO ()
-initialize (ConnectionDetails connStr) = do 
-  let c = c8Pack connStr
-  runStderrLoggingT $ withPostgresqlPool c 10 $ \pool -> liftIO $ do
-    flip runSqlPersistMPool pool $ do
-      runMigration migrateAll
 
 instance PersistZ DBType where 
   persistZ = do 

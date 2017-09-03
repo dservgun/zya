@@ -3,6 +3,7 @@
 module Data.Zya.Core.Writer(
   -- * Writers that handle log events
   writer
+  , createTopic
   ) where
 
 import GHC.Generics (Generic)
@@ -32,7 +33,7 @@ import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Persistence.PersistZ
-import Data.Zya.Persistence.Persistence(DBType, defaultPostgres, persist)
+import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
 -- File path to actually do the logging.
@@ -70,7 +71,7 @@ debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug
 
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
-  status <- liftIO $ runReaderT createTopic (defaultPostgres, debugConnStr, aMessage)
+  status <- liftIO $ runReaderT createTopic (defaultDb, debugConnStr, aMessage)
   -- Check the status and send a success or a failure to a group of 
   -- listeners: we need to set that up.
   inform status

@@ -2,7 +2,6 @@
 module Data.Zya.Persistence.Persistence
   (
   DBType
-  , defaultPostgres
   , persist
   ) 
 where
