@@ -31,6 +31,7 @@ import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
+import Data.Zya.Core.Persistence.PersistZ
 
 writerService :: ServerReaderT ()
 writerService = undefined 
@@ -73,9 +74,10 @@ terminator = do
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
 
+
 subscription :: Backend -> (ServiceProfile, Text) -> Process ()
 subscription backend (sP, params) = do
-  n <- newServer -- shadowing the one from io
+  n <- newServer
   let readerParams = (n, backend, sP, params) 
   say $ printf $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
@@ -85,6 +87,21 @@ subscription backend (sP, params) = do
     WebServer ->  runReaderT webservice readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
+
+
+
+
+remotable ['subscriptionService]
+
+
+simpleBackend :: String -> String -> IO Backend 
+simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
+
+-- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
+cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
+cloudEntryPoint backend (sP, sName)= do
+  node <- newLocalNode backend 
+  Node.runProcess node (subscription backend (sP, sName))
 
 
 parseArgs :: IO (ServiceProfile, Text, String)
@@ -100,20 +117,6 @@ parseArgs = do
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)
       _  -> throw $ startupException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
-
-
-remotable ['subscriptionService]
-
-
-simpleBackend :: String -> String -> IO Backend 
-simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
-
--- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
-cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
-cloudEntryPoint backend (sP, sName)= do
-  node <- newLocalNode backend 
-  Node.runProcess node (subscription backend (sP, sName))
-
 
 cloudMain :: IO () 
 cloudMain = do 

@@ -27,6 +27,7 @@ import Control.Concurrent.STM
 import Control.Applicative((<$>))
 import Control.Exception
 
+import Control.Lens
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans
@@ -36,6 +37,7 @@ import Control.Distributed.Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+import Control.Lens
 
 import Data.Binary
 import Data.Data
@@ -44,7 +46,6 @@ import Data.Text(pack, unpack, take, Text)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
-
 import Text.Printf
 
 
@@ -59,7 +60,7 @@ data User = User {
   login :: Login
   , topics :: [(Topic, CommitOffset)]
 } deriving (Show, Typeable, Generic)
-data OpenIdProvider = Google | Yahoo | Facebook | LinkedIn deriving (Show, Typeable, Generic)
+data OpenIdProvider = Google | Facebook | LinkedIn deriving (Show, Typeable, Generic)
 {- | Email needs to be validated. TODO
 -}
 type Email = Text 
@@ -129,11 +130,27 @@ newtype StartUpException = StartUpException Text deriving (Typeable, Show)
 instance Exception StartUpException
 
 
+--- Database types
+data DBVendor = Postgres
+data DBType = FileSystem | RDBMS DBVendor 
+newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
+
+
 
 startupException :: Text -> StartUpException
 startupException = StartUpException
 
-type ServerReaderT = ReaderT (Server, Backend, ServiceProfile, ServiceName) Process
+data ServerConfiguration = ServerConfig{
+   _server :: Server 
+  , _backend :: Backend 
+  , _serviceProfile :: ServiceProfile 
+  , _serviceName :: ServiceName 
+  , _dbType :: DBType 
+  , _connDetails :: ConnectionDetails
+  } 
+
+makeLenses ''ServerConfiguration
+type ServerReaderT = ReaderT ServerConfiguration Process
 
 subscriptionService :: String -> Process () 
 subscriptionService aPort = return ()
@@ -144,8 +161,11 @@ sendRemote aServer pid pmsg = writeTChan (proxyChannel aServer) (send pid pmsg)
 
 initializeProcess :: ServerReaderT()
 initializeProcess = do 
-  (server, backend, profile, serviceName) <- ask
-  let serviceNameS = unpack serviceName
+  serverConfiguration <- ask
+  --(server, backend, profile, serviceName) <- ask
+  let server1 = view server serverConfiguration
+  let serviceName1 = view serviceName serverConfiguration
+  let serviceNameS = unpack serviceName1
   mynode <- lift getSelfNode
 
   peers0 <- liftIO $ findPeers backend peerTimeout
@@ -154,7 +174,7 @@ initializeProcess = do
   lift $ register serviceNameS mypid
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   liftIO $ atomically $ do 
-    updateMyPid server mypid
+    updateMyPid server1 mypid
 
 proxyProcess :: Server -> Process ()
 proxyProcess server 

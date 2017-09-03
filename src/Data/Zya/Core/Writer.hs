@@ -4,6 +4,7 @@ module Data.Zya.Core.Writer(
   -- * Writers that handle log events
   writer
   , createTopic
+  , handleRemoteMessage
   ) where
 
 import GHC.Generics (Generic)

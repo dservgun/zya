@@ -22,6 +22,9 @@ type Version = [Int]
 isRecent :: (Eq a, Ord a) => a -> a -> Bool
 isRecent = (<)
 
+debugConnStr :: ConnectionDetails
+debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432"
+
 -- change backend to using inmemory for tests.
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
@@ -36,7 +39,7 @@ allTests :: TestTree
 allTests = testGroup "Yet another zookeeper tests" [
   testGroup "HUnit tests" [
     testCase "createTopic allocator, shutdown and no exceptions." createTopicTestCase
-    , testCase "log createTopic, save to local database. No exceptions. Cant run as a test case" testMessagePersist]
+    ]
   ]
 
   

@@ -103,8 +103,5 @@ topicAllocator :: ServerReaderT ()
 topicAllocator = do 
   (server, backend, profile, serviceName) <- ask
   initializeProcess 
-  liftIO $ atomically $ do 
-    myPid <- getMyPid server  
-    updateTopicAllocator server myPid TopicAllocator    
   topicAllocationEventLoop
   return ()

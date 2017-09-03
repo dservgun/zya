@@ -4,10 +4,6 @@ import Data.Zya.Core.ServiceTypes
 import Data.Text
 import Data.Bifunctor
 
-data DBVendor = Postgres
-data DBType = FileSystem | RDBMS DBVendor 
--- Name conflict, used to be ConnectionString.
-newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
 
 
 
