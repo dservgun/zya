@@ -34,18 +34,6 @@ import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
 import Data.Zya.Persistence.PersistZ
 
-writerService :: ServerReaderT ()
-writerService = undefined 
-
-readerService :: ServerReaderT ()
-readerService = undefined 
-
-databaseService :: ServerReaderT ()
-databaseService = undefined 
-
-webservice :: ServerReaderT ()
-webservice = undefined
-
 
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
@@ -78,14 +66,15 @@ terminator = do
 
 subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails) -> Process ()
 subscription backend (sP, params, dbType, dbConnection) = do
-  n <- newServer
+  myPid <- getSelfPid
+  n <- newServer myPid
   let readerParams = makeServerConfiguration n backend sP params dbType dbConnection
   say $ printf $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
-    Writer -> runReaderT writerService readerParams
-    Reader -> runReaderT readerService readerParams
-    DatabaseServer -> runReaderT databaseService readerParams
-    WebServer ->  runReaderT webservice readerParams
+    Writer -> runReaderT writer readerParams
+--    Reader -> runReaderT readerService readerParams
+--    DatabaseServer -> runReaderT databaseService readerParams
+--    WebServer ->  runReaderT webservice readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
 

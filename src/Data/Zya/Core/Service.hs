@@ -22,6 +22,7 @@ import Data.Monoid((<>))
 import Data.Map as Map
 import Data.List as List
 import Control.Monad
+import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
 import Control.Concurrent.STM
 import Control.Distributed.Process
@@ -56,25 +57,25 @@ data Server = Server {
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
     , _proxyChannel :: TChan(Process())
-    , _myProcessId :: TVar (Maybe ProcessId)
+    , _myProcessId :: TVar (ProcessId)
 }
 
 -- Accessors. TODO: Use lenses. At times, possessives in method names
 -- works.
-getMyPid :: Server -> STM (Maybe ProcessId)
+getMyPid :: Server -> STM ProcessId
 getMyPid server = readTVar $ myProcessId server
 
 updateMyPid :: Server -> ProcessId -> STM () 
-updateMyPid server processId = writeTVar (myProcessId server) (Just processId)
+updateMyPid server processId = writeTVar (myProcessId server) processId
 
 proxyChannel :: Server -> TChan(Process()) 
 proxyChannel = _proxyChannel
 
-myProcessId :: Server -> TVar (Maybe ProcessId) 
+myProcessId :: Server -> TVar ProcessId
 myProcessId = _myProcessId
 
-newServerIO :: IO Server 
-newServerIO = do
+newServerIO :: ProcessId -> IO Server 
+newServerIO myProcessId = do
     localClients <- newTVarIO Map.empty
     remoteClientMap <- newTVarIO Map.empty
     localWriterMap <- newTVarIO Map.empty 
@@ -82,7 +83,7 @@ newServerIO = do
     serviceMap <- newTVarIO Map.empty
     statistics <- newTVarIO Map.empty
     proxyChannel <- newTChanIO
-    initProcessId <- newTVarIO Nothing
+    initProcessId <- newTVarIO myProcessId
     return Server {
         localClients = localClients
         , remoteClients = remoteClientMap 
@@ -93,8 +94,8 @@ newServerIO = do
         , _proxyChannel = proxyChannel
         , _myProcessId = initProcessId 
     }
-newServer :: Process Server 
-newServer =  liftIO newServerIO
+newServer :: ProcessId -> Process Server 
+newServer =  liftIO . newServerIO
 
 
 
@@ -103,8 +104,8 @@ newServer =  liftIO newServerIO
 {- | Update the service map with the topic allocator. We really need a reliable 
    | consensus to deal with this class of problems.
 -}
-updateTopicAllocator :: Server -> Maybe ProcessId -> ServiceProfile -> STM () 
-updateTopicAllocator server (Just processId) TopicAllocator = do 
+updateTopicAllocator :: Server -> ProcessId -> ServiceProfile -> STM () 
+updateTopicAllocator server processId TopicAllocator = do 
   lServices <- readTVar $ services server 
   let nElement = ((processId, TopicAllocator), 1)
   let updateServices = uncurry Map.insert nElement lServices
@@ -122,25 +123,29 @@ queryService server aProfile = do
   let r = List.map (\((x, y), z) -> (x, y, z)) result
   return r
 
+remoteWriterList :: Server -> MaybeT STM(ProcessId, [ProcessId])
+remoteWriterList server = do
+  processId <- lift $ readTVar $ myProcessId server 
+  remoteWriters <- lift $ readTVar $ remoteWriters server
+  let w = List.map fst $ Map.keys remoteWriters
+  return(processId, w)
 {- | 
   Merge all the remote processes collecting ` remoteClients `
   `remoteWriters` and `services`. The remote client list 
   ought to be a superset of services and writers. 
 -}
-remoteProcesses :: Server -> STM [ProcessId] 
+
+remoteProcesses :: Server -> STM[ProcessId]
 remoteProcesses server = do 
   myProcessId <- readTVar $ myProcessId server
-  case myProcessId of
-      Nothing -> return []
-      Just pyd -> do 
-          remoteClients <- readTVar $ remoteClients server
-          remoteWriters <- readTVar $ remoteWriters server 
-          remoteServices <- readTVar $ services server
-          serviceMap <- readTVar $ services server
-          let result = List.map fst $ Map.keys remoteClients 
-          let r2 = List.map fst $ Map.keys remoteWriters 
-          let r3 = List.map fst $ Map.keys serviceMap
-          return $ List.filter (/= pyd) $ result <> r2 <> r3
+  remoteClients <- readTVar $ remoteClients server
+  remoteWriters <- readTVar $ remoteWriters server 
+  remoteServices <- readTVar $ services server
+  serviceMap <- readTVar $ services server
+  let result = List.map fst $ Map.keys remoteClients 
+  let r2 = List.map fst $ Map.keys remoteWriters 
+  let r3 = List.map fst $ Map.keys serviceMap
+  return $ List.filter (/= myProcessId) $ result <> r2 <> r3
 
 type ServiceRange = (Int, Int) 
 

@@ -72,12 +72,12 @@ topicAllocationEventLoop = do
   let profile = view serviceProfile serverConfiguration
   lift $ do 
     let sName = serviceNameS
+    selfPid <- getSelfPid
     spawnLocal (proxyProcess server1)
     say $ 
       printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
         (show (profile :: ServiceProfile)) 
     liftIO $ atomically $ do 
-      selfPid <- readTVar $ myProcessId server1
       updateTopicAllocator server1 selfPid TopicAllocator
     forever $
       receiveWait

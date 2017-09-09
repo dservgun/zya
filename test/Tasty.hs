@@ -30,6 +30,7 @@ createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
   ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA", RDBMS Postgresql, debugConnStr) 
+  writer <- async $ cloudEntryPoint test (Writer, "testZYA", RDBMS Postgresql, debugConnStr)
   threadDelay (10 ^ 6 * 3) -- add a delay
   tb <- async $ cloudEntryPoint test (Terminator, "testZYA", RDBMS Postgresql, debugConnStr)
   wait tb
