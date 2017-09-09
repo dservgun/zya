@@ -18,6 +18,14 @@ module Data.Zya.Core.ServiceTypes(
     , startupException
     -- ** Some utility functions
     , proxyProcess
+    -- * Database constants
+    , DBType(..)
+    , ConnectionDetails(..)
+    , DBVendor(..)
+    -- * Server configuration 
+    , ServerConfiguration
+    , server, backend, serviceProfile  
+    , serviceName, dbType, connDetails
   ) where
 
 import GHC.Generics (Generic)
@@ -166,9 +174,10 @@ initializeProcess = do
   let server1 = view server serverConfiguration
   let serviceName1 = view serviceName serverConfiguration
   let serviceNameS = unpack serviceName1
+  let backendl = view backend serverConfiguration
   mynode <- lift getSelfNode
 
-  peers0 <- liftIO $ findPeers backend peerTimeout
+  peers0 <- liftIO $ findPeers backendl peerTimeout
   let peers = filter (/= mynode) peers0
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid

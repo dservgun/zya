@@ -31,7 +31,7 @@ import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
-import Data.Zya.Core.Persistence.PersistZ
+import Data.Zya.Persistence.PersistZ
 
 writerService :: ServerReaderT ()
 writerService = undefined 
@@ -66,8 +66,8 @@ handleWhereIsReply server (WhereIsReply _ (Just pid)) =
 {- | Terminate all processes calling exit on each -}
 terminator :: ServerReaderT () 
 terminator = do 
-  (server, backend, profile, serviceName) <- ask
-  remoteProcesses <- liftIO $ atomically $ remoteProcesses server
+  serverConfiguration <- ask
+  remoteProcesses <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
   lift $ do
     say $ printf "Terminator %s %s " (show profile) (show serviceName)
     forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"

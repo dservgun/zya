@@ -10,6 +10,7 @@ import Data.Zya.Core.ServiceTypes(PMessage)
 import Data.Zya.Persistence.PersistZ as PersistZ
 import Control.Monad.Reader
 import Data.Zya.Persistence.Internal.Postgres
+import Data.Zya.Core.ServiceTypes
 {- | 
   Persist a process message to the appropriate database.
 -}

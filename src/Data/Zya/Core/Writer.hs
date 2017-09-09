@@ -14,6 +14,7 @@ import Control.Concurrent.STM
 import Control.Applicative((<$>))
 import Control.Exception
 
+import Control.Lens
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans
@@ -94,23 +95,25 @@ handleWhereIsReply server (WhereIsReply _ (Just pid)) =
 
 eventLoop :: ServerReaderT ()
 eventLoop = do
-  (server, backend, profile, serviceName) <- ask
+  serverConfiguration <- ask
   lift $ do 
-    let sName = unpack serviceName
-    spawnLocal (proxyProcess server)
+    let sName = unpack $ serverConfiguration^.serviceName
+    let serverL = serverConfiguration^.server 
+    let profileL = serverConfiguration^.serviceProfile
+    spawnLocal (proxyProcess serverL)
     say $ 
       printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
-        (show profile) 
+        (show profileL) 
     liftIO $ atomically $ do 
-      selfPid <- readTVar $ myProcessId server
-      updateTopicAllocator server selfPid TopicAllocator
+      selfPid <- readTVar $ myProcessId serverL
+      updateTopicAllocator serverL selfPid TopicAllocator
     forever $
       receiveWait
         [ 
-        match $ handleRemoteMessage server
-        , match $ handleMonitorNotification server
+        match $ handleRemoteMessage serverL
+        , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
-                handleWhereIsReply server
+                handleWhereIsReply serverL
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 
