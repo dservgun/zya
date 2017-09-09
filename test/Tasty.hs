@@ -29,9 +29,9 @@ debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
-  ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA") 
+  ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA", RDBMS Postgresql, debugConnStr) 
   threadDelay (10 ^ 6 * 3) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, "testZYA")
+  tb <- async $ cloudEntryPoint test (Terminator, "testZYA", RDBMS Postgresql, debugConnStr)
   wait tb
 
 

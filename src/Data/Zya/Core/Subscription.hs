@@ -9,6 +9,7 @@ import Control.Concurrent.STM
 import Control.Applicative((<$>))
 import Control.Exception
 
+import Control.Lens
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans
@@ -69,16 +70,16 @@ terminator = do
   serverConfiguration <- ask
   remoteProcesses <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
   lift $ do
-    say $ printf "Terminator %s %s " (show profile) (show serviceName)
+    say $ printf "Terminator %s %s " (show $ serverConfiguration^.serviceProfile) (show $ serverConfiguration^.serviceName)
     forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
 
 
-subscription :: Backend -> (ServiceProfile, Text) -> Process ()
-subscription backend (sP, params) = do
+subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails) -> Process ()
+subscription backend (sP, params, dbType, dbConnection) = do
   n <- newServer
-  let readerParams = (n, backend, sP, params) 
+  let readerParams = makeServerConfiguration n backend sP params dbType dbConnection
   say $ printf $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
     Writer -> runReaderT writerService readerParams
@@ -98,10 +99,10 @@ simpleBackend :: String -> String -> IO Backend
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
-cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName) -> IO ()
-cloudEntryPoint backend (sP, sName)= do
+cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName, DBType, ConnectionDetails) -> IO ()
+cloudEntryPoint backend (sP, sName, dbType, connectionDetails)= do
   node <- newLocalNode backend 
-  Node.runProcess node (subscription backend (sP, sName))
+  Node.runProcess node (subscription backend (sP, sName, dbType, connectionDetails))
 
 
 parseArgs :: IO (ServiceProfile, Text, String)
@@ -122,4 +123,6 @@ cloudMain :: IO ()
 cloudMain = do 
  (sProfile, sName, aPort) <- parseArgs
  backend <- simpleBackend "127.0.0.1" aPort
- cloudEntryPoint backend (sProfile, sName)
+ let dbType = RDBMS Postgresql
+ let connectionDetails = ConnectionDetails "this connection wont work"
+ cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails)

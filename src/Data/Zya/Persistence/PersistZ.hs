@@ -8,7 +8,7 @@ import Data.Bifunctor
 
 
 defaultDb :: DBType 
-defaultDb = RDBMS Postgres
+defaultDb = RDBMS Postgresql
 
 
 class PersistZ dbType where 

@@ -26,6 +26,7 @@ module Data.Zya.Core.ServiceTypes(
     , ServerConfiguration
     , server, backend, serviceProfile  
     , serviceName, dbType, connDetails
+    , makeServerConfiguration
   ) where
 
 import GHC.Generics (Generic)
@@ -139,7 +140,7 @@ instance Exception StartUpException
 
 
 --- Database types
-data DBVendor = Postgres
+data DBVendor = Postgresql
 data DBType = FileSystem | RDBMS DBVendor 
 newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
 
@@ -160,6 +161,8 @@ data ServerConfiguration = ServerConfig{
 makeLenses ''ServerConfiguration
 type ServerReaderT = ReaderT ServerConfiguration Process
 
+makeServerConfiguration :: Server -> Backend -> ServiceProfile -> ServiceName -> DBType -> ConnectionDetails -> ServerConfiguration
+makeServerConfiguration s b sp sName db cd = ServerConfig s b sp sName db cd
 subscriptionService :: String -> Process () 
 subscriptionService aPort = return ()
 
