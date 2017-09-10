@@ -16,6 +16,8 @@ module Data.Zya.Core.Service
         , isSingleton
         , findAvailableWriter
         , getMyPid
+        -- * Update maps 
+        , removeProcess
     )
 where 
 import Data.Monoid((<>))
@@ -34,12 +36,12 @@ import Data.Typeable
 
 newtype Request = Request {unRequest :: Text} deriving Show 
 newtype Response = Response {unResponse :: Text} deriving Show
-newtype ClientIdentifier = ClientIdentifier {unClid :: Text} deriving (Show)
-newtype Topic = Topic {unTopic :: Text} deriving Show
+newtype ClientIdentifier = ClientIdentifier {unClid :: Text} deriving (Show, Ord, Eq)
+newtype Topic = Topic {unTopic :: Text} deriving (Show, Ord, Eq)
 data ClientState = ClientState {
     topic :: Topic
     , readPos :: Integer
-}
+} deriving(Show, Ord, Eq)
 
 {- | The server unifies remote and local processes to manage logging messages.
     * localClients - For each client identifier, list of topics and their read positions.
@@ -188,5 +190,30 @@ findAvailableWriter server = do
       h : t -> Just $ fst h
       _ ->  Nothing
 
+{- | Remove all the references to the processid from the local server map.
+    , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
+    , localWriters :: TVar (Map Topic Integer)
+    , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
+    ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
+    , statistics :: TVar (Map ProcessId ([Request], [Response]))
+    , _proxyChannel :: TChan(Process())
+    , _myProcessId :: TVar (ProcessId)
 
 
+-}
+
+removeProcess :: Server -> ProcessId -> STM ProcessId 
+removeProcess server processId = do 
+  remoteClients1 <- readTVar $ remoteClients server 
+  let keysToBeDeleted = List.filter (\(p1,_) -> p1 == processId) $ Map.keys remoteClients1 
+  let nRemoteClients = List.foldr (\(k,c) m -> Map.delete (k, c) m) remoteClients1 keysToBeDeleted
+  services1 <- readTVar $ services server 
+  let servToBeDeleted = List.filter (\(p1, _) -> p1 == processId) $ Map.keys services1
+  let newServices = List.foldr(\(k,c) m -> Map.delete (k, c) m) services1 servToBeDeleted 
+  remServices1 <- readTVar $ remoteWriters server 
+  let servToBeDel = List.filter(\(p1,_) -> p1 == processId) $ Map.keys remServices1
+  let newServices1 = List.foldr(\(k, c) m -> Map.delete (k, c) m) remServices1 servToBeDel
+  writeTVar (remoteWriters server) newServices1
+  writeTVar (services server) newServices
+  writeTVar (remoteClients server) nRemoteClients
+  return processId

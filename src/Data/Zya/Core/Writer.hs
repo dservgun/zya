@@ -79,6 +79,15 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   inform status
   return ()
 
+
+handleRemoteMessage server aMessage@(ServiceAvailable aTopic _) = do
+  say $ printf ("Received message " <> (show aMessage))
+  status <- liftIO $ runReaderT createTopic (defaultDb, debugConnStr, aMessage)
+  -- Check the status and send a success or a failure to a group of 
+  -- listeners: we need to set that up.
+  inform status
+  return ()
+
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
 

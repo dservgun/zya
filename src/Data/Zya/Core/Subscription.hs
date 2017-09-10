@@ -46,19 +46,37 @@ handleMonitorNotification server notificationMessage =
 
 
 handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
-handleWhereIsReply server (WhereIsReply _ (Just pid)) =
-  liftIO $ atomically $ do
-    --clientmap <- readTVar clients
-    -- send our own server info,and request a response:
-    return ()
+handleWhereIsReply server (WhereIsReply _ (Just pid)) = do
+  mySpid <- liftIO $ atomically $ do
+    mySpId <- readTVar $ myProcessId server
+    sendRemote server pid (ServiceAvailable Terminator mySpId)
+    return mySpId
+  say $ printf "Handling where response for terminator %s" (show mySpid)
+
+readerService :: ServerReaderT () 
+readerService = undefined
+
+databaseService :: ServerReaderT () 
+databaseService = undefined
+
+webService :: ServerReaderT () 
+webService = undefined
+
+
+tester :: ServerReaderT () 
+tester = do 
+  serverConfiguration <- ask 
+  return () -- To be defined
 
 {- | Terminate all processes calling exit on each -}
 terminator :: ServerReaderT () 
 terminator = do 
   serverConfiguration <- ask
   remoteProcesses <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
+
   lift $ do
     say $ printf "Terminator %s %s " (show $ serverConfiguration^.serviceProfile) (show $ serverConfiguration^.serviceName)
+    forM_ remoteProcesses $ \peer -> liftIO $ atomically $ sendRemote (serverConfiguration^.server) peer $ CreateTopic "TerminatorTopic"
     forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
@@ -72,9 +90,9 @@ subscription backend (sP, params, dbType, dbConnection) = do
   say $ printf $ "Starting subscrpition " <> (show sP) <> (show params)
   case sP of
     Writer -> runReaderT writer readerParams
---    Reader -> runReaderT readerService readerParams
---    DatabaseServer -> runReaderT databaseService readerParams
---    WebServer ->  runReaderT webservice readerParams
+    Reader -> runReaderT readerService readerParams
+    DatabaseServer -> runReaderT databaseService readerParams
+    WebServer ->  runReaderT webService readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
 
@@ -115,3 +133,6 @@ cloudMain = do
  let dbType = RDBMS Postgresql
  let connectionDetails = ConnectionDetails "this connection wont work"
  cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails)
+
+
+

@@ -50,17 +50,19 @@ handleRemoteMessage server unhandledMessage =
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server notificationMessage = 
-  say $ printf ("Monitor notification " <> (show notificationMessage))
+handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
+  _ <- liftIO $ atomically $ removeProcess server pid 
+  return ()
 
 
 handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
-handleWhereIsReply server (WhereIsReply _ (Just pid)) =
-  liftIO $ atomically $ do
-    --clientmap <- readTVar clients
-    -- send our own server info,and request a response:
-    return ()
-
+handleWhereIsReply server (WhereIsReply _ (Just pid)) = do
+  mSpid <- 
+    liftIO $ atomically $ do
+    mySpId <- readTVar $ myProcessId server
+    sendRemote server pid (ServiceAvailable TopicAllocator mySpId)
+    return mySpId
+  say $ printf "Sending info about self %s -> %s" (show mSpid) (show pid)
 
 topicAllocationEventLoop :: ServerReaderT ()
 topicAllocationEventLoop = do
