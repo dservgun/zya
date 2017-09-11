@@ -43,11 +43,8 @@ import Data.Zya.Persistence.Persistence(DBType, persist)
 rootLocation :: FilePath 
 rootLocation = "./tmp" 
 
-newtype CreateStatus = CreateStatus {_un :: Text}
 
 type RemoteT = ReaderT (Server, PMessage) Process ()
-{-| Internal type for persisting process messages-}
-type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 {-| Transform the database error into a writer error. -}
 mapError :: Either Text PMessage -> CreateStatus
@@ -61,34 +58,32 @@ createTopic = do
   -- return the status. Send the status to 
   -- some peers (need to decide that, could be all).
   p <- persist
-  return $ mapError p
+  return $ CreateStatus "success??"
 
 
 inform :: CreateStatus -> Process () 
 inform = undefined
 
 
-debugConnStr :: ConnectionDetails
-debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432"
 
-handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
+handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
-  status <- liftIO $ runReaderT createTopic (defaultDb, debugConnStr, aMessage)
+  status <- liftIO $ runReaderT createTopic (dbType, connectionString, aMessage)
   -- Check the status and send a success or a failure to a group of 
   -- listeners: we need to set that up.
-  inform status
+  --inform status
   return ()
 
 
-handleRemoteMessage server aMessage@(ServiceAvailable aTopic _) = do
+handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable aTopic _) = do
   say $ printf ("Received message " <> (show aMessage))
-  status <- liftIO $ runReaderT createTopic (defaultDb, debugConnStr, aMessage)
+  status <- liftIO $ runReaderT createTopic (dbType, connectionString, aMessage)
   -- Check the status and send a success or a failure to a group of 
   -- listeners: we need to set that up.
-  inform status
+  --inform status
   return ()
 
-handleRemoteMessage server unhandledMessage = 
+handleRemoteMessage server dbType connectionString unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
@@ -109,6 +104,8 @@ eventLoop = do
     let sName = unpack $ serverConfiguration^.serviceName
     let serverL = serverConfiguration^.server 
     let profileL = serverConfiguration^.serviceProfile
+    let dbTypeL = serverConfiguration^.dbType 
+    let connectionDetailsL = serverConfiguration^.connDetails
     spawnLocal (proxyProcess serverL)
     say $ 
       printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
@@ -119,7 +116,7 @@ eventLoop = do
     forever $
       receiveWait
         [ 
-        match $ handleRemoteMessage serverL
+        match $ handleRemoteMessage serverL dbTypeL connectionDetailsL
         , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL

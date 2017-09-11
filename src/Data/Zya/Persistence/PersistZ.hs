@@ -5,11 +5,3 @@ import Data.Text
 import Data.Bifunctor
 
 
-
-
-defaultDb :: DBType 
-defaultDb = RDBMS Postgresql
-
-
-class PersistZ dbType where 
-  persistZ :: ReaderT (dbType, ConnectionDetails, PMessage) IO (Either Text PMessage)

@@ -32,7 +32,6 @@ import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
-import Data.Zya.Persistence.PersistZ
 
 
 

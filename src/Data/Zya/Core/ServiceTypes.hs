@@ -22,6 +22,8 @@ module Data.Zya.Core.ServiceTypes(
     , DBType(..)
     , ConnectionDetails(..)
     , DBVendor(..)
+    , MessageT(..)
+    , CreateStatus(..)
     -- * Server configuration 
     , ServerConfiguration
     , server, backend, serviceProfile  
@@ -140,9 +142,12 @@ instance Exception StartUpException
 
 
 --- Database types
-data DBVendor = Postgresql
+data DBVendor = Postgresql | Sqlite
 data DBType = FileSystem | RDBMS DBVendor 
 newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
+newtype CreateStatus = CreateStatus {_un :: Text}
+{-| Internal type for persisting process messages-}
+type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 
 

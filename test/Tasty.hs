@@ -11,7 +11,6 @@ import Data.Zya.Core.Writer
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
 import Data.Zya.Core.ServiceTypes
-import Data.Zya.Persistence.PersistZ
 import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
@@ -23,16 +22,16 @@ isRecent :: (Eq a, Ord a) => a -> a -> Bool
 isRecent = (<)
 
 debugConnStr :: ConnectionDetails
-debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432"
+debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debuguououo password=zya_debug port=5432"
 
 -- change backend to using inmemory for tests.
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
-  ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA", RDBMS Postgresql, debugConnStr) 
-  writer <- async $ cloudEntryPoint test (Writer, "testZYA", RDBMS Postgresql, debugConnStr)
+  ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA", RDBMS Sqlite, debugConnStr) 
+  writer <- async $ cloudEntryPoint test (Writer, "testZYA", RDBMS Sqlite, debugConnStr)
   threadDelay (10 ^ 6 * 30) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, "testZYA", RDBMS Postgresql, debugConnStr)
+  tb <- async $ cloudEntryPoint test (Terminator, "testZYA", RDBMS Sqlite, debugConnStr)
   wait tb
 
 
