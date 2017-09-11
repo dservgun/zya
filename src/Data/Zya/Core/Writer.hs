@@ -3,7 +3,6 @@
 module Data.Zya.Core.Writer(
   -- * Writers that handle log events
   writer
-  , createTopic
   , handleRemoteMessage
   ) where
 
@@ -52,8 +51,8 @@ mapError (Right e) = CreateStatus success
 mapError (Left e) = CreateStatus e
 
 
-createTopic :: MessageT
-createTopic = do 
+persistMessage :: MessageT
+persistMessage = do 
   -- Insert the topic into persistent store.
   -- return the status. Send the status to 
   -- some peers (need to decide that, could be all).
@@ -68,7 +67,6 @@ inform = undefined
 
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
-  status <- liftIO $ runReaderT createTopic (dbType, connectionString, aMessage)
   -- Check the status and send a success or a failure to a group of 
   -- listeners: we need to set that up.
   --inform status
@@ -77,10 +75,14 @@ handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic)
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable aTopic _) = do
   say $ printf ("Received message " <> (show aMessage))
-  status <- liftIO $ runReaderT createTopic (dbType, connectionString, aMessage)
   -- Check the status and send a success or a failure to a group of 
   -- listeners: we need to set that up.
   --inform status
+  return ()
+handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, message)) = do
+  say $ printf ("Received message " <> (show aMessage))
+  status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
+  say $ printf "Message persisted successfully %s " (show status)
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
@@ -131,6 +133,5 @@ writer = do
 
 
 -- Some synonyms
-
 success :: Text 
 success = "Success"

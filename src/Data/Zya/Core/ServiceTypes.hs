@@ -85,25 +85,37 @@ data Login = Login {
 
 type Start = Integer
 type End = Integer 
+
+-- The message id is unique among all the processes.
+type MessageId = Integer
 data OffsetHint = Beginning | Latest | MessageRange (Start , End) deriving (Show, Typeable, Generic)
 
-data Subscribe = 
-  Subscribe {
+data Subscriber = 
+  Subscriber {
     topic :: Topic
     , user :: User
     , reader :: OffsetHint
 } deriving (Show, Typeable, Generic)
 
-data PMessage
-  = MsgServerInfo         Bool ProcessId [Subscribe]
-  | MsgSend               Subscribe Text -- make this json.
-  | ServiceAvailable ServiceProfile ProcessId -- Announce that the service is available on the said process id.
+data Publisher = Publisher {unTopic :: Topic} deriving (Show, Typeable, Generic)
+
+data PMessage = 
+  -- Returns a set of subscribers handled by a process.
+  MsgServerInfo         Bool ProcessId [Subscriber]
+  -- * Notifies a subscriber of the next message.
+  | NotifyMessage Subscriber (MessageId, Text)
+  -- * Writes a message on a topic. 
+  | WriteMessage Publisher (MessageId, Text)
+  -- * Commits an offset read for a subscriber.
+  | CommitMessage Subscriber (MessageId, Text) -- Commit needs to know about the id that needs to be committed.
+  -- * Announces that a current service profile is available on a node.
+  | ServiceAvailable ServiceProfile ProcessId 
   | TerminateProcess Text
   | CreateTopic Text 
   deriving (Typeable, Generic)
 
 --MAX_BYTES :: Integer 
-maxBYTES = 10 * 1024 * 1024 * 1024 -- 
+maxBytes = 10 * 1024 * 1024 * 1024 -- 
 
 trim :: Int -> Text -> Text 
 trim = Data.Text.take
@@ -111,16 +123,19 @@ instance Show PMessage where
   show pMessage = 
       case pMessage of 
         MsgServerInfo a b l -> printf "MsgServerInfo %s %s %s" (show a) (show b) (show l)
-        MsgSend s t         -> printf "MsgSend %s %s" (show s) (unpack $ trim maxBYTES t)
+        NotifyMessage s (m, t) -> printf "Notify message %s %d %s" (show s) (show m) (unpack $ trim maxBytes t) 
+        WriteMessage p (m, t) -> printf "WriteMessage %s %d %s" (show p) m (unpack $ trim maxBytes t)
+        CommitMessage s (m, t) -> printf "Commit message %s %d %s" (show s) m (unpack $ trim maxBytes t)
         ServiceAvailable s p -> printf "ServiceAvailable %s %s" (show s) (show p) 
         TerminateProcess s  -> printf "TerminateProcess %s" (show s) 
-        CreateTopic t -> printf "CreateTopic %s" (show . unpack $ trim maxBYTES t)
+        CreateTopic t -> printf "CreateTopic %s" (show . unpack $ trim maxBytes t)
 
 instance Binary Login 
 instance Binary OpenIdProvider
 instance Binary User
 instance Binary OffsetHint
-instance Binary Subscribe
+instance Binary Subscriber
+instance Binary Publisher
 instance Binary PMessage
 
 
@@ -145,7 +160,7 @@ instance Exception StartUpException
 data DBVendor = Postgresql | Sqlite
 data DBType = FileSystem | RDBMS DBVendor 
 newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
-newtype CreateStatus = CreateStatus {_un :: Text}
+newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
 {-| Internal type for persisting process messages -}
 type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 

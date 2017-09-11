@@ -102,3 +102,8 @@ data Subscribe =
 	* Periodically merge gen0 with gen1 to make room from new messages.
 
 
+--- Whats the application flow?
+. Writers write to the database.
+. Subscribers when available, come up and begin to listen on a topic.
+. Readers when available, read messages since the last committed read. If the subscriber 
+  opts for uncommitted reads, read from the last n messages before the reader begins processing.
