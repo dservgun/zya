@@ -22,7 +22,7 @@ isRecent :: (Eq a, Ord a) => a -> a -> Bool
 isRecent = (<)
 
 debugConnStr :: ConnectionDetails
-debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debuguououo password=zya_debug port=5432"
+debugConnStr = ConnectionDetails ":memory:"
 
 -- change backend to using inmemory for tests.
 createTopicTestCase :: Assertion

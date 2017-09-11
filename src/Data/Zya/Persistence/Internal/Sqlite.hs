@@ -38,9 +38,7 @@ c8Pack = Data.ByteString.Char8.pack
 persistZ :: MessageT
 persistZ = do 
   (dbType, ConnectionDetails connStr, message) <- ask
-  -- save the message.
-  let c = c8Pack connStr
-  runSqlite ":memory:" $ do
+  runSqlite (Data.Text.pack connStr) $ do
       runMigration migrateAll
       currentTime <- liftIO getCurrentTime
       messageId <- insert $ InMemoryMessage (Data.Text.pack $ show message) currentTime

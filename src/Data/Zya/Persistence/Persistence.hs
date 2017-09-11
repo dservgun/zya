@@ -20,8 +20,8 @@ import Data.Zya.Core.ServiceTypes
 
 persist :: MessageT 
 persist = do 
-	(dbType, _,  _) <- ask
-	case dbType of 
-		RDBMS Postgresql -> Postgres.persistZ
-		RDBMS Sqlite -> Sqlite.persistZ
+  (dbType, _,  _) <- ask
+  case dbType of 
+    RDBMS Postgresql -> Postgres.persistZ
+    RDBMS Sqlite -> Sqlite.persistZ
 

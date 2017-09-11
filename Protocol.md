@@ -2,7 +2,7 @@
 Clients  connect on a well known port to query for a service map. 
 
 ## Service map
-A service map contains the services offered with the service names the port number the 
+A service map maintains the services offered with the service names the port number the 
 given service is running on. For example, 
 	```
 		Database : ["conn1", "conn2", "conn3"]

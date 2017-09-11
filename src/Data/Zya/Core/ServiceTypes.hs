@@ -146,7 +146,7 @@ data DBVendor = Postgresql | Sqlite
 data DBType = FileSystem | RDBMS DBVendor 
 newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
 newtype CreateStatus = CreateStatus {_un :: Text}
-{-| Internal type for persisting process messages-}
+{-| Internal type for persisting process messages -}
 type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 

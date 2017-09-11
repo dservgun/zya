@@ -67,18 +67,16 @@ handleWhereIsReply server (WhereIsReply _ (Just pid)) = do
 topicAllocationEventLoop :: ServerReaderT ()
 topicAllocationEventLoop = do
   serverConfiguration <- ask
-  let server1 = view server serverConfiguration
-  let serviceName1 = view serviceName serverConfiguration
-  let serviceNameS = unpack serviceName1
-  let backendl = view backend serverConfiguration
-  let profile = view serviceProfile serverConfiguration
+  let server1 = serverConfiguration^.server 
+  let serviceNameStr = unpack $ serverConfiguration^.serviceName
+  let profile = serverConfiguration^.serviceProfile
   lift $ do 
-    let sName = serviceNameS
+    let sName = serviceNameStr
     selfPid <- getSelfPid
     spawnLocal (proxyProcess server1)
     say $ 
       printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
-        (show (profile :: ServiceProfile)) 
+        (show (profile)) 
     liftIO $ atomically $ do 
       updateTopicAllocator server1 selfPid TopicAllocator
     forever $
