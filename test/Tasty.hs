@@ -30,6 +30,7 @@ createTopicTestCase =  do
   test <- testBackend 
   ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA", RDBMS Sqlite, debugConnStr) 
   writer <- async $ cloudEntryPoint test (Writer, "testZYA", RDBMS Sqlite, debugConnStr)
+  
   threadDelay (10 ^ 6 * 30) -- add a delay
   tb <- async $ cloudEntryPoint test (Terminator, "testZYA", RDBMS Sqlite, debugConnStr)
   wait tb

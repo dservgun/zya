@@ -67,6 +67,13 @@ tester = do
   serverConfiguration <- ask 
   return () -- To be defined
 
+
+{-| Test writer to send a few messages -}
+-- Find an available writer, if none found, error out.
+-- If one found, send one or more test messages.
+testWriter :: [PMessage] -> ServerReaderT () 
+testWriter testMessages = undefined
+
 {- | Terminate all processes calling exit on each -}
 terminator :: ServerReaderT () 
 terminator = do 
@@ -94,6 +101,7 @@ subscription backend (sP, params, dbType, dbConnection) = do
     WebServer ->  runReaderT webService readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
+    TestWriter -> runReaderT testWriter readerParams
 
 
 
