@@ -165,7 +165,10 @@ data ServiceProfile =
     | Reader 
     | Writer 
     | TopicAllocator
+    -- * Terminate all processes. This may not be needed.
     | Terminator
+    -- * A writer to test some messages to the system.
+    | TestWriter 
     deriving(Show, Generic, Typeable, Eq, Ord)
 
 instance Binary ServiceProfile
@@ -190,17 +193,6 @@ findAvailableWriter server = do
       h : t -> Just $ fst h
       _ ->  Nothing
 
-{- | Remove all the references to the processid from the local server map.
-    , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
-    , localWriters :: TVar (Map Topic Integer)
-    , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
-    ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
-    , statistics :: TVar (Map ProcessId ([Request], [Response]))
-    , _proxyChannel :: TChan(Process())
-    , _myProcessId :: TVar (ProcessId)
-
-
--}
 
 removeProcess :: Server -> ProcessId -> STM ProcessId 
 removeProcess server processId = do 
@@ -217,3 +209,4 @@ removeProcess server processId = do
   writeTVar (services server) newServices
   writeTVar (remoteClients server) nRemoteClients
   return processId
+

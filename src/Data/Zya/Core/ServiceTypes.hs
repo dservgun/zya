@@ -29,6 +29,8 @@ module Data.Zya.Core.ServiceTypes(
     , server, backend, serviceProfile  
     , serviceName, dbType, connDetails
     , makeServerConfiguration
+    -- * Publisher details 
+    , Publisher(..)
   ) where
 
 import GHC.Generics (Generic)

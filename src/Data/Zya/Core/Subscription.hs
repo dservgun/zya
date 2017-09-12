@@ -68,11 +68,20 @@ tester = do
   return () -- To be defined
 
 
+writeMessage :: Server -> PMessage -> Process ()
+writeMessage server aMessage =  do
+  writer <- liftIO $ atomically $ findAvailableWriter server 
+  case writer of 
+    Just x -> liftIO $ atomically $ sendRemote (server) x aMessage
+    Nothing -> say $ printf "No writer found. "
 {-| Test writer to send a few messages -}
 -- Find an available writer, if none found, error out.
 -- If one found, send one or more test messages.
-testWriter :: [PMessage] -> ServerReaderT () 
-testWriter testMessages = undefined
+testWriter :: ServerReaderT () 
+testWriter = do 
+  serverConfiguration <- ask
+  let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "This is a test")
+  lift $ writeMessage (serverConfiguration^.server) aMessage
 
 {- | Terminate all processes calling exit on each -}
 terminator :: ServerReaderT () 
@@ -88,6 +97,7 @@ terminator = do
     exit pid $ TerminateProcess "Shutting down self"
 
 
+
 subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails) -> Process ()
 subscription backend (sP, params, dbType, dbConnection) = do
   myPid <- getSelfPid
@@ -101,13 +111,10 @@ subscription backend (sP, params, dbType, dbConnection) = do
     WebServer ->  runReaderT webService readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
-    TestWriter -> runReaderT testWriter readerParams
-
-
+    TestWriter -> runReaderT terminator readerParams
 
 
 remotable ['subscriptionService]
-
 
 simpleBackend :: String -> String -> IO Backend 
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
@@ -131,6 +138,7 @@ parseArgs = do
       "Webserver" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)
+      "TestWriter" -> (TestWriter, params, portNumber)
       _  -> throw $ startupException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
 
 cloudMain :: IO () 
