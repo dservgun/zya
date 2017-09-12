@@ -62,8 +62,6 @@ library
     Data.Zya.Persistence.Internal.Sqlite
   -- Modules included in this library but not exported.
   other-modules:       
-    Parsers.Test
-    Parsers.HTMLScanner
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
   
@@ -125,4 +123,3 @@ test-suite Tasty
   hs-source-dirs: test
   default-language:   Haskell2010
   main-is : Tasty.hs
-  -- build-tools : alex, happy
