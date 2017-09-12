@@ -181,6 +181,10 @@ data ServerConfiguration = ServerConfig{
   } 
 
 makeLenses ''ServerConfiguration
+
+instance Show ServerConfiguration where 
+  show s = printf "%s : %s" (show (s^.serviceProfile)) (show (s^.serviceName))
+
 type ServerReaderT = ReaderT ServerConfiguration Process
 
 makeServerConfiguration :: Server -> Backend -> ServiceProfile -> ServiceName -> DBType -> ConnectionDetails -> ServerConfiguration

@@ -70,6 +70,7 @@ tester = do
 
 writeMessage :: Server -> PMessage -> Process ()
 writeMessage server aMessage =  do
+  say $ printf "Sending message %s " (show aMessage)
   writer <- liftIO $ atomically $ findAvailableWriter server 
   case writer of 
     Just x -> liftIO $ atomically $ sendRemote (server) x aMessage
@@ -80,6 +81,7 @@ writeMessage server aMessage =  do
 testWriter :: ServerReaderT () 
 testWriter = do 
   serverConfiguration <- ask
+  lift $ say $ printf "TestWriter %s" (show  serverConfiguration) 
   let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "This is a test")
   lift $ writeMessage (serverConfiguration^.server) aMessage
 
@@ -111,7 +113,7 @@ subscription backend (sP, params, dbType, dbConnection) = do
     WebServer ->  runReaderT webService readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
-    TestWriter -> runReaderT terminator readerParams
+    TestWriter -> runReaderT testWriter readerParams
 
 
 remotable ['subscriptionService]
