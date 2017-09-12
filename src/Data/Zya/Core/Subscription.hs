@@ -44,6 +44,7 @@ handleMonitorNotification server notificationMessage =
   say $ printf ("Monitor notification " <> (show notificationMessage))
 
 
+
 handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
 handleWhereIsReply server (WhereIsReply _ (Just pid)) = do
   mySpid <- liftIO $ atomically $ do

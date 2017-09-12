@@ -25,6 +25,7 @@ import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
 import Data.Binary
 import Data.Data
+import Data.Map
 import Data.Monoid((<>))
 import Data.Text(pack, unpack, Text)
 import Data.Time(UTCTime, getCurrentTime)
@@ -33,7 +34,6 @@ import Data.Zya.Core.Service
 
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
-
 
 
 

@@ -9,7 +9,6 @@ module Data.Zya.Core.Service
         , Server
         , proxyChannel
         , myProcessId
-        , updateTopicAllocator
         , updateMyPid
         , remoteProcesses
         , defaultSimpleConfiguration
@@ -103,18 +102,7 @@ newServer =  liftIO . newServerIO
 
 
 
-{- | Update the service map with the topic allocator. We really need a reliable 
-   | consensus to deal with this class of problems.
--}
-updateTopicAllocator :: Server -> ProcessId -> ServiceProfile -> STM () 
-updateTopicAllocator server processId TopicAllocator = do 
-  lServices <- readTVar $ services server 
-  let nElement = ((processId, TopicAllocator), 1)
-  let updateServices = uncurry Map.insert nElement lServices
-  -- Clever code alert: though, using flip takes away the need to 
-  -- parenthesize.
-  flip writeTVar updateServices $ services server
-updateTopicAllocator server _ _ = return () -- Error, we need to tell it somewhere.
+
 {- | 
   Given a service profile, return the count of services and the ProcessId for the service.
 -}
@@ -210,3 +198,13 @@ removeProcess server processId = do
   writeTVar (remoteClients server) nRemoteClients
   return processId
 
+{-- | 
+  Add 'ServiceProfile' to the local map
+--}
+addService :: Server -> ProcessId -> ServiceProfile -> STM ProcessId
+addService server processId serviceProfile = do 
+  s1 <- readTVar $ services server
+  writeTVar (services server) 
+    $ Map.insertWith (+) (processId, serviceProfile) 1 
+    s1
+  return processId

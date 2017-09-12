@@ -67,11 +67,7 @@ inform = undefined
 
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
-  -- Check the status and send a success or a failure to a group of 
-  -- listeners: we need to set that up.
-  --inform status
   return ()
-
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable aTopic _) = do
   say $ printf ("Received message " <> (show aMessage))
@@ -79,6 +75,7 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable aT
   -- listeners: we need to set that up.
   --inform status
   return ()
+
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, message)) = do
   say $ printf ("Received message " <> (show aMessage))
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
@@ -87,6 +84,7 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
+
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage = 
@@ -109,12 +107,6 @@ eventLoop = do
     let dbTypeL = serverConfiguration^.dbType 
     let connectionDetailsL = serverConfiguration^.connDetails
     spawnLocal (proxyProcess serverL)
-    say $ 
-      printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
-        (show profileL) 
-    liftIO $ atomically $ do 
-      selfPid <- readTVar $ myProcessId serverL
-      updateTopicAllocator serverL selfPid TopicAllocator
     forever $
       receiveWait
         [ 
