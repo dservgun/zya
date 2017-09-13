@@ -215,19 +215,19 @@ initializeProcess = do
   liftIO $ atomically $ do 
     updateMyPid server1 mypid
 
+
 proxyProcess :: Server -> Process ()
 proxyProcess server 
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
 
 
 
-
+handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply server serviceProfile (WhereIsReply _ (Just pid)) = do
   mSpid <- 
     liftIO $ atomically $ do
     mySpId <- readTVar $ myProcessId server
-    sendRemote server pid (ServiceAvailable serviceProfile mySpId)
+    sendRemote server pid $ ServiceAvailable serviceProfile mySpId
     return mySpId
   say $ printf "Sending info about self %s -> %s" (show mSpid) (show pid)
-
 handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()

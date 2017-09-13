@@ -63,7 +63,7 @@ topicAllocationEventLoop = do
   lift $ do 
     let sName = serviceNameStr
     selfPid <- getSelfPid
-    spawnLocal (proxyProcess server1)
+    spawnLocal $ proxyProcess server1
     say $ 
       printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
         (show (profile)) 

@@ -45,14 +45,6 @@ handleMonitorNotification server notificationMessage =
 
 
 
-handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
-handleWhereIsReply server (WhereIsReply _ (Just pid)) = do
-  mySpid <- liftIO $ atomically $ do
-    mySpId <- readTVar $ myProcessId server
-    sendRemote server pid (ServiceAvailable Terminator mySpId)
-    return mySpId
-  say $ printf "Handling where response for terminator %s" (show mySpid)
-
 readerService :: ServerReaderT () 
 readerService = undefined
 

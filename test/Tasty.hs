@@ -7,6 +7,7 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Monad.Reader
 import Test.Tasty
 import Test.Tasty.HUnit as HU
+import Data.Text as Text
 import Data.Zya.Core.Writer
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
@@ -24,15 +25,20 @@ isRecent = (<)
 debugConnStr :: ConnectionDetails
 debugConnStr = ConnectionDetails ":memory:"
 
+newtype TServiceName = TServiceName {_unName :: String} deriving Show 
+debugServiceName :: Text 
+debugServiceName = 
+    let s = TServiceName "testZYA" in
+    Text.pack $ _unName s
 -- change backend to using inmemory for tests.
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
-  ta <- async $ cloudEntryPoint test (TopicAllocator, "testZYA", RDBMS Sqlite, debugConnStr) 
-  writer <- async $ cloudEntryPoint test (Writer, "testZYA", RDBMS Sqlite, debugConnStr)
-  testWriter <- async $ cloudEntryPoint test (TestWriter, "testZYA", RDBMS Sqlite, debugConnStr)
+  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Sqlite, debugConnStr) 
+  writer <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStr)
+  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Sqlite, debugConnStr)
   threadDelay (10 ^ 6 * 3) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, "testZYA", RDBMS Sqlite, debugConnStr)
+  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Sqlite, debugConnStr)
   wait tb
 
 

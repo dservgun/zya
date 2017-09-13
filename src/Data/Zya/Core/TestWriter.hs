@@ -33,6 +33,8 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
+
+
 writeMessage :: Server -> PMessage -> Process ()
 writeMessage server aMessage =  do
   say $ printf "Sending message %s " (show aMessage)
@@ -40,6 +42,7 @@ writeMessage server aMessage =  do
   case writer of 
     Just x -> liftIO $ atomically $ sendRemote (server) x aMessage
     Nothing -> say $ printf "No writer found. "
+
 {-| Test writer to send a few messages -}
 -- Find an available writer, if none found, error out.
 -- If one found, send one or more test messages.
@@ -60,9 +63,6 @@ eventLoop = do
     let sName = serviceNameStr
     selfPid <- getSelfPid
     spawnLocal (proxyProcess server1)
-    say $ 
-      printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
-        (show (profile)) 
     forever $
       receiveWait
         [ 
