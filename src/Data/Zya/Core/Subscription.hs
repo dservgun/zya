@@ -32,7 +32,7 @@ import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
-
+import Data.Zya.Core.TestWriter
 
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
@@ -69,22 +69,6 @@ tester = do
   return () -- To be defined
 
 
-writeMessage :: Server -> PMessage -> Process ()
-writeMessage server aMessage =  do
-  say $ printf "Sending message %s " (show aMessage)
-  writer <- liftIO $ atomically $ findAvailableWriter server 
-  case writer of 
-    Just x -> liftIO $ atomically $ sendRemote (server) x aMessage
-    Nothing -> say $ printf "No writer found. "
-{-| Test writer to send a few messages -}
--- Find an available writer, if none found, error out.
--- If one found, send one or more test messages.
-testWriter :: ServerReaderT () 
-testWriter = do 
-  serverConfiguration <- ask
-  lift $ say $ printf "TestWriter %s" (show  serverConfiguration) 
-  let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "This is a test")
-  lift $ writeMessage (serverConfiguration^.server) aMessage
 
 {- | Terminate all processes calling exit on each -}
 terminator :: ServerReaderT () 

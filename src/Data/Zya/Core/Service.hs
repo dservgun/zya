@@ -17,6 +17,8 @@ module Data.Zya.Core.Service
         , getMyPid
         -- * Update maps 
         , removeProcess
+        -- * Maintain services 
+        , addService
     )
 where 
 import Data.Monoid((<>))
@@ -201,10 +203,13 @@ removeProcess server processId = do
 {-- | 
   Add 'ServiceProfile' to the local map
 --}
-addService :: Server -> ProcessId -> ServiceProfile -> STM ProcessId
-addService server processId serviceProfile = do 
+addService :: Server -> ServiceProfile-> ProcessId -> STM ProcessId
+addService server serviceProfile processId = do 
   s1 <- readTVar $ services server
   writeTVar (services server) 
     $ Map.insertWith (+) (processId, serviceProfile) 1 
     s1
   return processId
+
+
+

@@ -31,7 +31,6 @@ import Data.Text(pack, unpack, Text)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
-
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
 
@@ -55,15 +54,6 @@ handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
   return ()
 
 
-handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
-handleWhereIsReply server (WhereIsReply _ (Just pid)) = do
-  mSpid <- 
-    liftIO $ atomically $ do
-    mySpId <- readTVar $ myProcessId server
-    sendRemote server pid (ServiceAvailable TopicAllocator mySpId)
-    return mySpId
-  say $ printf "Sending info about self %s -> %s" (show mSpid) (show pid)
-
 topicAllocationEventLoop :: ServerReaderT ()
 topicAllocationEventLoop = do
   serverConfiguration <- ask
@@ -77,15 +67,13 @@ topicAllocationEventLoop = do
     say $ 
       printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
         (show (profile)) 
-    liftIO $ atomically $ do 
-      updateTopicAllocator server1 selfPid TopicAllocator
     forever $
       receiveWait
         [ 
         match $ handleRemoteMessage server1
         , match $ handleMonitorNotification server1
         , matchIf (\(WhereIsReply l _) -> l == sName) $
-                handleWhereIsReply server1
+                handleWhereIsReply server1 TopicAllocator
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 

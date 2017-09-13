@@ -69,11 +69,9 @@ handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic)
   say $ printf ("Received message " <> (show aMessage))
   return ()
 
-handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable aTopic _) = do
+handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
   say $ printf ("Received message " <> (show aMessage))
-  -- Check the status and send a success or a failure to a group of 
-  -- listeners: we need to set that up.
-  --inform status
+  _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, message)) = do
@@ -91,10 +89,6 @@ handleMonitorNotification server notificationMessage =
   say $ printf ("Monitor notification " <> (show notificationMessage))
 
 
-handleWhereIsReply _ (WhereIsReply _ Nothing) = return ()
-handleWhereIsReply server (WhereIsReply _ (Just pid)) =
-  liftIO $ atomically $ do
-    return ()
 
 
 eventLoop :: ServerReaderT ()
@@ -113,7 +107,7 @@ eventLoop = do
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL
         , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
-                handleWhereIsReply serverL
+                handleWhereIsReply serverL Writer
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 

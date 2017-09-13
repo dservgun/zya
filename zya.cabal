@@ -55,6 +55,7 @@ library
     Data.Zya.Core.ServiceTypes
     Data.Zya.Core.TopicAllocator  
     Data.Zya.Core.Writer
+    Data.Zya.Core.TestWriter
     Data.Zya.Persistence.PersistZ
     Data.Zya.Persistence.Persistence
     Data.Zya.Persistence.Internal.FileSystem

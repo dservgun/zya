@@ -31,6 +31,8 @@ module Data.Zya.Core.ServiceTypes(
     , makeServerConfiguration
     -- * Publisher details 
     , Publisher(..)
+    -- * Some common handlers for all nodes
+    , handleWhereIsReply
   ) where
 
 import GHC.Generics (Generic)
@@ -199,7 +201,6 @@ sendRemote aServer pid pmsg = writeTChan (proxyChannel aServer) (send pid pmsg)
 initializeProcess :: ServerReaderT()
 initializeProcess = do 
   serverConfiguration <- ask
-  --(server, backend, profile, serviceName) <- ask
   let server1 = view server serverConfiguration
   let serviceName1 = view serviceName serverConfiguration
   let serviceNameS = unpack serviceName1
@@ -217,3 +218,16 @@ initializeProcess = do
 proxyProcess :: Server -> Process ()
 proxyProcess server 
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
+
+
+
+
+handleWhereIsReply server serviceProfile (WhereIsReply _ (Just pid)) = do
+  mSpid <- 
+    liftIO $ atomically $ do
+    mySpId <- readTVar $ myProcessId server
+    sendRemote server pid (ServiceAvailable serviceProfile mySpId)
+    return mySpId
+  say $ printf "Sending info about self %s -> %s" (show mSpid) (show pid)
+
+handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()
