@@ -40,11 +40,14 @@ handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
   -- Check for writers and then send a message to the writer.
-  availableWriter <- liftIO $ atomically $ findAvailableWriter server 
+  availableWriter <- liftIO $ atomically $ findAvailableWriter server
+
   case availableWriter of
-    Just a -> liftIO $ atomically $ sendRemote server a aMessage
-    Nothing -> say $ printf $
-                      "No writer found. Dropping this message " <> (show aMessage)
+    Just a -> do
+        say $ printf "Found a writer %s " (show aMessage)
+        liftIO $ 
+          atomically $ sendRemote server a aMessage
+    Nothing -> say $ printf "No writer found. Dropping this message %s\n" (show aMessage)
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do

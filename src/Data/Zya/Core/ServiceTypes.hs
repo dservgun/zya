@@ -128,13 +128,14 @@ trim = Data.Text.take
 instance Show PMessage where 
   show pMessage = 
       case pMessage of 
-        MsgServerInfo a b l -> printf "MsgServerInfo %s %s %s" (show a) (show b) (show l)
-        NotifyMessage s (m, t) -> printf "Notify message %s %d %s" (show s) (show m) (unpack $ trim maxBytes t) 
-        WriteMessage p (m, t) -> printf "WriteMessage %s %d %s" (show p) m (unpack $ trim maxBytes t)
-        CommitMessage s (m, t) -> printf "Commit message %s %d %s" (show s) m (unpack $ trim maxBytes t)
-        ServiceAvailable s p -> printf "ServiceAvailable %s %s" (show s) (show p) 
-        TerminateProcess s  -> printf "TerminateProcess %s" (show s) 
-        CreateTopic t -> printf "CreateTopic %s" (show . unpack $ trim maxBytes t)
+        MsgServerInfo a b l -> printf "MsgServerInfo %s %s %s\n" (show a) (show b) (show l)
+        NotifyMessage s (m, t) -> printf "Notify message %s %d %s\n" (show s) (show m) (unpack $ trim maxBytes t) 
+        WriteMessage p (m, t) -> printf "WriteMessage %s %d %s\n" (show p) m (unpack $ trim maxBytes t)
+        CommitMessage s (m, t) -> printf "Commit message %s %d %s\n" (show s) m (unpack $ trim maxBytes t)
+        ServiceAvailable s p -> printf "ServiceAvailable %s %s\n" (show s) (show p) 
+        TerminateProcess s  -> printf "TerminateProcess %s\n" (show s) 
+        CreateTopic t -> printf "CreateTopic %s\n" (show . unpack $ trim maxBytes t)
+        GreetingsFrom s p -> printf "Greetings from %s %s \n" (show s) (show p)
 
 instance Binary Login 
 instance Binary OpenIdProvider
@@ -187,7 +188,7 @@ data ServerConfiguration = ServerConfig{
 makeLenses ''ServerConfiguration
 
 instance Show ServerConfiguration where 
-  show s = printf "%s : %s" (show (s^.serviceProfile)) (show (s^.serviceName))
+  show s = printf "%s : %s\n" (show (s^.serviceProfile)) (show (s^.serviceName))
 
 type ServerReaderT = ReaderT ServerConfiguration Process
 
@@ -228,12 +229,13 @@ proxyProcess server
 -- about itself to the new service. Will this result in n squared messages.
 
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
-handleWhereIsReply server serviceProfile (WhereIsReply _ (Just pid)) = do
+handleWhereIsReply server serviceProfile a@(WhereIsReply _ (Just pid)) = do
+  say $ printf "Handling whereIsReply %s : %s\n"  (show serviceProfile) (show a)
   mSpid <- 
     liftIO $ atomically $ do
     mySpId <- readTVar $ myProcessId server
     sendRemote server pid $ ServiceAvailable serviceProfile mySpId
 
     return mySpId
-  say $ printf "Sending info about self %s -> %s, %s " (show mSpid) (show pid) (show serviceProfile)
+  say $ printf "Sending info about self %s -> %s, %s \n" (show mSpid) (show pid) (show serviceProfile)
 handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()

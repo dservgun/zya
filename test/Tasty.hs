@@ -22,24 +22,27 @@ type Version = [Int]
 isRecent :: (Eq a, Ord a) => a -> a -> Bool
 isRecent = (<)
 
-debugConnStr :: ConnectionDetails
-debugConnStr = ConnectionDetails ":memory:"
+debugConnStrsqlite :: ConnectionDetails
+debugConnStrsqlite = ConnectionDetails ":memory:"
 
+
+debugConnStr :: ConnectionDetails 
+debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432"
 newtype TServiceName = TServiceName {_unName :: String} deriving Show 
 debugServiceName :: Text 
 debugServiceName = 
     let s = TServiceName "testZYA" in
     Text.pack $ _unName s
--- change backend to using inmemory for tests.
+
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
-  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Sqlite, debugConnStr) 
-  writer <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStr)
-  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Sqlite, debugConnStr)
-  threadDelay (10 ^ 6 * 3) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Sqlite, debugConnStr)
-  wait tb
+  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Postgresql, debugConnStr) 
+  writer <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Postgresql, debugConnStr)
+  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Postgresql, debugConnStr)
+  threadDelay (10 ^ 6 * 10) -- add a delay
+  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Postgresql, debugConnStr)
+  wait tb 
 
 
 allTests :: TestTree

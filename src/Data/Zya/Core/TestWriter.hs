@@ -8,6 +8,8 @@ module Data.Zya.Core.TestWriter(
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
 
+import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Applicative((<$>))
 import Control.Exception
@@ -37,7 +39,7 @@ import Data.Zya.Core.ServiceTypes
 
 writeMessage :: Server -> PMessage -> Process ()
 writeMessage server aMessage =  do
-  say $ printf "Sending message %s " (show aMessage)
+  say $ printf "Sending message %s\n" (show aMessage)
   writer <- liftIO $ atomically $ findAvailableWriter server 
   case writer of 
     Just x -> liftIO $ atomically $ sendRemote (server) x aMessage
@@ -48,10 +50,10 @@ writeMessage server aMessage =  do
 -- If one found, send one or more test messages.
 testWriter :: ServerReaderT () 
 testWriter = do 
-  serverConfiguration <- ask
-  lift $ say $ printf "TestWriter %s" (show  serverConfiguration) 
-  let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "This is a test")
-  lift $ writeMessage (serverConfiguration^.server) aMessage
+  initializeProcess
+  eventLoop
+  liftIO $ threadDelay (10 ^ 6 * 10) -- add a delay
+
 
 eventLoop :: ServerReaderT ()
 eventLoop = do
@@ -59,6 +61,7 @@ eventLoop = do
   let server1 = serverConfiguration^.server 
   let serviceNameStr = unpack $ serverConfiguration^.serviceName
   let profile = serverConfiguration^.serviceProfile
+  lift $ say $ printf "Test writer event loop : %s : %s\n" (show serviceNameStr) (show profile)
   lift $ do 
     let sName = serviceNameStr
     selfPid <- getSelfPid
@@ -68,8 +71,7 @@ eventLoop = do
         [ 
         match $ handleRemoteMessage server1
         , match $ handleMonitorNotification server1
-        , matchIf (\(WhereIsReply l _) -> l == sName) $
-                handleWhereIsReply server1 TestWriter
+        , matchIf (\(WhereIsReply l _) -> l == sName) $ handleWhereIsReply server1 TestWriter
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 
@@ -85,7 +87,7 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage))  
+  say $ printf ("TestWriter : Received message " <> (show aMessage))  
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
@@ -94,8 +96,12 @@ handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   say $ printf ("Received message " <> (show aMessage))
-  _ <- liftIO $ atomically $ do 
-    addService server serviceProfile pid
+  _ <- liftIO $ atomically $ addService server serviceProfile pid
+  case serviceProfile of 
+    Writer -> do 
+      let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "This is a test")
+      writeMessage server aMessage
+    _ -> return ()
   return ()
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
