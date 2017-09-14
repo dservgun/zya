@@ -221,6 +221,9 @@ proxyProcess server
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
 
 
+-- Announce that a service has come up. 
+-- When a service receives this message, it needs to send some info 
+-- about itself to the new service. Will this result in n squared messages.
 
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply server serviceProfile (WhereIsReply _ (Just pid)) = do
@@ -229,5 +232,5 @@ handleWhereIsReply server serviceProfile (WhereIsReply _ (Just pid)) = do
     mySpId <- readTVar $ myProcessId server
     sendRemote server pid $ ServiceAvailable serviceProfile mySpId
     return mySpId
-  say $ printf "Sending info about self %s -> %s" (show mSpid) (show pid)
+  say $ printf "Sending info about self %s -> %s, %s " (show mSpid) (show pid) (show serviceProfile)
 handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()

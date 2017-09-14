@@ -45,6 +45,14 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
     Just a -> liftIO $ atomically $ sendRemote server a aMessage
     Nothing -> say $ printf $
                       "No writer found. Dropping this message " <> (show aMessage)
+
+handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile processId) = do
+  say $ printf("Received message " <> show aMessage)
+  _ <- liftIO $ atomically $ addService server serviceProfile processId 
+  return ()
+
+
+handleRemoteMessage server (ServiceAvailable )
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage))
 
