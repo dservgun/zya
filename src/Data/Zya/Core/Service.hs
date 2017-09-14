@@ -176,10 +176,12 @@ isSingleton _ = False
 -}
 findAvailableWriter :: Server -> STM (Maybe ProcessId)
 findAvailableWriter server = do 
-  writers <- readTVar $ remoteClients server 
-  let keys = Map.keys writers 
+  writers <- readTVar $ services server 
+  let entries = 
+        Map.keys $ 
+          Map.filterWithKey(\(_, sProfile) _ -> sProfile == Writer) writers
   return $ 
-    case keys of
+    case entries of
       h : t -> Just $ fst h
       _ ->  Nothing
 

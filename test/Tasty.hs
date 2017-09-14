@@ -34,14 +34,15 @@ debugServiceName =
     let s = TServiceName "testZYA" in
     Text.pack $ _unName s
 
+
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
-  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Postgresql, debugConnStr) 
-  writer <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Postgresql, debugConnStr)
-  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Postgresql, debugConnStr)
+  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite) 
+  writer <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
+  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
   threadDelay (10 ^ 6 * 10) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Postgresql, debugConnStr)
+  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
   wait tb 
 
 
