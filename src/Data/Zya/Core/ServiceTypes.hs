@@ -116,6 +116,8 @@ data PMessage =
   | ServiceAvailable ServiceProfile ProcessId 
   | TerminateProcess Text
   | CreateTopic Text 
+  -- * When a service becomes available, this message greets the service.
+  | GreetingsFrom ServiceProfile ProcessId  
   deriving (Typeable, Generic)
 
 --MAX_BYTES :: Integer 
@@ -231,6 +233,7 @@ handleWhereIsReply server serviceProfile (WhereIsReply _ (Just pid)) = do
     liftIO $ atomically $ do
     mySpId <- readTVar $ myProcessId server
     sendRemote server pid $ ServiceAvailable serviceProfile mySpId
+
     return mySpId
   say $ printf "Sending info about self %s -> %s, %s " (show mSpid) (show pid) (show serviceProfile)
 handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()
