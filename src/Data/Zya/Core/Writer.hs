@@ -33,7 +33,6 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
-import Data.Zya.Persistence.PersistZ
 import Data.Zya.Persistence.Persistence(DBType, persist)
 
 

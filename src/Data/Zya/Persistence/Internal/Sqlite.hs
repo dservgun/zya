@@ -12,7 +12,6 @@ module Data.Zya.Persistence.Internal.Sqlite where
 import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Logger(runStderrLoggingT)
-import Data.Zya.Persistence.PersistZ
 import Data.Bifunctor
 import Database.Persist.TH 
 import Database.Persist 
