@@ -29,6 +29,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
 import Control.Concurrent.STM
 import Control.Distributed.Process
+import Data.Time
 import Data.Text 
 import Text.Printf
 import GHC.Generics (Generic)
@@ -57,6 +58,7 @@ data Server = Server {
     , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
     , localWriters :: TVar (Map Topic Integer)
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
+    , remoteWriterList :: TVar [(ProcessId, UTCTime)]
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
     , _proxyChannel :: TChan(Process())
@@ -85,6 +87,7 @@ newServerIO myProcessId = do
     remoteWriterMap <- newTVarIO Map.empty
     serviceMap <- newTVarIO Map.empty
     statistics <- newTVarIO Map.empty
+    rmList <- newTVarIO []
     proxyChannel <- newTChanIO
     initProcessId <- newTVarIO myProcessId
     return Server {
@@ -92,6 +95,7 @@ newServerIO myProcessId = do
         , remoteClients = remoteClientMap 
         , localWriters = localWriterMap 
         , remoteWriters = remoteWriterMap
+        , remoteWriterList = rmList
         , services = serviceMap 
         , statistics = statistics
         , _proxyChannel = proxyChannel
@@ -115,12 +119,6 @@ queryService server aProfile = do
   let r = List.map (\((x, y), z) -> (x, y, z)) result
   return r
 
-remoteWriterList :: Server -> MaybeT STM(ProcessId, [ProcessId])
-remoteWriterList server = do
-  processId <- lift $ readTVar $ myProcessId server 
-  remoteWriters <- lift $ readTVar $ remoteWriters server
-  let w = List.map fst $ Map.keys remoteWriters
-  return(processId, w)
 {- | 
   Merge all the remote processes collecting ` remoteClients `
   `remoteWriters` and `services`. The remote client list 
@@ -180,11 +178,14 @@ findAvailableWriter server = do
   let entries = 
         Map.keys $ 
           Map.filterWithKey(\(_, sProfile) _ -> sProfile == Writer) writers
-  return $ 
-    case entries of
-      h : t -> Just $ fst h
-      _ ->  Nothing
 
+  res <-
+      case entries of
+        h : t -> do 
+          return . Just $ fst h
+        _ ->  return Nothing
+  
+  return res
 
 removeProcess :: Server -> ProcessId -> STM ProcessId 
 removeProcess server processId = do 
