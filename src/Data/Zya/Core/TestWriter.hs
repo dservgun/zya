@@ -99,7 +99,7 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   _ <- liftIO $ atomically $ addService server serviceProfile pid
   case serviceProfile of 
     Writer -> do 
-      let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "This is a test")
+      let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "TestWriter", pack "This is a test")
       writeMessage server aMessage
     _ -> return ()
   return ()

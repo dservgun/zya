@@ -65,8 +65,6 @@ inform = undefined
 
 
 
--- Should each service have its own set of message handlers? 
--- how do i refactor so i can factor out common functions into on.
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
   return ()
@@ -85,7 +83,7 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
     addService server serviceProfile pid
   return ()
 
-handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, message)) = do
+handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   say $ printf ("Received message " <> (show aMessage))
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
   say $ printf "Message persisted successfully %s " (show status)

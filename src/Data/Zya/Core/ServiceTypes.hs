@@ -69,6 +69,58 @@ peerTimeout :: Int
 peerTimeout = 1000000
 
 
+
+--MAX_BYTES :: Integer 
+maxBytes = 10 * 1024 * 1024 * 1024 -- 
+
+trim :: Int -> Text -> Text 
+trim = Data.Text.take
+instance Show PMessage where 
+  show pMessage = 
+      case pMessage of 
+        MsgServerInfo a b l -> printf "MsgServerInfo %s %s %s\n" (show a) (show b) (show l)
+        NotifyMessage s (m, t) -> printf "Notify message %s %d %s\n" (show s) (show m) (unpack $ trim maxBytes t) 
+        WriteMessage p (m, topic, t) -> printf "WriteMessage %s %d %s %s\n" (show p) m (unpack $ topic) (unpack $ trim maxBytes t)
+        CommitMessage s (m, t) -> printf "Commit message %s %d %s\n" (show s) m (unpack $ trim maxBytes t)
+        ServiceAvailable s p -> printf "ServiceAvailable %s %s\n" (show s) (show p) 
+        TerminateProcess s  -> printf "TerminateProcess %s\n" (show s) 
+        CreateTopic t -> printf "CreateTopic %s\n" (show . unpack $ trim maxBytes t)
+        GreetingsFrom s p -> printf "Greetings from %s %s \n" (show s) (show p)
+
+instance Binary Login 
+instance Binary OpenIdProvider
+instance Binary User
+instance Binary OffsetHint
+instance Binary Subscriber
+instance Binary Publisher
+instance Binary PMessage
+
+
+
+---------- Basic types  ----
+type PageSize = Integer
+
+type ServiceName = Text
+type Topic = Text 
+type Location = Integer
+type ErrorCode = Text
+
+newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
+newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show) 
+instance Exception Error
+
+newtype StartUpException = StartUpException Text deriving (Typeable, Show)
+instance Exception StartUpException
+
+
+--- Database types
+data DBVendor = Postgresql | Sqlite
+data DBType = FileSystem | RDBMS DBVendor 
+newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
+newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
+{-| Internal type for persisting process messages -}
+type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
+
 --------------Application types ---
 type CommitOffset = Integer 
 data User = User {
@@ -109,7 +161,7 @@ data PMessage =
   -- * Notifies a subscriber of the next message.
   | NotifyMessage Subscriber (MessageId, Text)
   -- * Writes a message on a topic. 
-  | WriteMessage Publisher (MessageId, Text)
+  | WriteMessage Publisher (MessageId, Topic, Text)
   -- * Commits an offset read for a subscriber.
   | CommitMessage Subscriber (MessageId, Text) -- Commit needs to know about the id that needs to be committed.
   -- * Announces that a current service profile is available on a node.
@@ -119,57 +171,6 @@ data PMessage =
   -- * When a service becomes available, this message greets the service.
   | GreetingsFrom ServiceProfile ProcessId  
   deriving (Typeable, Generic)
-
---MAX_BYTES :: Integer 
-maxBytes = 10 * 1024 * 1024 * 1024 -- 
-
-trim :: Int -> Text -> Text 
-trim = Data.Text.take
-instance Show PMessage where 
-  show pMessage = 
-      case pMessage of 
-        MsgServerInfo a b l -> printf "MsgServerInfo %s %s %s\n" (show a) (show b) (show l)
-        NotifyMessage s (m, t) -> printf "Notify message %s %d %s\n" (show s) (show m) (unpack $ trim maxBytes t) 
-        WriteMessage p (m, t) -> printf "WriteMessage %s %d %s\n" (show p) m (unpack $ trim maxBytes t)
-        CommitMessage s (m, t) -> printf "Commit message %s %d %s\n" (show s) m (unpack $ trim maxBytes t)
-        ServiceAvailable s p -> printf "ServiceAvailable %s %s\n" (show s) (show p) 
-        TerminateProcess s  -> printf "TerminateProcess %s\n" (show s) 
-        CreateTopic t -> printf "CreateTopic %s\n" (show . unpack $ trim maxBytes t)
-        GreetingsFrom s p -> printf "Greetings from %s %s \n" (show s) (show p)
-
-instance Binary Login 
-instance Binary OpenIdProvider
-instance Binary User
-instance Binary OffsetHint
-instance Binary Subscriber
-instance Binary Publisher
-instance Binary PMessage
-
-
-
----------- Basic types  ----
-type PageSize = Integer
-
-type ServiceName = Text
-type Topic = Text 
-type Location = Integer
-type ErrorCode = Text
-
-newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
-newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show) 
-instance Exception Error
-
-newtype StartUpException = StartUpException Text deriving (Typeable, Show)
-instance Exception StartUpException
-
-
---- Database types
-data DBVendor = Postgresql | Sqlite
-data DBType = FileSystem | RDBMS DBVendor 
-newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
-newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
-{-| Internal type for persisting process messages -}
-type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 
 

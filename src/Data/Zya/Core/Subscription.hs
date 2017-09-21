@@ -69,8 +69,8 @@ terminator = do
   remoteProcesses <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
 
   lift $ do
-    say $ printf "Terminator %s %s \n" (show $ serverConfiguration^.serviceProfile) (show $ serverConfiguration^.serviceName)
-    forM_ remoteProcesses $ \peer -> liftIO $ atomically $ sendRemote (serverConfiguration^.server) peer $ CreateTopic "TerminatorTopic"
+    say $ printf "Terminator %s %s \n" (show $ serverConfiguration^.serviceProfile) 
+        (show $ serverConfiguration^.serviceName)
     forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
