@@ -19,11 +19,14 @@ module Data.Zya.Core.Service
         , removeProcess
         -- * Maintain services 
         , addService
+        , queryProcessId
+        , remoteServiceList
     )
 where 
 import Data.Monoid((<>))
 import Data.Map as Map
 import Data.List as List
+import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
@@ -45,6 +48,8 @@ data ClientState = ClientState {
     , readPos :: Integer
 } deriving(Show, Ord, Eq)
 
+
+
 {- | The server unifies remote and local processes to manage logging messages.
     * localClients - For each client identifier, list of topics and their read positions.
     * remoteClients - For each process id the state of the topics.
@@ -58,7 +63,7 @@ data Server = Server {
     , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
     , localWriters :: TVar (Map Topic Integer)
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
-    , remoteWriterList :: TVar [(ProcessId, UTCTime)]
+    , remoteServiceList :: TVar [(ProcessId, ServiceProfile, UTCTime)]
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
     , _proxyChannel :: TChan(Process())
@@ -87,15 +92,15 @@ newServerIO myProcessId = do
     remoteWriterMap <- newTVarIO Map.empty
     serviceMap <- newTVarIO Map.empty
     statistics <- newTVarIO Map.empty
-    rmList <- newTVarIO []
     proxyChannel <- newTChanIO
     initProcessId <- newTVarIO myProcessId
+    remoteServiceListT <- newTVarIO []
     return Server {
         localClients = localClients
         , remoteClients = remoteClientMap 
         , localWriters = localWriterMap 
         , remoteWriters = remoteWriterMap
-        , remoteWriterList = rmList
+        , remoteServiceList = remoteServiceListT
         , services = serviceMap 
         , statistics = statistics
         , _proxyChannel = proxyChannel
@@ -106,7 +111,15 @@ newServer =  liftIO . newServerIO
 
 
 
-
+-- Query a process id for its service profile
+queryProcessId :: Server -> ProcessId -> STM(ProcessId, Maybe ServiceProfile)
+queryProcessId server = 
+  \pid -> do
+    services <- readTVar $ services server 
+    let result = keys $ Map.filterWithKey(\(procId, _) _ -> procId == pid) services
+    case result of
+      [h] -> return (pid, Just . snd $ h)
+      _ -> return(pid, Nothing)
 
 
 {- | 
@@ -187,6 +200,25 @@ findAvailableWriter server = do
   
   return res
 
+data FairnessStrategy = RoundRobin | FirstOne deriving(Show)
+
+safeHead :: [a] -> Maybe a
+safeHead [] = Nothing
+safeHead (h:_) = Just h
+{--| 
+  Find a service to write to. Use a simple round robin strategy.
+--}
+findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId) 
+findAvailableService server sP RoundRobin = do 
+  rsl <- readTVar $ remoteServiceList server
+  spL <- List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) rsl
+  safeHead spL
+
+
+
+
+
+
 removeProcess :: Server -> ProcessId -> STM ProcessId 
 removeProcess server processId = do 
   remoteClients1 <- readTVar $ remoteClients server 
@@ -212,7 +244,6 @@ addService server serviceProfile processId = do
   writeTVar (services server) 
     $ Map.insertWith (+) (processId, serviceProfile) 1 
     s1
+
   return processId
-
-
 

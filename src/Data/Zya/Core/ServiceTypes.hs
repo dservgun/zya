@@ -33,6 +33,8 @@ module Data.Zya.Core.ServiceTypes(
     , Publisher(..)
     -- * Some common handlers for all nodes
     , handleWhereIsReply
+    -- * Manage remote service queues
+    , updateRemoteServiceQueue
   ) where
 
 import GHC.Generics (Generic)
@@ -198,8 +200,12 @@ makeServerConfiguration s b sp sName db cd = ServerConfig s b sp sName db cd
 subscriptionService :: String -> Process () 
 subscriptionService aPort = return ()
 
-sendRemote :: Server -> ProcessId -> PMessage -> STM ()
-sendRemote aServer pid pmsg = writeTChan (proxyChannel aServer) (send pid pmsg)
+
+sendRemote :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ()
+sendRemote aServer pid (pmsg, utcTime) = do 
+    writeTChan (proxyChannel aServer) (send pid pmsg)
+    _ <- updateRemoteServiceQueue aServer pid (pmsg, utcTime)
+    return ()
 
 
 initializeProcess :: ServerReaderT()
@@ -232,11 +238,39 @@ proxyProcess server
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply server serviceProfile a@(WhereIsReply _ (Just pid)) = do
   say $ printf "Handling whereIsReply %s : %s\n"  (show serviceProfile) (show a)
-  mSpid <- 
-    liftIO $ atomically $ do
-    mySpId <- readTVar $ myProcessId server
-    sendRemote server pid $ ServiceAvailable serviceProfile mySpId
 
-    return mySpId
+  mSpid <- 
+    liftIO $ do
+    currentTime <- getCurrentTime
+    atomically $ do
+      mySpId <- readTVar $ myProcessId server
+      sendRemote server pid $ (ServiceAvailable serviceProfile mySpId, currentTime)
+      return mySpId
   say $ printf "Sending info about self %s -> %s, %s \n" (show mSpid) (show pid) (show serviceProfile)
 handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()
+
+{--| 
+  An exception condition when process id was expected to be present.
+--}
+data MissingProcessException =  
+              MissingProcessException
+                {_unProcess :: ProcessId
+                , message :: Text} deriving (Show, Typeable)
+instance Exception MissingProcessException
+
+
+
+{--| 
+Update a service queue for round robin or any other strategy.
+--}
+updateRemoteServiceQueue :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ProcessId
+updateRemoteServiceQueue server processId (m, time) = do 
+
+  (procId, servProfile) <- queryProcessId server processId 
+  case servProfile of 
+    Just sP -> do 
+        readTVar (remoteServiceList server) >>= \rsl -> 
+          writeTVar (remoteServiceList server) ((procId, sP, time) : rsl)
+        return procId
+    Nothing ->  throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
+

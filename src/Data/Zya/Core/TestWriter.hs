@@ -40,9 +40,10 @@ import Data.Zya.Core.ServiceTypes
 writeMessage :: Server -> PMessage -> Process ()
 writeMessage server aMessage =  do
   say $ printf "Sending message %s\n" (show aMessage)
+  currentTime <- liftIO getCurrentTime
   writer <- liftIO $ atomically $ findAvailableWriter server 
   case writer of 
-    Just x -> liftIO $ atomically $ sendRemote (server) x aMessage
+    Just x -> liftIO $ atomically $ sendRemote (server) x (aMessage, currentTime)
     Nothing -> say $ printf "No writer found. "
 
 {-| Test writer to send a few messages -}
@@ -79,19 +80,21 @@ eventLoop = do
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage))
+  currentTime <- liftIO getCurrentTime
   availableWriter <- liftIO $ atomically $ findAvailableWriter server 
   case availableWriter of
-    Just a -> liftIO $ atomically $ sendRemote server a aMessage
+    Just a -> liftIO $ atomically $ sendRemote server a (aMessage, currentTime)
     Nothing -> say $ printf $
                       ("No writer found. Dropping this message " <> (show aMessage))
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
   say $ printf ("TestWriter : Received message " <> (show aMessage))  
+  currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid (GreetingsFrom TestWriter myPid)
+      sendRemote server pid ((GreetingsFrom TestWriter myPid), currentTime)
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
