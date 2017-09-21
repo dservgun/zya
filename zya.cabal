@@ -95,6 +95,7 @@ library
     , transformers >= 0.5 && < 0.6
     , monad-logger >= 0.3 && < 0.4
     , lens >= 4.15 && < 4.16
+    , monad-control >= 1.0 && < 1.1
   -- Directories containing source files.
   hs-source-dirs:      src
   

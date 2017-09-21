@@ -20,7 +20,8 @@ import Data.Time
 import Data.Text
 import Data.ByteString.Char8
 import Data.Zya.Core.ServiceTypes
-
+import Control.Monad.Trans.Control
+import Control.Monad.IO.Class
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] 
  [persistLowerCase|
@@ -36,11 +37,16 @@ c8Pack = Data.ByteString.Char8.pack
 
 persistZ :: MessageT
 persistZ = do 
-  (dbType, ConnectionDetails connStr, message) <- ask
-  runSqlite (Data.Text.pack connStr) $ do
-      runMigration migrateAll
-      currentTime <- liftIO getCurrentTime
-      messageId <- insert $ InMemoryMessage (Data.Text.pack $ show message) currentTime
-      return messageId
-  return $ CreateStatus $  Data.Text.pack $ show message
+  (dbType, ConnectionDetails connStr, message) <- ask 
+  --internalPersist connStr message 
+  return $ CreateStatus $ Data.Text.pack $ show message
 
+
+internalPersist :: (MonadBaseControl IO m, MonadIO m, Show a) => String -> a -> m  CreateStatus
+internalPersist connStr message = do  
+      runSqlite (Data.Text.pack connStr) $ do
+        c <- ask 
+        runMigration migrateAll
+        currentTime <- liftIO getCurrentTime
+        messageId <- insert $ InMemoryMessage (Data.Text.pack $ show message) currentTime
+        return $ CreateStatus $  Data.Text.pack $ show message

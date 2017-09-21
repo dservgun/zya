@@ -27,6 +27,7 @@ import Data.Monoid((<>))
 import Data.Map as Map
 import Data.List as List
 import Control.Exception
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
@@ -208,11 +209,15 @@ safeHead (h:_) = Just h
 {--| 
   Find a service to write to. Use a simple round robin strategy.
 --}
+
 findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId) 
 findAvailableService server sP RoundRobin = do 
   rsl <- readTVar $ remoteServiceList server
-  spL <- List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) rsl
-  safeHead spL
+  let spl = List.map(\(x, y, _) -> x) $
+              List.sortBy(\(_, _, time1) (_, _, time2) -> time1 `compare` time2) $ 
+              List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) rsl
+
+  return $ safeHead spl
 
 
 

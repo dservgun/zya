@@ -39,7 +39,9 @@ createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
   ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite) 
-  writer <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
+  writer1 <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
+  writer2 <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
+  writer3 <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)  
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
   threadDelay (10 ^ 6 * 10) -- add a delay
   tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
