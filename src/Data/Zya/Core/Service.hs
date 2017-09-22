@@ -85,28 +85,22 @@ proxyChannel = _proxyChannel
 myProcessId :: Server -> TVar ProcessId
 myProcessId = _myProcessId
 
+
 newServerIO :: ProcessId -> IO Server 
-newServerIO myProcessId = do
-    localClients <- newTVarIO Map.empty
-    remoteClientMap <- newTVarIO Map.empty
-    localWriterMap <- newTVarIO Map.empty 
-    remoteWriterMap <- newTVarIO Map.empty
-    serviceMap <- newTVarIO Map.empty
-    statistics <- newTVarIO Map.empty
-    proxyChannel <- newTChanIO
-    initProcessId <- newTVarIO myProcessId
-    remoteServiceListT <- newTVarIO []
-    return Server {
-        localClients = localClients
-        , remoteClients = remoteClientMap 
-        , localWriters = localWriterMap 
-        , remoteWriters = remoteWriterMap
-        , remoteServiceList = remoteServiceListT
-        , services = serviceMap 
-        , statistics = statistics
-        , _proxyChannel = proxyChannel
-        , _myProcessId = initProcessId 
-    }
+newServerIO =
+  \m -> 
+    Server 
+      <$> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO [] 
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTChanIO 
+      <*> newTVarIO m
+
+
 newServer :: ProcessId -> Process Server 
 newServer =  liftIO . newServerIO
 
@@ -246,17 +240,19 @@ findAvailableService server sP RoundRobin = do
 removeProcess :: Server -> ProcessId -> STM ProcessId 
 removeProcess server processId = do 
   remoteClients1 <- readTVar $ remoteClients server 
-  let keysToBeDeleted = List.filter (\(p1,_) -> p1 == processId) $ Map.keys remoteClients1 
-  let nRemoteClients = List.foldr (\(k,c) m -> Map.delete (k, c) m) remoteClients1 keysToBeDeleted
+  writeTVar (remoteClients server) $
+    Map.filterWithKey(\(prId, _) c -> prId /= processId) remoteClients1
+
   services1 <- readTVar $ services server 
-  let servToBeDeleted = List.filter (\(p1, _) -> p1 == processId) $ Map.keys services1
-  let newServices = List.foldr(\(k,c) m -> Map.delete (k, c) m) services1 servToBeDeleted 
-  remServices1 <- readTVar $ remoteWriters server 
-  let servToBeDel = List.filter(\(p1,_) -> p1 == processId) $ Map.keys remServices1
-  let newServices1 = List.foldr(\(k, c) m -> Map.delete (k, c) m) remServices1 servToBeDel
-  writeTVar (remoteWriters server) newServices1
-  writeTVar (services server) newServices
-  writeTVar (remoteClients server) nRemoteClients
+  writeTVar (services server) $ Map.filterWithKey(\(prId, _) _ -> processId /= prId) services1
+
+  remWriters <- readTVar $ remoteWriters server 
+  writeTVar (remoteWriters server) $
+    Map.filterWithKey(\(prId, _) _ -> processId /= prId) remWriters
+
+  remoteServiceQueue <- readTVar $ remoteServiceList server 
+  writeTVar (remoteServiceList server) 
+    $ List.filter(\(prId, _,  _) -> prId /= processId) remoteServiceQueue
   return processId
 
 {-- | 
@@ -266,8 +262,6 @@ addService :: Server -> ServiceProfile-> ProcessId -> STM ProcessId
 addService server serviceProfile processId = do 
   s1 <- readTVar $ services server
   writeTVar (services server) 
-    $ Map.insertWith (+) (processId, serviceProfile) 1 
-    s1
-
+    $ Map.insertWith (+) (processId, serviceProfile) 1 s1
   return processId
 
