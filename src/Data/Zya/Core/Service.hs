@@ -206,6 +206,24 @@ data FairnessStrategy = RoundRobin | FirstOne deriving(Show)
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (h:_) = Just h
+
+queryAnyAvailableService :: Server -> ServiceProfile -> STM (Maybe ProcessId)
+queryAnyAvailableService server serviceProfile = do 
+  services <- readTVar $ services server 
+  let entries = 
+        Map.keys $ 
+          Map.filterWithKey(\(_, sProfile) _ -> sProfile == serviceProfile) services
+
+  res <-
+      case entries of
+        h : t -> do 
+          return . Just $ fst h
+        _ ->  return Nothing
+  
+  return res
+
+
+
 {--| 
   Find a service to write to. Use a simple round robin strategy.
 --}
@@ -216,8 +234,9 @@ findAvailableService server sP RoundRobin = do
   let spl = List.map(\(x, y, _) -> x) $
               List.sortBy(\(_, _, time1) (_, _, time2) -> time1 `compare` time2) $ 
               List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) rsl
-
-  return $ safeHead spl
+  case spl of 
+    [] -> queryAnyAvailableService server sP
+    h : _ -> return . Just $ h  
 
 
 

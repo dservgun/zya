@@ -38,34 +38,35 @@ import Data.Zya.Core.ServiceTypes
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
-  say $ printf ("Received message " <> (show aMessage))
+  say $ printf ("Received message " <> (show aMessage) <> "\n")
   -- Check for writers and then send a message to the writer.
+  currentTime <- liftIO getCurrentTime
   availableWriter <- liftIO $ atomically $ findAvailableWriter server
-
   case availableWriter of
     Just a -> do
-        say $ printf "Found a writer %s " (show aMessage)
+        say $ printf "Found a writer %s \n" (show aMessage)
         liftIO $ 
-          atomically $ sendRemote server a aMessage
+          atomically $ sendRemote server a (aMessage, currentTime)
     Nothing -> say $ printf "No writer found. Dropping this message %s\n" (show aMessage)
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage))  
+  say $ printf ("Received message " <> (show aMessage) <> "\n") 
+  currentTime <- liftIO getCurrentTime 
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid (GreetingsFrom TopicAllocator myPid)
+      sendRemote server pid ((GreetingsFrom TopicAllocator myPid), currentTime)
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage))
+  say $ printf ("Received message " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ do 
     addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server unhandledMessage = 
-  say $ printf ("Received unhandled message  " <> (show unhandledMessage))
+  say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
@@ -84,7 +85,7 @@ topicAllocationEventLoop = do
     selfPid <- getSelfPid
     spawnLocal $ proxyProcess server1
     say $ 
-      printf "Updating topic allocator %s, profile : %s" (show TopicAllocator) 
+      printf "Updating topic allocator %s, profile : %s\n" (show TopicAllocator) 
         (show (profile)) 
     forever $
       receiveWait

@@ -36,12 +36,13 @@ import Data.Zya.Core.TestWriter
 
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
-handleRemoteMessage server aMessage = 
-  say $ printf ("Received message " <> (show aMessage))
+handleRemoteMessage server aMessage = do 
+  selfPid <- getSelfPid
+  say $ printf ("Received message " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage = 
-  say $ printf ("Monitor notification " <> (show notificationMessage))
+  say $ printf ("Monitor notification " <> (show notificationMessage) <> "\n")
 
 
 

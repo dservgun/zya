@@ -47,7 +47,6 @@ createTopicTestCase =  do
   tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
   wait tb 
 
-
 allTests :: TestTree
 allTests = testGroup "Yet another zookeeper tests" [
   testGroup "HUnit tests" [

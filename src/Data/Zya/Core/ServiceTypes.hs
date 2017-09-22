@@ -238,7 +238,6 @@ proxyProcess server
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply server serviceProfile a@(WhereIsReply _ (Just pid)) = do
   say $ printf "Handling whereIsReply %s : %s\n"  (show serviceProfile) (show a)
-
   mSpid <- 
     liftIO $ do
     currentTime <- getCurrentTime
@@ -272,5 +271,5 @@ updateRemoteServiceQueue server processId (m, time) = do
         readTVar (remoteServiceList server) >>= \rsl -> 
           writeTVar (remoteServiceList server) ((procId, sP, time) : rsl)
         return procId
-    Nothing ->  throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
+    Nothing ->  return processId --throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
 

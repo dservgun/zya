@@ -42,7 +42,7 @@ persistZ = do
   insert <- 
       runStderrLoggingT $ withPostgresqlPool c 10 $ \pool -> liftIO $ do
         flip runSqlPersistMPool pool $ do
-          --runMigration migrateAll
+          runMigration migrateAll
           currentTime <- liftIO getCurrentTime
           messageId <- insert $ Message (Data.Text.pack $ show message) currentTime
           return messageId

@@ -38,7 +38,7 @@ c8Pack = Data.ByteString.Char8.pack
 persistZ :: MessageT
 persistZ = do 
   (dbType, ConnectionDetails connStr, message) <- ask 
-  --internalPersist connStr message 
+  internalPersist connStr message 
   return $ CreateStatus $ Data.Text.pack $ show message
 
 

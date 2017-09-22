@@ -66,36 +66,38 @@ inform = undefined
 
 
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
-  say $ printf ("Received message " <> (show aMessage))
+  say $ printf ("Received message " <> (show aMessage) <> "\n")
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage))  
+  say $ printf ("Received message " <> (show aMessage) <> "\n")  
+  currentTime <- liftIO $ getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid (GreetingsFrom Writer myPid)
+      sendRemote server pid ((GreetingsFrom Writer myPid), currentTime)
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage))
+  say $ printf ("Received message " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ do 
     addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
-  say $ printf ("Received message " <> (show aMessage))
+  selfPid <- getSelfPid
+  say $ printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
-  say $ printf "Message persisted successfully %s " (show status)
+  say $ printf "Message persisted successfully %s \n" (show status)
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
-  say $ printf ("Received unhandled message  " <> (show unhandledMessage))
+  say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage = 
-  say $ printf ("Monitor notification " <> (show notificationMessage))
+  say $ printf ("Monitor notification " <> (show notificationMessage) <> "\n")
 
 
 

@@ -79,7 +79,7 @@ eventLoop = do
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
-  say $ printf ("Received message " <> (show aMessage))
+  say $ printf ("Received message " <> (show aMessage) <> "\n")
   currentTime <- liftIO getCurrentTime
   availableWriter <- liftIO $ atomically $ findAvailableWriter server 
   case availableWriter of
@@ -89,7 +89,7 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("TestWriter : Received message " <> (show aMessage))  
+  say $ printf ("TestWriter : Received message " <> (show aMessage) <> "\n")  
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
@@ -98,16 +98,16 @@ handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage))
+  say $ printf ("Received message " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ addService server serviceProfile pid
   case serviceProfile of 
     Writer -> do 
       let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "TestWriter", pack "This is a test")
-      writeMessage server aMessage
+      replicateM_ 10 $ writeMessage server aMessage
     _ -> return ()
   return ()
 handleRemoteMessage server unhandledMessage = 
-  say $ printf ("Received unhandled message  " <> (show unhandledMessage))
+  say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
