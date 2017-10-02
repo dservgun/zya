@@ -22,12 +22,15 @@ type Version = [Int]
 isRecent :: (Eq a, Ord a) => a -> a -> Bool
 isRecent = (<)
 
-debugConnStrsqlite :: ConnectionDetails
-debugConnStrsqlite = ConnectionDetails ":memory:"
+debugConnStrsqlite :: (DBType, ConnectionDetails)
+debugConnStrsqlite = (RDBMS Sqlite, ConnectionDetails ":memory:")
 
 
-debugConnStr :: ConnectionDetails 
-debugConnStr = ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432"
+debugConnStrPostgres :: (DBType, ConnectionDetails)
+debugConnStrPostgres = 
+    (RDBMS Postgresql, ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432")
+
+debugConnStr = debugConnStrPostgres
 newtype TServiceName = TServiceName {_unName :: String} deriving Show 
 debugServiceName :: Text 
 debugServiceName = 
@@ -38,19 +41,19 @@ debugServiceName =
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend 
-  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite) 
-  writer1 <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
-  writer2 <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
-  writer3 <- async $ cloudEntryPoint test (Writer, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)  
-  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
-  threadDelay (10 ^ 6 * 10) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, RDBMS Sqlite, debugConnStrsqlite)
+  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr) 
+  writer1 <- async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
+  writer2 <- async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
+  writer3 <- async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)  
+  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr)
+  threadDelay (10 ^ 6 * 30) -- add a delay
+  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, fst debugConnStr, snd debugConnStr)
   wait tb 
 
 allTests :: TestTree
 allTests = testGroup "Yet another zookeeper tests" [
   testGroup "HUnit tests" [
-    testCase "createTopic allocator, shutdown and no exceptions." createTopicTestCase
+    testCase "createTopic allocator, shutdown and no exceptions.\n" createTopicTestCase
     ]
   ]
 

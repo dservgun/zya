@@ -25,6 +25,7 @@ import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
+import Data.UUID.V1
 import Data.Binary
 import Data.Data
 import Data.Map
@@ -37,14 +38,13 @@ import Text.Printf
 import Data.Zya.Core.ServiceTypes
 
 
-writeMessage :: Server -> PMessage -> Process ()
-writeMessage server aMessage =  do
-  say $ printf "Sending message %s\n" (show aMessage)
+--writeMessage :: Server -> PMessage -> Process ()
+writeMessage writer server aMessage =  do
+  say $ printf "Sending message " <> (show aMessage) <> "\n"
   currentTime <- liftIO getCurrentTime
-  writer <- liftIO $ atomically $ findAvailableWriter server 
   case writer of 
     Just x -> liftIO $ atomically $ sendRemote (server) x (aMessage, currentTime)
-    Nothing -> say $ printf "No writer found. "
+    Nothing -> say $ printf "No writer found. " <> "\n"
 
 {-| Test writer to send a few messages -}
 -- Find an available writer, if none found, error out.
@@ -62,7 +62,8 @@ eventLoop = do
   let server1 = serverConfiguration^.server 
   let serviceNameStr = unpack $ serverConfiguration^.serviceName
   let profile = serverConfiguration^.serviceProfile
-  lift $ say $ printf "Test writer event loop : %s : %s\n" (show serviceNameStr) (show profile)
+  lift $ say $ printf "Test writer event loop : " <> (show serviceNameStr) <> ": " <> 
+        (show profile) <> ".\n" 
   lift $ do 
     let sName = serviceNameStr
     selfPid <- getSelfPid
@@ -85,7 +86,7 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   case availableWriter of
     Just a -> liftIO $ atomically $ sendRemote server a (aMessage, currentTime)
     Nothing -> say $ printf $
-                      ("No writer found. Dropping this message " <> (show aMessage))
+                      "No writer found. Dropping this message " <> show aMessage <> "\n"
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
@@ -96,16 +97,45 @@ handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
       addService server serviceProfile pid
       sendRemote server pid ((GreetingsFrom TestWriter myPid), currentTime)
   return ()
+handleRemoteMessage server aMessage@(MessageKeyStore (messageId, processId)) = do
+  say $ printf ("Test writer : Updating process key " 
+                <> (show messageId) <> "->" <> (show processId) <> "\n")
+  void $ liftIO $ atomically $ updateMessageKey server processId messageId
+  return()
+
+
+
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   say $ printf ("Received message " <> (show aMessage) <> "\n")
-  _ <- liftIO $ atomically $ addService server serviceProfile pid
+  p <- liftIO $ atomically $ addService server serviceProfile pid
+  say $ printf "Added service " <> show p <> show serviceProfile <> "\n"
   case serviceProfile of 
-    Writer -> do 
-      let aMessage = WriteMessage (Publisher $ pack "testPublisher") (1, pack "TestWriter", pack "This is a test")
-      replicateM_ 10 $ writeMessage server aMessage
+    Writer -> replicateM_ 10 sendOneMessage 
     _ -> return ()
   return ()
+  where
+    sendOneMessage = do 
+        nextId <- liftIO (nextUUID)
+        writer <- liftIO $ atomically $ findAvailableWriter server 
+
+        case nextId of 
+          Just nId -> do 
+            say $ printf "Next Id " <> (show nId) <> "\n"
+            let topic = Topic $ pack "TestTopic"
+            let nMessage =  
+                  WriteMessage 
+                    (Publisher topic) 
+                    (pack $ show nId , topic, pack ("This is a test" <> show writer))
+            say $ printf "Topic " <> show topic <>  show nMessage <> "\n"
+
+            -- liftIO $ print "Message " <> show nMessage <> "\n"
+            _ <- writeMessage writer server nMessage
+            say $ printf "Before exiting..." <> "\n"
+            return ()
+          Nothing -> do 
+            say $ printf "Nothing to print" <> "\n"
+
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 

@@ -88,7 +88,9 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   selfPid <- getSelfPid
   say $ printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
-  say $ printf "Message persisted successfully %s \n" (show status)
+  liftIO $ atomically $ updateMessageKey server selfPid messageId   
+  liftIO $ atomically $ publishMessageAddress server selfPid messageId
+  say $ printf "Message persisted successfully " <> (show status) <> "\n"
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 

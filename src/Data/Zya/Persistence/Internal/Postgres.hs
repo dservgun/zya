@@ -20,7 +20,7 @@ import Database.Persist.Postgresql
 import Data.Time
 import Data.Text
 import Data.ByteString.Char8
-import Data.Zya.Core.ServiceTypes
+import Data.Zya.Core.Service
 
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] 

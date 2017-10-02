@@ -19,7 +19,7 @@ import Database.Persist.Sqlite
 import Data.Time
 import Data.Text
 import Data.ByteString.Char8
-import Data.Zya.Core.ServiceTypes
+import Data.Zya.Core.Service
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
 

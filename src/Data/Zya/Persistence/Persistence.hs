@@ -7,11 +7,10 @@ module Data.Zya.Persistence.Persistence
   ) 
 where
 import Data.Text as Text
-import Data.Zya.Core.ServiceTypes(PMessage)
 import Control.Monad.Reader
 import Data.Zya.Persistence.Internal.Postgres as Postgres
 import Data.Zya.Persistence.Internal.Sqlite as Sqlite
-import Data.Zya.Core.ServiceTypes
+import Data.Zya.Core.Service
 
 {- | 
   Persist a process message to the appropriate database.

@@ -40,23 +40,26 @@ handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
   say $ printf ("Received message " <> (show aMessage) <> "\n")
   -- Check for writers and then send a message to the writer.
-  currentTime <- liftIO getCurrentTime
-  availableWriter <- liftIO $ atomically $ findAvailableWriter server
-  case availableWriter of
-    Just a -> do
-        say $ printf "Found a writer %s \n" (show aMessage)
-        liftIO $ 
-          atomically $ sendRemote server a (aMessage, currentTime)
-    Nothing -> say $ printf "No writer found. Dropping this message %s\n" (show aMessage)
+  availableWriter <- 
+    liftIO $ do 
+      currentTime <- getCurrentTime
+      availableWriter <- atomically $ findAvailableWriter server
+      case availableWriter of 
+        Just a ->  atomically $ sendRemote server a (aMessage, currentTime)
+        Nothing -> return ()
+      return availableWriter
+  say $ printf ("Sent message to writer " <> (show availableWriter) <> "\n")
+  return ()
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
   say $ printf ("Received message " <> (show aMessage) <> "\n") 
-  currentTime <- liftIO getCurrentTime 
-  _ <- liftIO $ atomically $ do 
-      myPid <- getMyPid server
-      addService server serviceProfile pid
-      sendRemote server pid ((GreetingsFrom TopicAllocator myPid), currentTime)
+  liftIO $ do 
+      currentTime <- liftIO getCurrentTime
+      atomically $ do 
+        myPid <- getMyPid server
+        addService server serviceProfile pid
+        sendRemote server pid ((GreetingsFrom TopicAllocator myPid), currentTime)
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
@@ -69,9 +72,8 @@ handleRemoteMessage server unhandledMessage =
   say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
-  _ <- liftIO $ atomically $ removeProcess server pid 
-  return ()
+handleMonitorNotification server (ProcessMonitorNotification _ pid _) = 
+  void $ liftIO $ atomically $ removeProcess server pid
 
 
 topicAllocationEventLoop :: ServerReaderT ()
@@ -85,8 +87,9 @@ topicAllocationEventLoop = do
     selfPid <- getSelfPid
     spawnLocal $ proxyProcess server1
     say $ 
-      printf "Updating topic allocator %s, profile : %s\n" (show TopicAllocator) 
-        (show (profile)) 
+      printf "Updating topic allocator profile : " 
+          <> (show TopicAllocator)  <> ":"
+          <> (show (profile)) <> "\n"
     forever $
       receiveWait
         [ 
@@ -111,8 +114,6 @@ topicAllocationEventLoop = do
   get a basic understanding of the overall interactions with the system. 
 
 -}
-
-
 topicAllocator :: ServerReaderT ()
 topicAllocator = do 
   serverConfiguration <- ask
