@@ -13,7 +13,7 @@ import Data.Zya.Persistence.Internal.Sqlite as Sqlite
 import Data.Zya.Core.Service
 
 {- | 
-  Persist a process message to the appropriate database.
+  Persist a process message.
 -}
 
 

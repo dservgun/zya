@@ -23,6 +23,8 @@ import Control.Distributed.Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+--If debug: how to set debug flags
+import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
 
 import Data.Binary
 import Data.Data
@@ -59,18 +61,14 @@ persistMessage = do
   return $ CreateStatus "success??"
 
 
-inform :: CreateStatus -> Process () 
-inform = undefined
 
-
-
-
+handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n")
+  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n")  
+  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")  
   currentTime <- liftIO $ getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
@@ -79,29 +77,28 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n")
+  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ do 
     addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  say $ printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
+  traceLog $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
-  liftIO $ atomically $ updateMessageKey server selfPid messageId   
-  liftIO $ atomically $ publishMessageAddress server selfPid messageId
-  say $ printf "Message persisted successfully " <> (show status) <> "\n"
+  _ <- liftIO $ atomically $ do 
+      _ <- updateMessageKey server selfPid messageId   
+      publishMessageKey server selfPid messageId
+  traceLog $ printf "Message persisted successfully " <> (show status) <> "\n"
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
-  say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  traceLog $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage = 
-  say $ printf ("Monitor notification " <> (show notificationMessage) <> "\n")
-
-
+  traceLog $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
 
 
 eventLoop :: ServerReaderT ()

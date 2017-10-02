@@ -22,7 +22,7 @@ module Data.Zya.Core.Service
         , addService
         , queryProcessId
         , remoteServiceList
-        , publishMessageAddress
+        , publishMessageKey
     -- * server reader 
     , ServerReaderT
     -- * Message types.
@@ -549,8 +549,8 @@ fireRemote aServer pid pmsg = do
   return ()
 
 -- Publish the key info to all the services other than self.
-publishMessageAddress :: Server -> ProcessId -> MessageId -> STM ProcessId 
-publishMessageAddress server processId messageId = do 
+publishMessageKey :: Server -> ProcessId -> MessageId -> STM ProcessId 
+publishMessageKey server processId messageId = do 
     rProcesses <- remoteProcesses server
     mapM_ (\pid -> fireRemote server pid (MessageKeyStore (messageId, processId)))
       rProcesses

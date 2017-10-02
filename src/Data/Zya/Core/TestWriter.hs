@@ -105,7 +105,6 @@ handleRemoteMessage server aMessage@(MessageKeyStore (messageId, processId)) = d
 
 
 
-
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   say $ printf ("Received message " <> (show aMessage) <> "\n")
   p <- liftIO $ atomically $ addService server serviceProfile pid
@@ -116,9 +115,8 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   return ()
   where
     sendOneMessage = do 
-        nextId <- liftIO (nextUUID)
-        writer <- liftIO $ atomically $ findAvailableWriter server 
-
+        nextId <- fmap id $ liftIO (nextUUID)
+        writer <- liftIO $ atomically $ findAvailableWriter server
         case nextId of 
           Just nId -> do 
             say $ printf "Next Id " <> (show nId) <> "\n"
