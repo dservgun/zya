@@ -86,9 +86,10 @@ topicAllocationEventLoop = do
     let sName = serviceNameStr
     selfPid <- getSelfPid
     spawnLocal $ proxyProcess server1
+    -- TODO: Replace with trace logs.
     say $ 
       printf "Updating topic allocator profile : " 
-          <> (show TopicAllocator)  <> ":"
+          <> (serviceNameStr)  <> ":"
           <> (show (profile)) <> "\n"
     forever $
       receiveWait

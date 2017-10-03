@@ -36,7 +36,7 @@ import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
 import Data.Zya.Core.TestWriter
-
+import Data.Zya.Core.QueryService
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage = do 
@@ -52,8 +52,6 @@ handleMonitorNotification server notificationMessage =
 readerService :: ServerReaderT () 
 readerService = undefined
 
-databaseService :: ServerReaderT () 
-databaseService = undefined
 
 webService :: ServerReaderT () 
 webService = undefined
@@ -92,7 +90,7 @@ subscription backend (sP, params, dbType, dbConnection) = do
   case sP of
     Writer -> runReaderT writer readerParams
     Reader -> runReaderT readerService readerParams
-    DatabaseServer -> runReaderT databaseService readerParams
+    QueryService -> runReaderT queryService readerParams
     WebServer ->  runReaderT webService readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
@@ -119,7 +117,7 @@ parseArgs = do
     case serviceName of 
       "Writer" -> (Writer, params, portNumber)
       "Reader" -> (Reader, params, portNumber)
-      "Database" -> (DatabaseServer, params, portNumber) 
+      "QueryService" -> (QueryService, params, portNumber) 
       "Webserver" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)

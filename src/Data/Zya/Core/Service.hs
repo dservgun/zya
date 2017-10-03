@@ -15,6 +15,7 @@ module Data.Zya.Core.Service
         , defaultSimpleConfiguration
         , isSingleton
         , findAvailableWriter
+        , findAvailableService
         , getMyPid
         -- * Update maps 
         , removeProcess
@@ -59,10 +60,12 @@ module Data.Zya.Core.Service
     , updateRemoteServiceQueue
     , updateMessageKey
     , Topic(..)
+    , FairnessStrategy(..)
     )
 where 
 import Data.Monoid((<>))
 import Data.Map as Map
+import Data.Set as Set
 import Data.List as List
 import Control.Exception
 import Control.Applicative
@@ -143,6 +146,10 @@ data Server = Server {
     , _proxyChannel :: TChan(Process())
     , _myProcessId :: TVar (ProcessId)
     , _messageKey :: TVar (Map MessageId ProcessId)
+    -- Except for query services, the rest of the processes wont be populating 
+    -- this cache. This should be modeled as a service level cache,
+    -- that each kind of service should handle.
+    , _messageValues :: TVar(Set PMessage)
 }
 
 
@@ -250,9 +257,9 @@ data FairnessStrategy = RoundRobin | FirstOne deriving(Show)
 {- | Supported services -}
 data ServiceProfile = 
     WebServer 
-    | DatabaseServer 
     | Reader 
     | Writer 
+    | QueryService
     | TopicAllocator
     -- * Terminate all processes. This may not be needed.
     | Terminator
@@ -281,7 +288,9 @@ subscriptionService :: String -> Process ()
 subscriptionService aPort = return ()
 
 
-
+{--| 
+  Service initialization and generic handlers.
+--}
 initializeProcess :: ServerReaderT()
 initializeProcess = do 
   serverConfiguration <- ask
@@ -381,7 +390,7 @@ newServerIO =
       <*> newTChanIO 
       <*> newTVarIO m
       <*> newTVarIO Map.empty
-
+      <*> newTVarIO Set.empty
 
 newServer :: ProcessId -> Process Server 
 newServer =  liftIO . newServerIO
@@ -432,7 +441,7 @@ type ServiceRange = (Int, Int)
 {- | A typical default configuration.
 -}
 defaultSimpleConfiguration :: [(ServiceProfile, ServiceRange)]
-defaultSimpleConfiguration = [(WebServer, (3, 10)), (DatabaseServer, (3, 10)), 
+defaultSimpleConfiguration = [(WebServer, (3, 10)), (QueryService, (3, 10)), 
                         (Reader, (3, 10)), 
                         (Writer, (3, 10))]
 
@@ -466,9 +475,6 @@ findAvailableWriter server = do
   return res
 
 
-safeHead :: [a] -> Maybe a
-safeHead [] = Nothing
-safeHead (h:_) = Just h
 
 queryAnyAvailableService :: Server -> ServiceProfile -> STM (Maybe ProcessId)
 queryAnyAvailableService server serviceProfile = do 
@@ -488,20 +494,20 @@ queryAnyAvailableService server serviceProfile = do
 
 
 {--| 
-  Find a service to write to. Use a simple round robin strategy.
+  Find a service to write to. Use a simple strategy
 --}
 
 findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId) 
 findAvailableService server sP RoundRobin = do 
-  rsl <- readTVar $ remoteServiceList server
+  services <- readTVar $ remoteServiceList server  
   let spl = List.map(\(x, y, _) -> x) $
               List.sortBy(\(_, _, time1) (_, _, time2) -> time1 `compare` time2) $ 
-              List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) rsl
+              List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) services
   case spl of 
     [] -> queryAnyAvailableService server sP
     h : _ -> return . Just $ h  
 
-
+findAvailableService server sP FirstOne = queryAnyAvailableService server sP
 
 
 

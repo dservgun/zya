@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
-module Data.Zya.Core.Writer(
-  -- * Writers that handle log events
-  writer
+module Data.Zya.Core.QueryService(
+  -- * Query service that process query requests
+  queryService
   , handleRemoteMessage
   ) where
 
@@ -38,10 +38,7 @@ import Data.Zya.Core.ServiceTypes
 import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
--- File path to actually do the logging.
--- Use conduits.
-rootLocation :: FilePath 
-rootLocation = "./tmp" 
+
 
 
 persistMessage :: MessageT
@@ -75,15 +72,8 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  time <- liftIO $ getCurrentTime
   traceLog $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
-  status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
-  _ <- liftIO $ atomically $ do 
-      _ <- updateMessageKey server selfPid messageId   
-      publishMessageKey server selfPid messageId
-  queryService <- liftIO $ atomically $ findAvailableService server QueryService RoundRobin
-  _ <- maybe (return ()) (\x -> liftIO $ atomically $ sendRemote server x (aMessage, time)) queryService
-  traceLog $ printf "Message persisted successfully " <> (show status) <> "\n"
+  -- Update local cache.
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
@@ -91,8 +81,9 @@ handleRemoteMessage server dbType connectionString unhandledMessage =
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server notificationMessage = 
+handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
   traceLog $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  void $ liftIO $ atomically $ removeProcess server pid 
 
 
 eventLoop :: ServerReaderT ()
@@ -115,8 +106,8 @@ eventLoop = do
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 
-writer :: ServerReaderT () 
-writer = do
+queryService :: ServerReaderT () 
+queryService = do
   initializeProcess
   eventLoop
   return()
