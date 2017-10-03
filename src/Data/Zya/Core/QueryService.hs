@@ -74,6 +74,7 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   selfPid <- getSelfPid
   traceLog $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   -- Update local cache.
+  _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 

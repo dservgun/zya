@@ -59,6 +59,10 @@ module Data.Zya.Core.Service
     -- * Manage remote service queues
     , updateRemoteServiceQueue
     , updateMessageKey
+    , updateMessageLocation
+    , updateMessageValue
+    , queryMessageValue
+    , queryMessageLocation
     , Topic(..)
     , FairnessStrategy(..)
     )
@@ -146,10 +150,12 @@ data Server = Server {
     , _proxyChannel :: TChan(Process())
     , _myProcessId :: TVar (ProcessId)
     , _messageKey :: TVar (Map MessageId ProcessId)
+    -- The location of the message in the cluster of query services
+    , _messageLocation :: TVar(Map MessageId ProcessId)
     -- Except for query services, the rest of the processes wont be populating 
     -- this cache. This should be modeled as a service level cache,
     -- that each kind of service should handle.
-    , _messageValues :: TVar(Set PMessage)
+    , _messageValues :: TVar(Map MessageId PMessage)
 }
 
 
@@ -376,6 +382,7 @@ myProcessId = _myProcessId
 messageKey :: Server -> TVar (Map MessageId ProcessId) 
 messageKey s = _messageKey s 
 
+
 newServerIO :: ProcessId -> IO Server 
 newServerIO =
   \m -> 
@@ -390,7 +397,8 @@ newServerIO =
       <*> newTChanIO 
       <*> newTVarIO m
       <*> newTVarIO Map.empty
-      <*> newTVarIO Set.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
 
 newServer :: ProcessId -> Process Server 
 newServer =  liftIO . newServerIO
@@ -548,7 +556,29 @@ updateMessageKey server processId messageId = do
             $ Map.insert messageId processId messageKeyL
           return processId
 
+updateMessageValue :: Server -> MessageId -> PMessage -> STM PMessage 
+updateMessageValue server messageKey aMessage = do 
+  readTVar (_messageValues server) >>= \x -> 
+    writeTVar (_messageValues server) $ 
+      Map.insert messageKey aMessage x
+  return aMessage
 
+queryMessageValue :: Server -> MessageId -> STM (Maybe PMessage) 
+queryMessageValue server messageKey = 
+  readTVar (_messageValues server) >>= \x -> return $ Map.lookup messageKey x
+queryMessageLocation :: Server -> MessageId -> STM (Maybe ProcessId)
+queryMessageLocation server messageId = 
+    readTVar (_messageLocation server)
+      >>= \ x -> do 
+          return (Map.lookup messageId x)
+-- Update message query location 
+updateMessageLocation :: Server -> ProcessId -> MessageId -> STM ProcessId 
+updateMessageLocation server processId messageId =
+    readTVar (_messageLocation server)
+        >>= \x -> do 
+          writeTVar (_messageLocation server) $ 
+            Map.insert messageId processId x 
+          return processId
 fireRemote :: Server -> ProcessId -> PMessage -> STM ()
 fireRemote aServer pid pmsg = do 
   writeTChan (proxyChannel aServer) (send pid pmsg)

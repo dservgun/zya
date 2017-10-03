@@ -81,8 +81,12 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   _ <- liftIO $ atomically $ do 
       _ <- updateMessageKey server selfPid messageId   
       publishMessageKey server selfPid messageId
-  queryService <- liftIO $ atomically $ findAvailableService server QueryService RoundRobin
-  _ <- maybe (return ()) (\x -> liftIO $ atomically $ sendRemote server x (aMessage, time)) queryService
+  posProcessId <- liftIO $ atomically $ do 
+        r <- queryMessageLocation server messageId
+        case r of 
+          Just r1 -> return r
+          Nothing -> findAvailableService server QueryService RoundRobin
+  _ <- maybe (return ()) (\x -> liftIO $ atomically $ sendRemote server x (aMessage, time)) posProcessId
   traceLog $ printf "Message persisted successfully " <> (show status) <> "\n"
   return ()
 
