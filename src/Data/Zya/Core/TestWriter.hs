@@ -11,7 +11,7 @@ import System.Environment(getArgs)
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Concurrent.STM
-import Control.Applicative((<$>))
+import Control.Applicative((<$>), liftA2)
 import Control.Exception
 
 import Control.Lens
@@ -28,6 +28,7 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
 import Data.UUID.V1
+import Data.Maybe
 import Data.Binary
 import Data.Data
 import Data.Map
@@ -38,6 +39,11 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
+
+
+newtype UUIDGenException = 
+    UUIDGenException{_unReason :: String} deriving Show
+instance Exception UUIDGenException
 
 
 --writeMessage :: Server -> PMessage -> Process ()
@@ -116,7 +122,6 @@ handleRemoteMessage server aMessage@(MessageKeyStore (messageId, processId)) = d
   return()
 
 
-
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   say $ printf ("Received message " <> (show aMessage) <> "\n")
   p <- liftIO $ atomically $ addService server serviceProfile pid
@@ -138,29 +143,10 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
             WriteMessage 
               (Publisher topic) 
               (pack $ show nId , topic, pack ("This is a test" <> show nId))
-
-    sendOneMessage = do 
-        nextId <- fmap id $ liftIO (nextUUID)
-        writer <- liftIO $ atomically $ findAvailableWriter server
-        case nextId of 
-          Just nId -> do 
-            say $ printf "Next Id " <> (show nId) <> "\n"
-            let topic = Topic $ pack "TestTopic"
-            let nMessage =  
-                  WriteMessage 
-                    (Publisher topic) 
-                    (pack $ show nId , topic, pack ("This is a test" <> show writer))
-            say $ printf "Topic " <> show topic <>  show nMessage <> "\n"
-
-            -- liftIO $ print "Message " <> show nMessage <> "\n"
-            _ <- writeMessage writer server nMessage
-            return ()
-          Nothing -> do 
-            say $ printf "Nothing to print" <> "\n"
+        Nothing -> throw $ UUIDGenException "No next id."
 
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
-
 
 
 type AvailableServerState = StateT(Maybe ProcessId) (ReaderT (ServiceProfile, FairnessStrategy) Process)
@@ -169,9 +155,16 @@ sendMessage :: PMessage -> Server -> AvailableServerState ()
 sendMessage aMessage server = do
   (serviceProfile, strategy) <- ask
   prevWriter <-  State.get 
-  nextWriter <- lift $ liftIO $ atomically $ findAvailableService server serviceProfile strategy
-  State.put(nextWriter)
+  current <- lift $ liftIO $ atomically $ findAvailableService server serviceProfile strategy
+  State.put(current)
+  let sticky = sameAsBefore prevWriter current
+  when sticky $ 
+      lift $ lift $ say $ printf ("Sticky process.." <> show prevWriter <> " : " <> show current)
   return ()
+
+
+sameAsBefore :: Maybe(ProcessId) -> Maybe(ProcessId) -> Bool
+sameAsBefore a b = fromMaybe False $ liftA2 (==) a b 
 
 runMessage :: PMessage -> Server -> Process () 
 runMessage aMessage server = do 
