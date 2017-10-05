@@ -255,6 +255,8 @@ data PMessage =
   | CreateTopic Text 
   -- * When a service becomes available, this message greets the service.
   | GreetingsFrom ServiceProfile ProcessId  
+  -- Send the message back to the process id
+  | QueryMessage (MessageId, ProcessId, Maybe PMessage)
   deriving (Typeable, Generic)
 
 data FairnessStrategy = RoundRobin | FirstOne deriving(Show)

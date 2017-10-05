@@ -21,7 +21,7 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
 --If debug: how to set debug flags
-import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
+import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog, eventLogTracer)
 
 import Data.Binary
 import Data.Data
@@ -81,12 +81,11 @@ terminator = do
 
 subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails) -> Process ()
 subscription backend (sP, params, dbType, dbConnection) = do
-  systemLoggerTracer
-  logfileTracer("./tmp/zya.log")
+  --eventLogTracer  
   myPid <- getSelfPid
   n <- newServer myPid
   let readerParams = makeServerConfiguration n backend sP params dbType dbConnection
-  traceLog $ printf $ "Starting subscrpition " <> (show sP) <> (show params) <> "\n"
+  say $ printf $ "Starting subscrpition " <> (show sP) <> (show params) <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
     Reader -> runReaderT readerService readerParams

@@ -23,7 +23,7 @@ import Control.Distributed.Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
---If debug: how to set debug flags
+
 import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
 
 import Data.Binary
@@ -53,11 +53,11 @@ persistMessage = do
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
-  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> (show aMessage) <> "\n")
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
-  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")  
+  say $  printf ("Received message " <> (show aMessage) <> "\n")  
   currentTime <- liftIO $ getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
@@ -66,24 +66,32 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
-  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  traceLog $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
-  -- Update local cache.
+  say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
   return ()
+handleRemoteMessage server dbType connectionString aMessage@(QueryMessage (messageId, processId, message)) = do
+  say $ printf ("Received message " <> show aMessage <> "\n") 
+  currentTime <- liftIO getCurrentTime
+  _ <- liftIO $ atomically $ do 
+        messageValue <- queryMessageValue server messageId
+        sendRemote server processId 
+          ((QueryMessage (messageId, processId, messageValue)), currentTime)
+  return ()
+  
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
-  traceLog $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  traceLog $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid 
 
 

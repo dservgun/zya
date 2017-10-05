@@ -19,6 +19,8 @@ import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Trans
 import Control.Monad.Reader
+import Control.Monad.State as State
+import Control.Monad.Writer
 
 import Control.Distributed.Process
 import Control.Distributed.Process.Closure
@@ -97,10 +99,20 @@ handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
       addService server serviceProfile pid
       sendRemote server pid ((GreetingsFrom TestWriter myPid), currentTime)
   return ()
+
+handleRemoteMessage server aMessage@(QueryMessage (messageId, processId, message)) = do 
+  say $ printf ("Query Message handler : Received message " <> show message <> "\n")
+
 handleRemoteMessage server aMessage@(MessageKeyStore (messageId, processId)) = do
+  myPid <- getSelfPid
   say $ printf ("Test writer : Updating process key " 
                 <> (show messageId) <> "->" <> (show processId) <> "\n")
+  currentTime <- liftIO getCurrentTime
   void $ liftIO $ atomically $ updateMessageKey server processId messageId
+{-  _ <- liftIO $ atomically $ 
+            sendRemote server processId ((QueryMessage (messageId, myPid, Nothing)), currentTime)
+-}  
+  say $ printf ("Message key store message processed..")
   return()
 
 
@@ -110,10 +122,23 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   p <- liftIO $ atomically $ addService server serviceProfile pid
   say $ printf "Added service " <> show p <> show serviceProfile <> "\n"
   case serviceProfile of 
-    Writer -> replicateM_ 10 sendOneMessage 
+    Writer -> do 
+      nMessage <- getNextMessage
+      replicateM_ 10 $ runMessage nMessage server
     _ -> return ()
   return ()
   where
+    getNextMessage = do 
+      nextId <- fmap id $ liftIO nextUUID 
+      case nextId of 
+        Just nId -> do 
+          let topic = Topic $ pack "TestTopic"
+          return $ 
+            WriteMessage 
+              (Publisher topic) 
+              (pack $ show nId , topic, pack ("This is a test" <> show nId))
+
+
     sendOneMessage = do 
         nextId <- fmap id $ liftIO (nextUUID)
         writer <- liftIO $ atomically $ findAvailableWriter server
@@ -129,13 +154,30 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
 
             -- liftIO $ print "Message " <> show nMessage <> "\n"
             _ <- writeMessage writer server nMessage
-            say $ printf "Before exiting..." <> "\n"
             return ()
           Nothing -> do 
             say $ printf "Nothing to print" <> "\n"
 
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+
+
+
+type AvailableServerState = StateT(Maybe ProcessId) (ReaderT (ServiceProfile, FairnessStrategy) Process)
+
+sendMessage :: PMessage -> Server -> AvailableServerState ()
+sendMessage aMessage server = do
+  (serviceProfile, strategy) <- ask
+  prevWriter <-  State.get 
+  nextWriter <- lift $ liftIO $ atomically $ findAvailableService server serviceProfile strategy
+  State.put(nextWriter)
+  return ()
+
+runMessage :: PMessage -> Server -> Process () 
+runMessage aMessage server = do 
+  initWriter <- liftIO $ atomically $ findAvailableWriter server
+  runReaderT (runStateT (sendMessage aMessage server) initWriter) (Writer, RoundRobin)
+  return ()
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do

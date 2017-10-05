@@ -56,11 +56,11 @@ persistMessage = do
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
-  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> (show aMessage) <> "\n")
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
-  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")  
+  say $  printf ("Received message " <> (show aMessage) <> "\n")  
   currentTime <- liftIO $ getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
@@ -69,14 +69,14 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
-  traceLog $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   selfPid <- getSelfPid
   time <- liftIO $ getCurrentTime
-  traceLog $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
   _ <- liftIO $ atomically $ do 
       _ <- updateMessageKey server selfPid messageId   
@@ -87,16 +87,16 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
           Just r1 -> return r
           Nothing -> findAvailableService server QueryService RoundRobin
   _ <- maybe (return ()) (\x -> liftIO $ atomically $ sendRemote server x (aMessage, time)) posProcessId
-  traceLog $ printf "Message persisted successfully " <> (show status) <> "\n"
+  say $ printf "Message persisted successfully " <> (show status) <> "\n"
   return ()
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
-  traceLog $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage = 
-  traceLog $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
 
 
 eventLoop :: ServerReaderT ()
