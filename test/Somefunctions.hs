@@ -1,7 +1,14 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module SomeFunctions where  
 
 import Control.Monad
+import Control.Monad.Trans 
+import Control.Monad.Reader 
+import Control.Monad.Writer 
+import Control.Monad.State 
+import Control.Concurrent.STM
+
 import Data.Set as Set hiding(foldl, map, foldr)
 data Tree a = Node a [Tree a] deriving(Show)
 data MyMaybe a = MJust a | MNothing deriving (Show)
@@ -145,23 +152,28 @@ f2 :: Int -> Int
 f2 a = a
 
 
---Goal : create a validation mechanism
-type Product = String
-isADR :: String -> Either String Product
-isADR "ADR" = Right "ADR"
-isADR _ = Left "Not an adr"
+type Process = IO 
+newtype AvailableServerState a = 
+    AServerState {
+      runAs :: StateT(Maybe ProcessId) (ReaderT (ServiceProfile, FairnessStrategy) Process) a
+      } deriving(
+          Functor
+        , Applicative
+        , Monad
+        , MonadIO 
+        , MonadState (Maybe ProcessId)
+        , MonadReader (ServiceProfile, FairnessStrategy)
+        )
 
-{-
-newtype Validation e a = 
-    Validation {getValidation :: Either e a}
-      deriving(Functor)-}
-{-
-instance Monoid e => Applicative (Validation e) where 
-  pure = Validation . Right 
-  Validation-}
+type ProcessId = Int
+type ServiceProfile = Int
+type Server = Int
+type PMessage = String
+type FairnessStrategy = Int
+findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId) 
+findAvailableService = undefined
 
-newtype MaybeT m a = MaybeT {runMaybeT :: m a}
 
-instance Monad m => Monad (MaybeT m) where 
-  return = MaybeT . return
-  (>>=)  = undefined
+sendMessage :: PMessage -> Server -> AvailableServerState ()
+sendMessage p s = do 
+  void $ liftIO $ atomically $ findAvailableService s 1 2 
