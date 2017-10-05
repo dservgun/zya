@@ -133,11 +133,11 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
       case nextId of 
         Just nId -> do 
           let topic = Topic $ pack "TestTopic"
+          say $ printf "Writing message \n" 
           return $ 
             WriteMessage 
               (Publisher topic) 
               (pack $ show nId , topic, pack ("This is a test" <> show nId))
-
 
     sendOneMessage = do 
         nextId <- fmap id $ liftIO (nextUUID)
