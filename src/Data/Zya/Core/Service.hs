@@ -144,7 +144,7 @@ data Server = Server {
     , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
     , localWriters :: TVar (Map Topic Integer)
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
-    , remoteServiceList :: TVar [(ProcessId, ServiceProfile, UTCTime)]
+    , remoteServiceList :: TVar (Map (ProcessId, ServiceProfile) UTCTime)
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
     , _proxyChannel :: TChan(Process())
@@ -348,12 +348,12 @@ Update a service queue for round robin or any other strategy.
 --}
 updateRemoteServiceQueue :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ProcessId
 updateRemoteServiceQueue server processId (m, time) = do 
-
   (procId, servProfile) <- queryProcessId server processId 
   case servProfile of 
     Just sP -> do 
         readTVar (remoteServiceList server) >>= \rsl -> 
-          writeTVar (remoteServiceList server) ((procId, sP, time) : rsl)
+          writeTVar (remoteServiceList server) $ 
+              Map.insert (procId, sP) time rsl
         return procId
     Nothing ->  return processId --throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
 
@@ -393,7 +393,7 @@ newServerIO =
       <*> newTVarIO Map.empty
       <*> newTVarIO Map.empty
       <*> newTVarIO Map.empty
-      <*> newTVarIO [] 
+      <*> newTVarIO Map.empty 
       <*> newTVarIO Map.empty
       <*> newTVarIO Map.empty
       <*> newTChanIO 
@@ -470,20 +470,7 @@ isSingleton _ = False
   , though find the one with the least number of topics or messages or both.
 -}
 findAvailableWriter :: Server -> STM (Maybe ProcessId)
-findAvailableWriter server = do 
-  writers <- readTVar $ services server 
-  let entries = 
-        Map.keys $ 
-          Map.filterWithKey(\(_, sProfile) _ -> sProfile == Writer) writers
-
-  res <-
-      case entries of
-        h : t -> do 
-          return . Just $ fst h
-        _ ->  return Nothing
-  
-  return res
-
+findAvailableWriter server = findAvailableService server Writer RoundRobin
 
 
 queryAnyAvailableService :: Server -> ServiceProfile -> STM (Maybe ProcessId)
@@ -510,9 +497,10 @@ queryAnyAvailableService server serviceProfile = do
 findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId) 
 findAvailableService server sP RoundRobin = do 
   services <- readTVar $ remoteServiceList server  
-  let spl = List.map(\(x, y, _) -> x) $
-              List.sortBy(\(_, _, time1) (_, _, time2) -> time1 `compare` time2) $ 
-              List.filter (\(pid, serviceProfile, time) -> serviceProfile == sP) services
+  let spl = List.map(\((x, y), _) -> x) $
+              List.sortBy(\(_, time1) (_, time2) -> time1 `compare` time2) $ 
+              List.filter (\((pid, serviceProfile), time) -> serviceProfile == sP) 
+                $ Map.toList services
   case spl of 
     [] -> queryAnyAvailableService server sP
     h : _ -> return . Just $ h  
@@ -537,7 +525,7 @@ removeProcess server processId = do
 
   remoteServiceQueue <- readTVar $ remoteServiceList server 
   writeTVar (remoteServiceList server) 
-    $ List.filter(\(prId, _,  _) -> prId /= processId) remoteServiceQueue
+    $ Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteServiceQueue
   return processId
 
 {-- | 
@@ -568,11 +556,11 @@ updateMessageValue server messageKey aMessage = do
 queryMessageValue :: Server -> MessageId -> STM (Maybe PMessage) 
 queryMessageValue server messageKey = 
   readTVar (_messageValues server) >>= \x -> return $ Map.lookup messageKey x
+
 queryMessageLocation :: Server -> MessageId -> STM (Maybe ProcessId)
 queryMessageLocation server messageId = 
     readTVar (_messageLocation server)
-      >>= \ x -> do 
-          return (Map.lookup messageId x)
+      >>= \ x -> return (Map.lookup messageId x)
 -- Update message query location 
 updateMessageLocation :: Server -> ProcessId -> MessageId -> STM ProcessId 
 updateMessageLocation server processId messageId =

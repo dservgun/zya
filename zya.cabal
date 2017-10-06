@@ -57,10 +57,12 @@ library
     Data.Zya.Core.Writer
     Data.Zya.Core.QueryService
     Data.Zya.Core.TestWriter
+    Data.Zya.Core.LocalMessageHandlingStrategy
     Data.Zya.Persistence.Persistence
     Data.Zya.Persistence.Internal.FileSystem
     Data.Zya.Persistence.Internal.Postgres
     Data.Zya.Persistence.Internal.Sqlite
+
   -- Modules included in this library but not exported.
   other-modules:       
   -- LANGUAGE extensions used by modules in this package.

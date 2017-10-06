@@ -39,7 +39,7 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
-
+import Data.Zya.Core.LocalMessageHandlingStrategy(runMessageWriter)
 
 newtype UUIDGenException = 
     UUIDGenException{_unReason :: String} deriving Show
@@ -128,7 +128,7 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
   case serviceProfile of 
     Writer -> do 
       nMessage <- getNextMessage
-      replicateM_ 10 $ runMessage nMessage server
+      replicateM_ 2 $ runMessageWriter nMessage server
     _ -> return ()
   return ()
   where
@@ -141,16 +141,17 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
           return $ 
             WriteMessage 
               (Publisher topic) 
-              (pack $ show nId , topic, pack ("This is a test" <> show nId))
+              (pack $ show nId , topic, pack ("This is a test " <> show nId <> " : " <> show pid))
         Nothing -> throw $ UUIDGenException "No next id."
 
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
-type AvailableServerState = StateT(Maybe ProcessId) (ReaderT (ServiceProfile, FairnessStrategy) Process)
+{-type AvailableServerState = StateT(Maybe ProcessId) (ReaderT (ServiceProfile, FairnessStrategy) Process)
+-}
 
-sendMessage :: PMessage -> Server -> AvailableServerState ()
+{-sendMessage :: PMessage -> Server -> AvailableServerState ()
 sendMessage aMessage server = do
   (serviceProfile, strategy) <- ask
   currentTime <- liftIO getCurrentTime
@@ -163,17 +164,22 @@ sendMessage aMessage server = do
   case current of 
     Just x -> lift $ liftIO $ atomically $ sendRemote server x (aMessage, currentTime)
     Nothing -> return ()
+  remServiceList <- lift $ liftIO $ atomically $ readTVar $ remoteServiceList server 
+  lift $ lift $ say $ printf (show remServiceList <> "\n") 
   return ()
+-}
 
-
-sameAsBefore :: Maybe(ProcessId) -> Maybe(ProcessId) -> Bool
+{-sameAsBefore :: Maybe(ProcessId) -> Maybe(ProcessId) -> Bool
 sameAsBefore a b = fromMaybe False $ liftA2 (==) a b 
+-}
 
-runMessage :: PMessage -> Server -> Process () 
+
+{-runMessage :: PMessage -> Server -> Process () 
 runMessage aMessage server = do 
   initWriter <- liftIO $ atomically $ findAvailableWriter server
   runReaderT (runStateT (sendMessage aMessage server) initWriter) (Writer, RoundRobin)
   return ()
+-}
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
