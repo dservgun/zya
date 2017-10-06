@@ -115,10 +115,9 @@ handleRemoteMessage server aMessage@(MessageKeyStore (messageId, processId)) = d
                 <> (show messageId) <> "->" <> (show processId) <> "\n")
   currentTime <- liftIO getCurrentTime
   void $ liftIO $ atomically $ updateMessageKey server processId messageId
-{-  _ <- liftIO $ atomically $ 
-            sendRemote server processId ((QueryMessage (messageId, myPid, Nothing)), currentTime)
--}  
-  say $ printf ("Message key store message processed..")
+  _ <- liftIO $ atomically $ 
+            sendRemote server processId ((QueryMessage (messageId, myPid, Nothing)), currentTime)  
+  say $ printf ("Message key store message processed..\n")
   return()
 
 
@@ -154,12 +153,16 @@ type AvailableServerState = StateT(Maybe ProcessId) (ReaderT (ServiceProfile, Fa
 sendMessage :: PMessage -> Server -> AvailableServerState ()
 sendMessage aMessage server = do
   (serviceProfile, strategy) <- ask
+  currentTime <- liftIO getCurrentTime
   prevWriter <-  State.get 
   current <- lift $ liftIO $ atomically $ findAvailableService server serviceProfile strategy
   State.put(current)
   let sticky = sameAsBefore prevWriter current
   when sticky $ 
-      lift $ lift $ say $ printf ("Sticky process.." <> show prevWriter <> " : " <> show current)
+      lift $ lift $ say $ printf ("Sticky process.." <> show prevWriter <> " : " <> show current <> "\n")
+  case current of 
+    Just x -> lift $ liftIO $ atomically $ sendRemote server x (aMessage, currentTime)
+    Nothing -> return ()
   return ()
 
 
