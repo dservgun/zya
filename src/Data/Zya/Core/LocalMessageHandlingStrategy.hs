@@ -32,10 +32,12 @@ import Control.Monad.State
 import Control.Monad.Reader 
 import Control.Monad.Writer
 
+import Data.Time(UTCTime, getCurrentTime)
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
 import Data.Maybe
+
 
 newtype AvailableServerState a = 
   ServerState {
@@ -55,11 +57,18 @@ sendMessage aMessage server = do
   (serviceProfile, strategy) <- ask
   prevWriter <-  State.get 
   current <- liftIO $ atomically $ findAvailableService server serviceProfile strategy
+  currentTime <- liftIO getCurrentTime
   State.put(current)
-  let sticky = sameAsBefore prevWriter current
+  let sticky = stickyProcess prevWriter current
   when sticky $  
         ServerState $ 
           lift $ lift $ say $ printf ("Sticky process.." <> show prevWriter <> " : " <> show current)
+
+  case current of 
+    Just x -> ServerState 
+                $ lift $ liftIO $ atomically $ sendRemote server x (aMessage, currentTime)
+    Nothing -> return ()
+
   return ()
 
 

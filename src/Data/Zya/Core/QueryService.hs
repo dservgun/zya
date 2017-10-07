@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Data.Zya.Core.QueryService(
   -- * Query service that process query requests
   queryService
@@ -19,7 +21,7 @@ import Control.Monad.Catch
 import Control.Monad.Trans
 import Control.Monad.Reader
 
-import Control.Distributed.Process
+import Control.Distributed.Process as Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
@@ -39,18 +41,17 @@ import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
 
+newtype RemoteMessageHandler a = RemoteMessageHandler {
+  runApp :: ReaderT (Server, DBType, ConnectionDetails, PMessage) Process a 
+} deriving (
+    Functor, 
+    Applicative,
+    Monad,
+    MonadIO
+  )
 
-
-persistMessage :: MessageT
-persistMessage = do 
-  -- Insert the topic into persistent store.
-  -- return the status. Send the status to 
-  -- some peers (need to decide that, could be all).
-  p <- persist
-  return $ CreateStatus "success??"
-
-
-
+handleRemoteMessage1 :: RemoteMessageHandler ()
+handleRemoteMessage1 = undefined
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
@@ -75,6 +76,8 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
   return ()
+
+
 handleRemoteMessage server dbType connectionString aMessage@(QueryMessage (messageId, processId, message)) = do
   say $ printf ("Received message " <> show aMessage <> "\n") 
   currentTime <- liftIO getCurrentTime
