@@ -40,14 +40,13 @@ debugServiceName =
 
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
-  test <- testBackend 
-  putStrLn "Starting tests..."
+  test <- testBackend
   ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr) 
   writers <- forM [1..1] $ \_ -> do 
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
   query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr)
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr)
-  threadDelay(10 ^ 6 * 30)
+  --threadDelay(10 ^ 6 * 30)
   wait query1
 
 allTests :: TestTree
