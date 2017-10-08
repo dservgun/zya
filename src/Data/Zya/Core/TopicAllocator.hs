@@ -68,12 +68,19 @@ handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
     addService server serviceProfile pid
   return ()
 
+
+handleRemoteMessage server aMessage@(TerminateProcess message) = do 
+  say $ printf ("Terminating self " <> show aMessage <> "\n")
+  getSelfPid >>= flip exit (show aMessage)
+
 handleRemoteMessage server unhandledMessage = 
   say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server (ProcessMonitorNotification _ pid _) = 
-  void $ liftIO $ atomically $ removeProcess server pid
+handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
+  say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  void $ liftIO $ atomically $ removeProcess server pid 
+  terminate
 
 
 topicAllocationEventLoop :: ServerReaderT ()

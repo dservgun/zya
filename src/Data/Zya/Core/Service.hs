@@ -356,8 +356,6 @@ terminateAllProcesses server = do
   serverConfiguration <- ask
   remoteProcesses <- liftIO $ atomically $ remoteProcesses server
   forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
-  pid <- getSelfPid -- the state is not updated in the terminator, at least for now.
-  exit pid $ TerminateProcess "Shutting down self"
 
 
 proxyProcess :: Server -> Process ()

@@ -84,6 +84,7 @@ handleRemoteMessage server dbType connectionString messageCount
     say $ printf("Total messages processed " 
         <> (show messagesProcessed) <> " Max to be processed" 
         <> (show messageCount) <> " " <> (show shouldTerminate) <> "\n")
+    getSelfPid >>= \x -> exit x ("Query service exiting." :: String)
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher (messageId, topic, message)) = do
@@ -100,6 +101,11 @@ handleRemoteMessage server dbType connectionString _ aMessage@(QueryMessage (mes
         sendRemote server processId 
           ((QueryMessage (messageId, processId, messageValue)), currentTime)
   return ()
+
+
+handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do 
+  say $ printf ("Terminating self " <> show aMessage <> "\n")
+  getSelfPid >>= flip exit (show aMessage)
   
 
 handleRemoteMessage server dbType connectionString unhandledMessage _ = 
@@ -110,7 +116,7 @@ handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
   say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid 
-
+  terminate
 
 eventLoop :: ServerReaderT ()
 eventLoop = do

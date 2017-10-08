@@ -161,4 +161,4 @@ handleRemoteMessage server _ unhandledMessage =
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server (ProcessMonitorNotification _ pid _) = do
   _ <- liftIO $ atomically $ removeProcess server pid 
-  return ()
+  terminate
