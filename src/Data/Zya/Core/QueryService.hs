@@ -129,7 +129,7 @@ eventLoop = do
     let connectionDetailsL = serverConfiguration^.connDetails
     let testMessageCount = serverConfiguration^.numberOfTestMessages
     spawnLocal (proxyProcess serverL)
-    forever $
+    (forever $
       receiveWait
         [ 
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL testMessageCount
@@ -137,7 +137,7 @@ eventLoop = do
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL QueryService
         , matchAny $ \_ -> return ()      -- discard unknown messages
-        ]
+        ]) `Process.catchExit` (\pId (TerminateProcess aText) -> return ())
 
 queryService :: ServerReaderT () 
 queryService = do
