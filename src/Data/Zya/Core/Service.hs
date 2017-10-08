@@ -526,7 +526,7 @@ findAvailableService server sP RoundRobin = do
               List.filter (\((pid, serviceProfile), time) -> serviceProfile == sP) 
                 $ Map.toList services
   case spl of 
-    [] -> queryFalLbackservIce server sP
+    [] -> queryFallbackservice server sP
     h : _ -> return . Just $ h  
 
 findAvailableService server sP FirstOne = queryFallbackservice server sP

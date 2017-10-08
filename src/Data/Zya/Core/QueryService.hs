@@ -57,8 +57,9 @@ handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopi
   say $  printf ("Received message " <> (show aMessage) <> "\n")
   return ()
 
+
 handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")  
+  say $  printf ("QueryService : Received Service Available message " <> (show aMessage) <> "\n")  
   currentTime <- liftIO $ getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server

@@ -91,7 +91,7 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   case posProcessId of 
     Just x -> liftIO $ atomically $ sendRemote server x (committedMessage, time)
     Nothing -> say $ printf ("No process id found for QueryService " <> "\n")
-  say $ printf "Message persisted successfully " <> (show status) <> "\n"
+  say $ printf "Message persisted successfully " <> (show status) <> " " <> "Using query service " <> (show posProcessId) <> "\n"
   return ()
   where 
     committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
