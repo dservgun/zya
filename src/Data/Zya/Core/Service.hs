@@ -24,6 +24,7 @@ module Data.Zya.Core.Service
         , queryProcessId
         , remoteServiceList
         , publishMessageKey
+        , terminateAllProcesses
     -- * server reader 
     , ServerReaderT
     -- * Message types.
@@ -51,6 +52,7 @@ module Data.Zya.Core.Service
     , ServerConfiguration
     , server, backend, serviceProfile  
     , serviceName, dbType, connDetails
+    , numberOfTestMessages
     , makeServerConfiguration
     -- * Publisher details 
     , Publisher(..)
@@ -63,6 +65,8 @@ module Data.Zya.Core.Service
     , updateMessageValue
     , queryMessageValue
     , queryMessageLocation
+    -- * Total messages handled till now.
+    , queryMessageCount
     , Topic(..)
     , FairnessStrategy(..)
     )
@@ -285,13 +289,14 @@ data ServerConfiguration = ServerConfig{
   , _serviceName :: ServiceName 
   , _dbType :: DBType 
   , _connDetails :: ConnectionDetails
+  , _numberOfTestMessages :: Maybe Int
   } 
 
 
 makeLenses ''ServerConfiguration
 
 makeServerConfiguration :: Server -> Backend -> ServiceProfile -> ServiceName -> DBType -> ConnectionDetails -> ServerConfiguration
-makeServerConfiguration s b sp sName db cd = ServerConfig s b sp sName db cd
+makeServerConfiguration s b sp sName db cd = ServerConfig s b sp sName db cd $ Just 10
 subscriptionService :: String -> Process () 
 subscriptionService aPort = return ()
 
@@ -315,6 +320,16 @@ initializeProcess = do
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   liftIO $ atomically $ do 
     updateMyPid server1 mypid
+
+
+{- | Terminate all processes calling exit on each -}
+terminateAllProcesses :: Server -> Process ()
+terminateAllProcesses server = do 
+  serverConfiguration <- ask
+  remoteProcesses <- liftIO $ atomically $ remoteProcesses server
+  forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
+  pid <- getSelfPid -- the state is not update in the terminator, at least for now.
+  exit pid $ TerminateProcess "Shutting down self"
 
 
 proxyProcess :: Server -> Process ()
@@ -545,6 +560,9 @@ updateMessageKey server processId messageId = do
           writeTVar (messageKey server)
             $ Map.insert messageId processId messageKeyL
           return processId
+
+queryMessageCount :: Server -> STM Int 
+queryMessageCount server = readTVar (_messageValues server) >>= return . Map.size
 
 updateMessageValue :: Server -> MessageId -> PMessage -> STM PMessage 
 updateMessageValue server messageKey aMessage = do 

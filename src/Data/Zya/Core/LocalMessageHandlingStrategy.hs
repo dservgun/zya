@@ -52,6 +52,15 @@ newtype AvailableServerState a =
       )
 
 
+liftPrintln :: String -> AvailableServerState ()
+liftPrintln aString = 
+  ServerState $ 
+    lift . lift . say $ printf $ aString <> "\n"
+
+liftLiftIO :: IO a -> AvailableServerState a
+liftLiftIO f = ServerState $ lift . liftIO $ f
+
+
 sendMessage :: PMessage -> Server -> AvailableServerState ()
 sendMessage aMessage server = do
   (serviceProfile, strategy) <- ask
@@ -60,15 +69,13 @@ sendMessage aMessage server = do
   currentTime <- liftIO getCurrentTime
   State.put(current)
   let sticky = stickyProcess prevWriter current
-  when sticky $  
-        ServerState $ 
-          lift $ lift $ say $ printf ("Sticky process.." <> show prevWriter <> " : " <> show current)
+  when sticky $ liftPrintln $ ("Sticky process.." <> show prevWriter <> " : " <> show current)
 
+  -- make this into fmap.
   case current of 
-    Just x -> ServerState 
-                $ lift $ liftIO $ atomically $ sendRemote server x (aMessage, currentTime)
+    Just x -> liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
     Nothing -> return ()
-
+    
   return ()
 
 

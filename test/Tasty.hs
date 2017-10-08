@@ -43,14 +43,12 @@ createTopicTestCase =  do
   test <- testBackend 
   putStrLn "Starting tests..."
   ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr) 
-  writer1 <- async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
-  writer2 <- async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
-  writer3 <- async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)  
+  writers <- forM [1..1] $ \_ -> do 
+                async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
   query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr)
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr)
-  threadDelay (10 ^ 6 * 10) -- add a delay
-  tb <- async $ cloudEntryPoint test (Terminator, debugServiceName, fst debugConnStr, snd debugConnStr)
-  wait tb 
+  threadDelay(10 ^ 6 * 30)
+  wait query1
 
 allTests :: TestTree
 allTests = testGroup "Yet another zookeeper tests" [
