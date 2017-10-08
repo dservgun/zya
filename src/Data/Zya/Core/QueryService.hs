@@ -63,7 +63,7 @@ handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable 
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid ((GreetingsFrom Writer myPid), currentTime)
+      sendRemote server pid ((GreetingsFrom QueryService myPid), currentTime)
   return ()
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
@@ -71,19 +71,23 @@ handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom ser
   _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
+handleRemoteMessage server dbType connectionString messageCount 
+  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do 
+    say $ printf ("Handling remote message " <> show aMessage)
+    _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
+    messagesProcessed <- liftIO $ atomically $ queryMessageCount server
+    let shouldTerminate = liftA2 (>=) (pure messagesProcessed) (messageCount)
+    _ <- case shouldTerminate of 
+          Just True -> terminateAllProcesses server 
+          _ -> return ()
+    say $ printf("Total messages processed " 
+        <> (show messagesProcessed) <> " Max to be processed" 
+        <> (show messageCount) <> " " <> (show shouldTerminate) <> "\n")
+
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   selfPid <- getSelfPid
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
-  _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
-  messagesProcessed <- liftIO $ atomically $ queryMessageCount server
-  let shouldTerminate = liftA2 (>) (pure messagesProcessed) (messageCount)
-  _ <- case shouldTerminate of 
-        Just x -> terminateAllProcesses server 
-        Nothing -> return () 
-  say $ printf("Total messages processed " 
-      <> (show messagesProcessed) <> " Max to be processed" 
-      <> (show messageCount) <> " " <> (show shouldTerminate) <> "\n")
   return ()
 
 
@@ -124,7 +128,7 @@ eventLoop = do
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL testMessageCount
         , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
-                handleWhereIsReply serverL Writer
+                handleWhereIsReply serverL QueryService
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]
 

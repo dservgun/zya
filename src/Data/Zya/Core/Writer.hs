@@ -78,6 +78,7 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   time <- liftIO $ getCurrentTime
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
+  say $ printf ("Persisted message with status " <> (show status) <> "\n")
   _ <- liftIO $ atomically $ do 
       _ <- updateMessageKey server selfPid messageId   
       publishMessageKey server selfPid messageId
@@ -86,9 +87,14 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
         case r of 
           Just r1 -> return r
           Nothing -> findAvailableService server QueryService RoundRobin
-  _ <- maybe (return ()) (\x -> liftIO $ atomically $ sendRemote server x (aMessage, time)) posProcessId
+
+  case posProcessId of 
+    Just x -> liftIO $ atomically $ sendRemote server x (committedMessage, time)
+    Nothing -> say $ printf ("No process id found for QueryService " <> "\n")
   say $ printf "Message persisted successfully " <> (show status) <> "\n"
   return ()
+  where 
+    committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
 
 handleRemoteMessage server dbType connectionString unhandledMessage = 
   say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")

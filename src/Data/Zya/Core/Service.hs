@@ -65,7 +65,9 @@ module Data.Zya.Core.Service
     , updateMessageValue
     , queryMessageValue
     , queryMessageLocation
-    -- * Total messages handled till now.
+    -- * Approximate count of the total messages processed by the cloud.
+    , queryMessageKeyCount 
+    -- * Total messages handled till now locally.
     , queryMessageCount
     , Topic(..)
     , FairnessStrategy(..)
@@ -253,6 +255,7 @@ data PMessage =
   | MessageKeyStore (MessageId, ProcessId)
   -- * Commits an offset read for a subscriber.
   | CommitMessage Subscriber (MessageId, Text) -- Commit needs to know about the id that needs to be committed.
+  | CommittedWriteMessage Publisher (MessageId, Topic, Text)
   -- * Announces that a current service profile is available on a node.
   | ServiceAvailable ServiceProfile ProcessId 
   | TerminateProcess Text
@@ -294,9 +297,34 @@ data ServerConfiguration = ServerConfig{
 
 
 makeLenses ''ServerConfiguration
+{--| 
+  * Initialization.
+--}
+newServerIO :: ProcessId -> IO Server 
+newServerIO =
+  \m -> 
+    Server 
+      <$> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty 
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTChanIO 
+      <*> newTVarIO m
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
 
-makeServerConfiguration :: Server -> Backend -> ServiceProfile -> ServiceName -> DBType -> ConnectionDetails -> ServerConfiguration
-makeServerConfiguration s b sp sName db cd = ServerConfig s b sp sName db cd $ Just 10
+newServer :: ProcessId -> Process Server 
+newServer =  liftIO . newServerIO
+
+
+
+makeServerConfiguration :: 
+  Server -> Backend -> ServiceProfile -> ServiceName -> DBType -> ConnectionDetails -> Maybe Int -> ServerConfiguration
+makeServerConfiguration s b sp sName db cd aCount = ServerConfig s b sp sName db cd aCount 
 subscriptionService :: String -> Process () 
 subscriptionService aPort = return ()
 
@@ -328,7 +356,7 @@ terminateAllProcesses server = do
   serverConfiguration <- ask
   remoteProcesses <- liftIO $ atomically $ remoteProcesses server
   forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
-  pid <- getSelfPid -- the state is not update in the terminator, at least for now.
+  pid <- getSelfPid -- the state is not updated in the terminator, at least for now.
   exit pid $ TerminateProcess "Shutting down self"
 
 
@@ -400,25 +428,6 @@ messageKey :: Server -> TVar (Map MessageId ProcessId)
 messageKey s = _messageKey s 
 
 
-newServerIO :: ProcessId -> IO Server 
-newServerIO =
-  \m -> 
-    Server 
-      <$> newTVarIO Map.empty
-      <*> newTVarIO Map.empty
-      <*> newTVarIO Map.empty
-      <*> newTVarIO Map.empty
-      <*> newTVarIO Map.empty 
-      <*> newTVarIO Map.empty
-      <*> newTVarIO Map.empty
-      <*> newTChanIO 
-      <*> newTVarIO m
-      <*> newTVarIO Map.empty
-      <*> newTVarIO Map.empty
-      <*> newTVarIO Map.empty
-
-newServer :: ProcessId -> Process Server 
-newServer =  liftIO . newServerIO
 
 
 
@@ -488,8 +497,8 @@ findAvailableWriter :: Server -> STM (Maybe ProcessId)
 findAvailableWriter server = findAvailableService server Writer RoundRobin
 
 
-queryAnyAvailableService :: Server -> ServiceProfile -> STM (Maybe ProcessId)
-queryAnyAvailableService server serviceProfile = do 
+queryFallbackservice :: Server -> ServiceProfile -> STM (Maybe ProcessId)
+queryFallbackservice server serviceProfile = do 
   services <- readTVar $ services server 
   let entries = 
         Map.keys $ 
@@ -517,10 +526,10 @@ findAvailableService server sP RoundRobin = do
               List.filter (\((pid, serviceProfile), time) -> serviceProfile == sP) 
                 $ Map.toList services
   case spl of 
-    [] -> queryAnyAvailableService server sP
+    [] -> queryFalLbackservIce server sP
     h : _ -> return . Just $ h  
 
-findAvailableService server sP FirstOne = queryAnyAvailableService server sP
+findAvailableService server sP FirstOne = queryFallbackservice server sP
 
 
 
@@ -561,6 +570,16 @@ updateMessageKey server processId messageId = do
             $ Map.insert messageId processId messageKeyL
           return processId
 
+{--| This should give the approximate count of the number of messages processed by the cloud.
+   | Since the message key is a map, this value will ignore duplicates that may have been processed.
+
+--}
+queryMessageKeyCount :: Server -> STM Int 
+queryMessageKeyCount server = readTVar (messageKey server) >>= return . Map.size
+{-- | Query the local message counts. This count is different from the actual messages processed as far as 
+    | the current process is concerned. Use ** queryMessageKeyCount ** to get an estimate of how many messages
+    | got processed by the cloud.
+--}
 queryMessageCount :: Server -> STM Int 
 queryMessageCount server = readTVar (_messageValues server) >>= return . Map.size
 
@@ -619,6 +638,8 @@ instance Show PMessage where
         TerminateProcess s  -> printf "TerminateProcess " <> (show s) <> "\n"
         CreateTopic t -> printf "CreateTopic " <> (show . unpack $ trim maxBytes t) <> "\n"
         GreetingsFrom s p -> printf "Greetings from " <> (show s) <> " " <> (show p) <> "\n"
+        CommittedWriteMessage p (m, topic, t) -> 
+          printf "CommittedWriteMessage " <> (show p) <> ":" <> (show m) <> ":" <> (show topic) <> (unpack $ trim maxBytes t) <> "\n"
 
 instance Binary Login 
 instance Binary OpenIdProvider

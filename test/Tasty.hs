@@ -22,8 +22,8 @@ type Version = [Int]
 isRecent :: (Eq a, Ord a) => a -> a -> Bool
 isRecent = (<)
 
-debugConnStrsqlite :: (DBType, ConnectionDetails)
-debugConnStrsqlite = (RDBMS Sqlite, ConnectionDetails ":memory:")
+debugConnStrSqlite :: (DBType, ConnectionDetails)
+debugConnStrSqlite = (RDBMS Sqlite, ConnectionDetails ":memory:")
 
 
 debugConnStrPostgres :: (DBType, ConnectionDetails)
@@ -41,11 +41,13 @@ debugServiceName =
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend
-  ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr) 
-  writers <- forM [1..1] $ \_ -> do 
-                async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr)
-  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr)
-  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr)
+  --ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr, Nothing)
+  let nWriters = 3
+  let messages = 30 -- Messages to be published.
+  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
+  writers <- forM [1..nWriters] $ \_ -> do 
+                async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
+  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages)
   --threadDelay(10 ^ 6 * 30)
   wait query1
 

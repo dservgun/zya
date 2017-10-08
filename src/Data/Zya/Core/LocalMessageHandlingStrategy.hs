@@ -74,7 +74,7 @@ sendMessage aMessage server = do
   -- make this into fmap.
   case current of 
     Just x -> liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
-    Nothing -> return ()
+    Nothing -> liftPrintln $ ("No writer found " <> show prevWriter <> " : " <> show current)
     
   return ()
 

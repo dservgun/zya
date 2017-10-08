@@ -81,12 +81,12 @@ terminator = do
     exit pid $ TerminateProcess "Shutting down self"
 
 
-subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails) -> Process ()
-subscription backend (sP, params, dbType, dbConnection) = do
+subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails, Maybe Int) -> Process ()
+subscription backend (sP, params, dbType, dbConnection, count) = do
   --eventLogTracer  
   myPid <- getSelfPid
   n <- newServer myPid
-  let readerParams = makeServerConfiguration n backend sP params dbType dbConnection
+  let readerParams = makeServerConfiguration n backend sP params dbType dbConnection count
   say $ printf $ "Starting subscrpition " <> (show sP) <> (show params) <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
@@ -104,10 +104,10 @@ simpleBackend :: String -> String -> IO Backend
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
-cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName, DBType, ConnectionDetails) -> IO ()
-cloudEntryPoint backend (sP, sName, dbType, connectionDetails)= do
+cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName, DBType, ConnectionDetails, Maybe Int) -> IO ()
+cloudEntryPoint backend (sP, sName, dbType, connectionDetails, count)= do
   node <- newLocalNode backend 
-  Node.runProcess node (subscription backend (sP, sName, dbType, connectionDetails))
+  Node.runProcess node (subscription backend (sP, sName, dbType, connectionDetails, count))
 
 
 parseArgs :: IO (ServiceProfile, Text, String)
@@ -131,7 +131,7 @@ cloudMain = do
  backend <- simpleBackend "127.0.0.1" aPort
  let dbType = RDBMS Postgresql
  let connectionDetails = ConnectionDetails "this connection wont work"
- cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails)
+ cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails, Nothing)
 
 
 
