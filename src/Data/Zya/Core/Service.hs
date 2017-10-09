@@ -389,13 +389,13 @@ Update a service queue for round robin or any other strategy.
 --}
 updateRemoteServiceQueue :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ProcessId
 updateRemoteServiceQueue server processId (m, time) = do 
-  (procId, servProfile) <- queryProcessId server processId 
-  case servProfile of 
-    Just sP -> do 
+  serviceEntry <- queryProcessId server processId 
+  case serviceEntry of 
+    Just (pid, serviceProfile) -> do 
         readTVar (remoteServiceList server) >>= \rsl -> 
           writeTVar (remoteServiceList server) $ 
-              Map.insert (procId, sP) time rsl
-        return procId
+              Map.insert (pid, serviceProfile) time rsl
+        return pid
     Nothing ->  throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
 
 
@@ -430,14 +430,14 @@ messageKey s = _messageKey s
 
 
 -- Query a process id for its service profile
-queryProcessId :: Server -> ProcessId -> STM(ProcessId, Maybe ServiceProfile)
+queryProcessId :: Server -> ProcessId -> STM(Maybe (ProcessId, ServiceProfile))
 queryProcessId server = 
   \pid -> do
     services <- readTVar $ services server 
     let result = keys $ Map.filterWithKey(\(procId, _) _ -> procId == pid) services
     case result of
-      h : t -> return (pid, Just . snd $ h)
-      _ -> return(pid, Nothing)
+      h : t -> return . Just $ h
+      _ -> return Nothing
 
 
 {- | 
