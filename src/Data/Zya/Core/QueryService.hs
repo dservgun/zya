@@ -64,12 +64,11 @@ handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable 
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid ((GreetingsFrom QueryService myPid), currentTime)
+      fireRemote server pid $ GreetingsFrom QueryService myPid
   return ()
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
-  _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 handleRemoteMessage server dbType connectionString messageCount 

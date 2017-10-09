@@ -67,15 +67,14 @@ sendMessage aMessage server = do
   prevWriter <-  State.get 
   current <- liftIO $ atomically $ findAvailableService server serviceProfile strategy
   currentTime <- liftIO getCurrentTime
-  State.put(current)
   let sticky = stickyProcess prevWriter current
   when sticky $ liftPrintln $ ("Sticky process.." <> show prevWriter <> " : " <> show current)
-
   -- make this into fmap.
   case current of 
     Just x -> liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
     Nothing -> liftPrintln $ ("No writer found " <> show prevWriter <> " : " <> show current)
-    
+  
+  State.put(current)  
   return ()
 
 

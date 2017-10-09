@@ -65,14 +65,18 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid ((GreetingsFrom Writer myPid), currentTime)
+      fireRemote server pid $ 
+                GreetingsFrom Writer myPid 
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
-  _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
+
+
+-- When the write succeeds, find a query service to send the entire message to.
+-- Update a map with writer information for a process.
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
   selfPid <- getSelfPid
   time <- liftIO $ getCurrentTime

@@ -38,6 +38,7 @@ debugServiceName =
     Text.pack $ _unName s
 
 
+
 createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend
@@ -57,6 +58,7 @@ allTests = testGroup "Yet another zookeeper tests" [
     testCase "createTopic allocator, shutdown and no exceptions.\n" createTopicTestCase
     ]
   ]
+
 
   
 

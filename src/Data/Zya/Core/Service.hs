@@ -33,6 +33,7 @@ module Data.Zya.Core.Service
     , peerTimeout
     -- * Sending and receiving messages
     , sendRemote
+    , fireRemote
     -- * Initializing the cloud process
     , initializeProcess
     , subscriptionService
@@ -405,8 +406,6 @@ sendRemote aServer pid (pmsg, utcTime) = do
     writeTChan (proxyChannel aServer) (send pid pmsg)
     _ <- updateRemoteServiceQueue aServer pid (pmsg, utcTime)
     return ()
-
-
 -- Accessors. TODO: Use lenses. At times, possessives in method names
 -- works.
 getMyPid :: Server -> STM ProcessId
@@ -596,6 +595,7 @@ queryMessageLocation :: Server -> MessageId -> STM (Maybe ProcessId)
 queryMessageLocation server messageId = 
     readTVar (_messageLocation server)
       >>= \ x -> return (Map.lookup messageId x)
+
 -- Update message query location 
 updateMessageLocation :: Server -> ProcessId -> MessageId -> STM ProcessId 
 updateMessageLocation server processId messageId =
@@ -604,6 +604,11 @@ updateMessageLocation server processId messageId =
           writeTVar (_messageLocation server) $ 
             Map.insert messageId processId x 
           return processId
+
+{--| 
+  Use this to send messages that are most likely one time sends, such as service
+  available, greetings etc. These dont need to be timestamped.
+--}
 fireRemote :: Server -> ProcessId -> PMessage -> STM ()
 fireRemote aServer pid pmsg = do 
   writeTChan (proxyChannel aServer) (send pid pmsg)
