@@ -396,7 +396,7 @@ updateRemoteServiceQueue server processId (m, time) = do
           writeTVar (remoteServiceList server) $ 
               Map.insert (procId, sP) time rsl
         return procId
-    Nothing ->  return processId --throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
+    Nothing ->  throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
 
 
 
@@ -436,7 +436,7 @@ queryProcessId server =
     services <- readTVar $ services server 
     let result = keys $ Map.filterWithKey(\(procId, _) _ -> procId == pid) services
     case result of
-      [h] -> return (pid, Just . snd $ h)
+      h : t -> return (pid, Just . snd $ h)
       _ -> return(pid, Nothing)
 
 

@@ -137,7 +137,10 @@ eventLoop = do
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL QueryService
         , matchAny $ \_ -> return ()      -- discard unknown messages
-        ]) `Process.catchExit` (\pId (TerminateProcess aText) -> return ())
+        ]) `Process.catchExit` 
+              (\pId (TerminateProcess aText) -> do 
+                  say $ printf ("Terminating process " <> show aText <> " " <> show sName <> "\n")
+                  return ())
 
 queryService :: ServerReaderT () 
 queryService = do
