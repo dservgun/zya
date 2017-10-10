@@ -10,3 +10,4 @@ setup componentRoot =
     >>= \s ->updateGlobalLogger componentRoot (addHandler s)
 
 debugMessage = debugM 
+

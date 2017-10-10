@@ -30,7 +30,7 @@ debugConnStrPostgres :: (DBType, ConnectionDetails)
 debugConnStrPostgres = 
     (RDBMS Postgresql, ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432")
 
-debugConnStr = debugConnStrSqlite
+debugConnStr = debugConnStrPostgres
 newtype TServiceName = TServiceName {_unName :: String} deriving Show 
 debugServiceName :: Text 
 debugServiceName = 
@@ -50,9 +50,10 @@ createTopicTestCase =  do
 
   writers <- forM [1..nWriters] $ \_ -> do 
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
---  threadDelay(10 ^ 6 * 5) -- to deal with a race condition.
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages)
-  threadDelay(10 ^ 6 * 30)
+  -- Run for 30 seconds and quit.
+  threadDelay (fromIntegral $ (10 ^ 6 * 30 :: Integer))
+
 
 allTests :: TestTree
 allTests = testGroup "Yet another zookeeper tests" [

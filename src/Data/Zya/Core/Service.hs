@@ -47,7 +47,7 @@ module Data.Zya.Core.Service
     , DBType(..)
     , ConnectionDetails(..)
     , DBVendor(..)
-    , MessageT(..)
+    , MessageT
     , CreateStatus(..)
     -- * Server configuration 
     , ServerConfiguration
@@ -75,48 +75,27 @@ module Data.Zya.Core.Service
 where 
 import Data.Monoid((<>))
 import Data.Map as Map
-import Data.Set as Set
 import Data.List as List
 import Control.Exception
-import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans.Maybe
 import Control.Monad.Reader
 import Control.Concurrent.STM
 import Control.Distributed.Process
-import Data.Time
-import Data.Text 
 import Text.Printf
-import GHC.Generics (Generic)
 import Data.Binary
 import Data.Typeable
 import GHC.Generics (Generic)
-import System.Environment(getArgs)
 
-import Control.Concurrent.STM
 import Control.Applicative((<$>))
-import Control.Exception
 
 import Control.Lens
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.Trans
-import Control.Monad.Reader
 
-import Control.Distributed.Process
-import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
-import Control.Lens
 
-import Data.Binary
-import Data.Data
-import Data.Monoid((<>))
-import Data.Text(pack, unpack, take, Text)
+import Data.Text(unpack, take, Text)
 import Data.Time(UTCTime, getCurrentTime)
-import Data.Typeable
 import Text.Printf
-
+import Data.Zya.Utils.Logger(debugMessage)
 
 
 ------------ Constants --------------
@@ -126,10 +105,11 @@ peerTimeout = 1000000
 
 
 --MAX_BYTES :: Integer 
+{--| 
+  Some constants. Messages cant be bigger than maxBytes??
+--}
+maxBytes :: Integer
 maxBytes = 10 * 1024 * 1024 * 1024 -- 
-
-trim :: Int -> Text -> Text 
-trim = Data.Text.take
 
 
 
@@ -343,26 +323,28 @@ initializeProcess = do
   mynode <- lift getSelfNode
 
   peers0 <- liftIO $ findPeers backendl peerTimeout
+
+  liftIO $ debugMessage "Data.Zya.Core.TestWriter" ("Initializing process " <> (show serviceNameS) <> "\n")
   let peers = List.filter (/= mynode) peers0
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   liftIO $ atomically $ do 
-    addService server1 serviceProfileL mypid
+    _ <- addService server1 serviceProfileL mypid
     updateMyPid server1 mypid
 
 
 {- | Terminate all processes calling exit on each -}
 terminateAllProcesses :: Server -> Process ()
-terminateAllProcesses server = do 
+terminateAllProcesses =  \lServer ->  do 
   serverConfiguration <- ask
-  remoteProcesses <- liftIO $ atomically $ remoteProcesses server
-  forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
+  remoteProcessesL <- liftIO $ atomically $ remoteProcesses lServer
+  forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
 
 
 proxyProcess :: Server -> Process ()
-proxyProcess server 
-  =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel server
+proxyProcess aServer 
+  =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel aServer
 
 
 -- Announce that a service has come up. 
@@ -370,19 +352,19 @@ proxyProcess server
 -- about itself to the new service. Will this result in n squared messages.
 
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
-handleWhereIsReply server serviceProfile a@(WhereIsReply _ (Just pid)) = do
+handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
 --  say $ printf "Handling whereIsReply : "  <> (show serviceProfile) <> " " <> (show a) <> "\n"
   mSpid <- 
     liftIO $ do
     currentTime <- getCurrentTime
     atomically $ do
-      mySpId <- readTVar $ myProcessId server
-      sendRemote server pid $ (ServiceAvailable serviceProfile mySpId, currentTime)
+      mySpId <- readTVar $ myProcessId aServer
+      sendRemote aServer pid $ (ServiceAvailable aServiceProfile mySpId, currentTime)
       return mySpId
   say $ printf 
-        ("Sending info about self " <> " " <> (show mSpid) <> ":" <> (show pid) <> (show serviceProfile) 
+        ("Sending info about self " <> " " <> (show mSpid) <> ":" <> (show pid) <> (show aServiceProfile) 
             <> "\n")
-handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()
+handleWhereIsReply _ _ (WhereIsReply _ Nothing) = return ()
 
 
 
@@ -390,13 +372,13 @@ handleWhereIsReply _ serviceProfile (WhereIsReply _ Nothing) = return ()
 Update a service queue for round robin or any other strategy.
 --}
 updateRemoteServiceQueue :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ProcessId
-updateRemoteServiceQueue server processId (m, time) = do 
-  serviceEntry <- queryProcessId server processId 
+updateRemoteServiceQueue aServer processId (m, time) = do 
+  serviceEntry <- queryProcessId aServer processId 
   case serviceEntry of 
-    Just (pid, serviceProfile) -> do 
-        readTVar (remoteServiceList server) >>= \rsl -> 
-          writeTVar (remoteServiceList server) $ 
-              Map.insert (pid, serviceProfile) time rsl
+    Just (pid, serviceProfileL) -> do 
+        readTVar (remoteServiceList aServer) >>= \rsl -> 
+          writeTVar (remoteServiceList aServer) $ 
+              Map.insert (pid, serviceProfileL) time rsl
         return pid
     Nothing ->  return processId --throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
 
@@ -410,11 +392,11 @@ sendRemote aServer pid (pmsg, utcTime) = do
 -- Accessors. TODO: Use lenses. At times, possessives in method names
 -- works.
 getMyPid :: Server -> STM ProcessId
-getMyPid server = readTVar $ myProcessId server
+getMyPid = readTVar . myProcessId
 
 
 updateMyPid :: Server -> ProcessId -> STM () 
-updateMyPid server processId = writeTVar (myProcessId server) processId
+updateMyPid aServer processId = writeTVar (myProcessId aServer) processId
 
 proxyChannel :: Server -> TChan(Process()) 
 proxyChannel = _proxyChannel
@@ -431,10 +413,10 @@ messageKey s = _messageKey s
 
 -- Query a process id for its service profile
 queryProcessId :: Server -> ProcessId -> STM(Maybe (ProcessId, ServiceProfile))
-queryProcessId server = 
-  \pid -> do
-    services <- readTVar $ services server 
-    let result = keys $ Map.filterWithKey(\(procId, _) _ -> procId == pid) services
+queryProcessId  = 
+  \lServer pid -> do
+    servicesL <- readTVar $ services lServer 
+    let result = keys $ Map.filterWithKey(\(procId, _) _ -> procId == pid) servicesL
     case result of
       h : t -> return . Just $ h
       _ -> return Nothing
@@ -444,9 +426,9 @@ queryProcessId server =
   Given a service profile, return the count of services and the ProcessId for the service.
 -}
 queryService :: Server -> ServiceProfile -> STM[(ProcessId, ServiceProfile, Integer)]
-queryService server aProfile = do 
-  services <- readTVar $ services server 
-  let result = List.filter (\((x, y), z) -> y == aProfile) $ Map.assocs services
+queryService aServer aProfile = do 
+  servicesL <- readTVar $ services aServer 
+  let result = List.filter (\((_, profile), _) -> profile == aProfile) $ Map.assocs servicesL
   let r = List.map (\((x, y), z) -> (x, y, z)) result
   return r
 
@@ -457,16 +439,16 @@ queryService server aProfile = do
 -}
 
 remoteProcesses :: Server -> STM[ProcessId]
-remoteProcesses server = do 
-  myProcessId <- readTVar $ myProcessId server
-  remoteClients <- readTVar $ remoteClients server
-  remoteWriters <- readTVar $ remoteWriters server 
-  remoteServices <- readTVar $ services server
-  serviceMap <- readTVar $ services server
-  let result = List.map fst $ Map.keys remoteClients 
-  let r2 = List.map fst $ Map.keys remoteWriters 
+remoteProcesses aServer = do 
+  myProcessIdL <- readTVar $ myProcessId aServer
+  remoteClientsL <- readTVar $ remoteClients aServer
+  remoteWritersL <- readTVar $ remoteWriters aServer 
+  remoteServicesL <- readTVar $ services aServer
+  serviceMap <- readTVar $ services aServer
+  let result = List.map fst $ Map.keys remoteClientsL
+  let r2 = List.map fst $ Map.keys remoteWritersL
   let r3 = List.map fst $ Map.keys serviceMap
-  return $ List.filter (/= myProcessId) $ result <> r2 <> r3
+  return $ List.filter (/= myProcessIdL) $ result <> r2 <> r3
 
 type ServiceRange = (Int, Int) 
 
@@ -490,23 +472,24 @@ isSingleton _ = False
   , though find the one with the least number of topics or messages or both.
 -}
 findAvailableWriter :: Server -> STM (Maybe ProcessId)
-findAvailableWriter server = findAvailableService server Writer RoundRobin
+findAvailableWriter = \serverL -> findAvailableService serverL Writer RoundRobin
 
 
 queryFallbackservice :: Server -> ServiceProfile -> STM (Maybe ProcessId)
-queryFallbackservice server serviceProfile = do 
-  services <- readTVar $ services server 
-  let entries = 
-        Map.keys $ 
-          Map.filterWithKey(\(_, sProfile) _ -> sProfile == serviceProfile) services
+queryFallbackservice = \serverL serviceProfileL -> 
+  do 
+    servicesL <- readTVar $ services serverL
+    let entries = 
+          Map.keys $ 
+            Map.filterWithKey(\(_, sProfile) _ -> sProfile == serviceProfileL) servicesL
 
-  res <-
-      case entries of
-        h : t -> do 
-          return . Just $ fst h
-        _ ->  return Nothing
-  
-  return res
+    res <-
+        case entries of
+          h : t -> do 
+            return . Just $ fst h
+          _ ->  return Nothing
+    
+    return res
 
 
 
@@ -515,36 +498,36 @@ queryFallbackservice server serviceProfile = do
 --}
 
 findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId) 
-findAvailableService server sP RoundRobin = do 
-  services <- readTVar $ remoteServiceList server  
+findAvailableService aServer sP RoundRobin = do 
+  servicesL <- readTVar $ remoteServiceList aServer
   let spl = List.map(\((x, y), _) -> x) $
               List.sortBy(\(_, time1) (_, time2) -> time1 `compare` time2) $ 
-              List.filter (\((pid, serviceProfile), time) -> serviceProfile == sP) 
-                $ Map.toList services
+              List.filter (\((pid, serviceProfileL), time) -> serviceProfileL == sP) 
+                $ Map.toList servicesL
   case spl of 
-    [] -> queryFallbackservice server sP
+    [] -> queryFallbackservice aServer sP
     h : _ -> return . Just $ h  
 
-findAvailableService server sP FirstOne = queryFallbackservice server sP
+findAvailableService aServer sP FirstOne = queryFallbackservice aServer sP
 
 
 
-
+-- TODO: clean this up.
 removeProcess :: Server -> ProcessId -> STM ProcessId 
-removeProcess server processId = do 
-  remoteClients1 <- readTVar $ remoteClients server 
-  writeTVar (remoteClients server) $
-    Map.filterWithKey(\(prId, _) c -> prId /= processId) remoteClients1
+removeProcess aServer processId = do 
+  remoteClientsL <- readTVar $ remoteClients aServer
+  writeTVar (remoteClients aServer) $
+    Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteClientsL
 
-  services1 <- readTVar $ services server 
-  writeTVar (services server) $ Map.filterWithKey(\(prId, _) _ -> processId /= prId) services1
+  servicesL <- readTVar $ services aServer 
+  writeTVar (services aServer) $ Map.filterWithKey(\(prId, _) _ -> processId /= prId) servicesL
 
-  remWriters <- readTVar $ remoteWriters server 
-  writeTVar (remoteWriters server) $
+  remWriters <- readTVar $ remoteWriters aServer
+  writeTVar (remoteWriters aServer) $
     Map.filterWithKey(\(prId, _) _ -> processId /= prId) remWriters
 
-  remoteServiceQueue <- readTVar $ remoteServiceList server 
-  writeTVar (remoteServiceList server) 
+  remoteServiceQueue <- readTVar $ remoteServiceList aServer 
+  writeTVar (remoteServiceList aServer) 
     $ Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteServiceQueue
   return processId
 
@@ -552,17 +535,17 @@ removeProcess server processId = do
   Add 'ServiceProfile' to the local map
 --}
 addService :: Server -> ServiceProfile-> ProcessId -> STM ProcessId
-addService server serviceProfile processId = do 
-  s1 <- readTVar $ services server
-  writeTVar (services server) 
-    $ Map.insertWith (+) (processId, serviceProfile) 1 s1
+addService aServer aServiceProfile processId = do 
+  s1 <- readTVar $ services aServer
+  writeTVar (services aServer) 
+    $ Map.insertWith (+) (processId, aServiceProfile) 1 s1
   return processId
 
 -- Update the messageId with a processId.
 updateMessageKey :: Server -> ProcessId -> MessageId -> STM ProcessId 
-updateMessageKey server processId messageId = do 
-          messageKeyL <- readTVar (messageKey server)
-          writeTVar (messageKey server)
+updateMessageKey aServer processId messageId = do 
+          messageKeyL <- readTVar (messageKey aServer)
+          writeTVar (messageKey aServer)
             $ Map.insert messageId processId messageKeyL
           return processId
 
@@ -571,36 +554,36 @@ updateMessageKey server processId messageId = do
 
 --}
 queryMessageKeyCount :: Server -> STM Int 
-queryMessageKeyCount server = readTVar (messageKey server) >>= return . Map.size
+queryMessageKeyCount = \serverL -> readTVar (messageKey serverL) >>= return . Map.size
 {-- | Query the local message counts. This count is different from the actual messages processed as far as 
     | the current process is concerned. Use ** queryMessageKeyCount ** to get an estimate of how many messages
     | got processed by the cloud.
 --}
 queryMessageCount :: Server -> STM Int 
-queryMessageCount server = readTVar (_messageValues server) >>= return . Map.size
+queryMessageCount serverL = readTVar (_messageValues serverL) >>= return . Map.size
 
 updateMessageValue :: Server -> MessageId -> PMessage -> STM PMessage 
-updateMessageValue server messageKey aMessage = do 
-  readTVar (_messageValues server) >>= \x -> 
-    writeTVar (_messageValues server) $ 
+updateMessageValue serverL messageKey aMessage = do 
+  readTVar (_messageValues serverL) >>= \x -> 
+    writeTVar (_messageValues serverL) $ 
       Map.insert messageKey aMessage x
   return aMessage
 
 queryMessageValue :: Server -> MessageId -> STM (Maybe PMessage) 
-queryMessageValue server messageKey = 
-  readTVar (_messageValues server) >>= \x -> return $ Map.lookup messageKey x
+queryMessageValue aServer messageKey = 
+  readTVar (_messageValues aServer) >>= \x -> return $ Map.lookup messageKey x
 
 queryMessageLocation :: Server -> MessageId -> STM (Maybe ProcessId)
-queryMessageLocation server messageId = 
-    readTVar (_messageLocation server)
+queryMessageLocation aServer messageId = 
+    readTVar (_messageLocation aServer)
       >>= \ x -> return (Map.lookup messageId x)
 
 -- Update message query location 
 updateMessageLocation :: Server -> ProcessId -> MessageId -> STM ProcessId 
-updateMessageLocation server processId messageId =
-    readTVar (_messageLocation server)
+updateMessageLocation aServer processId messageId =
+    readTVar (_messageLocation aServer)
         >>= \x -> do 
-          writeTVar (_messageLocation server) $ 
+          writeTVar (_messageLocation aServer) $ 
             Map.insert messageId processId x 
           return processId
 
@@ -615,9 +598,9 @@ fireRemote aServer pid pmsg = do
 
 -- Publish the key info to all the services other than self.
 publishMessageKey :: Server -> ProcessId -> MessageId -> STM ProcessId 
-publishMessageKey server processId messageId = do 
-    rProcesses <- remoteProcesses server
-    mapM_ (\pid -> fireRemote server pid (MessageKeyStore (messageId, processId)))
+publishMessageKey aServer processId messageId = do 
+    rProcesses <- remoteProcesses aServer
+    mapM_ (\pid -> fireRemote aServer pid (MessageKeyStore (messageId, processId)))
       rProcesses
     return processId
 
