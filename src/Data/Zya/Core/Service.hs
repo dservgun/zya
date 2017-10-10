@@ -60,7 +60,6 @@ module Data.Zya.Core.Service
     -- * Some common handlers for all nodes
     , handleWhereIsReply
     -- * Manage remote service queues
-    , updateRemoteServiceQueue
     , updateMessageKey
     , updateMessageLocation
     , updateMessageValue
@@ -340,6 +339,7 @@ initializeProcess = do
   let serviceName1 = view serviceName serverConfiguration
   let serviceNameS = unpack serviceName1
   let backendl = view backend serverConfiguration
+  let serviceProfileL = view serviceProfile serverConfiguration
   mynode <- lift getSelfNode
 
   peers0 <- liftIO $ findPeers backendl peerTimeout
@@ -348,6 +348,7 @@ initializeProcess = do
   lift $ register serviceNameS mypid
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   liftIO $ atomically $ do 
+    addService server1 serviceProfileL mypid
     updateMyPid server1 mypid
 
 
@@ -397,7 +398,7 @@ updateRemoteServiceQueue server processId (m, time) = do
           writeTVar (remoteServiceList server) $ 
               Map.insert (pid, serviceProfile) time rsl
         return pid
-    Nothing ->  throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
+    Nothing ->  return processId --throwSTM $ MissingProcessException processId (pack "Cannot update service queue" )
 
 
 
@@ -476,8 +477,6 @@ defaultSimpleConfiguration = [(WebServer, (3, 10)), (QueryService, (3, 10)),
                         (Reader, (3, 10)), 
                         (Writer, (3, 10))]
 
-
-instance Binary ServiceProfile
 
 {-| 
   A global map indicating if a particular service is a singleton, ideally a leader should fix the 
@@ -652,3 +651,4 @@ instance Binary Subscriber
 instance Binary Publisher
 instance Binary PMessage
 instance Binary Topic
+instance Binary ServiceProfile

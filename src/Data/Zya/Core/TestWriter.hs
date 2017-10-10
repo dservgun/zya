@@ -47,13 +47,6 @@ newtype UUIDGenException =
 instance Exception UUIDGenException
 
 
---writeMessage :: Server -> PMessage -> Process ()
-writeMessage writer server aMessage =  do
-  say $ printf "Sending message " <> (show aMessage) <> "\n"
-  currentTime <- liftIO getCurrentTime
-  case writer of 
-    Just x -> liftIO $ atomically $ sendRemote (server) x (aMessage, currentTime)
-    Nothing -> say $ printf "No writer found. " <> "\n"
 
 {-| Test writer to send a few messages -}
 -- Find an available writer, if none found, error out.
