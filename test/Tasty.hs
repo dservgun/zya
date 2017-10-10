@@ -52,7 +52,7 @@ createTopicTestCase =  do
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages)
   -- Run for 30 seconds and quit.
-  threadDelay (fromIntegral $ (10 ^ 6 * 30 :: Integer))
+  threadDelay (fromIntegral $ (10 ^ 6 * 30))
 
 
 allTests :: TestTree
