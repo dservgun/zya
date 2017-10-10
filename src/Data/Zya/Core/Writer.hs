@@ -71,6 +71,8 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
+  liftIO $ atomically $ addService server serviceProfile pid
+
   return ()
 
 
@@ -132,7 +134,7 @@ eventLoop = do
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL Writer
         , matchAny $ \_ -> return ()      -- discard unknown messages
-        ]
+        ] `Control.Distributed.Process.catch` (\e@(SomeException e1) -> liftIO $ putStrLn $ "Exception " <> show e <> "\n")
 
 writer :: ServerReaderT () 
 writer = do

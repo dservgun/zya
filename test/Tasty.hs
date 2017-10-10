@@ -43,14 +43,16 @@ createTopicTestCase :: Assertion
 createTopicTestCase =  do 
   test <- testBackend
   --ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr, Nothing)
-  let nWriters = 3
-  let messages = 30 -- Messages to be published.
+  let nWriters = 6
+  let messages = 150 -- Messages to be published.
   query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
+  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
+
   writers <- forM [1..nWriters] $ \_ -> do 
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
-  threadDelay(10 ^ 6 * 5) -- to deal with a race condition.
+--  threadDelay(10 ^ 6 * 5) -- to deal with a race condition.
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages)
-  wait query1
+  threadDelay(10 ^ 6 * 30)
 
 allTests :: TestTree
 allTests = testGroup "Yet another zookeeper tests" [

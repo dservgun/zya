@@ -78,12 +78,13 @@ handleRemoteMessage server dbType connectionString messageCount
     messagesProcessed <- liftIO $ atomically $ queryMessageCount server
     let shouldTerminate = liftA2 (>=) (pure messagesProcessed) (messageCount)
     _ <- case shouldTerminate of 
-          Just True -> terminateAllProcesses server 
+          Just True -> do 
+            terminateAllProcesses server 
           _ -> return ()
     say $ printf("Total messages processed " 
         <> (show messagesProcessed) <> " Max to be processed" 
         <> (show messageCount) <> " " <> (show shouldTerminate) <> "\n")
-    getSelfPid >>= \x -> exit x ("Query service exiting." :: String)
+    
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher (messageId, topic, message)) = do

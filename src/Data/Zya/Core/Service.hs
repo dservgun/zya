@@ -264,7 +264,7 @@ data PMessage =
   | GreetingsFrom ServiceProfile ProcessId  
   -- Send the message back to the process id
   | QueryMessage (MessageId, ProcessId, Maybe PMessage)
-  deriving (Typeable, Generic)
+  deriving (Typeable, Generic, Show)
 
 data FairnessStrategy = RoundRobin | FirstOne deriving(Show)
 
@@ -293,7 +293,7 @@ data ServerConfiguration = ServerConfig{
   , _dbType :: DBType 
   , _connDetails :: ConnectionDetails
   , _numberOfTestMessages :: Maybe Int
-  } 
+  }
 
 
 makeLenses ''ServerConfiguration
@@ -625,23 +625,6 @@ publishMessageKey server processId messageId = do
 startupException :: Text -> StartUpException
 startupException = StartUpException
 
-
-instance Show PMessage where 
-  show pMessage = 
-      case pMessage of 
-        MsgServerInfo a b l -> printf "MsgServerInfo " <>(show a) <> ":"  <> show b <> " " <> (show l) <> "\n"
-        NotifyMessage s (m, t) -> 
-            printf "Notify message " 
-              <> (show s) <> ":" <> (show m) <> (unpack $ trim maxBytes t) <> "\n"
-        WriteMessage p (m, topic, t) -> 
-          printf "WriteMessage " <> (show p) <> ":" <> (show m) <> ":" <> (show topic) <> (unpack $ trim maxBytes t) <> "\n"
-        CommitMessage s (m, t) -> printf "Commit message " <> (show s) <> (show m) <> (unpack $ trim maxBytes t) <> "\n"
-        ServiceAvailable s p -> printf "ServiceAvailable " <>(show s) <> ":" <> (show p)  <> "\n"
-        TerminateProcess s  -> printf "TerminateProcess " <> (show s) <> "\n"
-        CreateTopic t -> printf "CreateTopic " <> (show . unpack $ trim maxBytes t) <> "\n"
-        GreetingsFrom s p -> printf "Greetings from " <> (show s) <> " " <> (show p) <> "\n"
-        CommittedWriteMessage p (m, topic, t) -> 
-          printf "CommittedWriteMessage " <> (show p) <> ":" <> (show m) <> ":" <> (show topic) <> (unpack $ trim maxBytes t) <> "\n"
 
 instance Binary Login 
 instance Binary OpenIdProvider
