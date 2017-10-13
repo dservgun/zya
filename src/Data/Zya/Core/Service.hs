@@ -246,7 +246,7 @@ data PMessage =
   | QueryMessage (MessageId, ProcessId, Maybe PMessage)
   deriving (Typeable, Generic, Show)
 
-data FairnessStrategy = RoundRobin | FirstOne deriving(Show)
+data FairnessStrategy = RoundRobin | FirstOne deriving (Show)
 
 
 {- | Supported services -}
