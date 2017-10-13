@@ -5,7 +5,7 @@
 module Data.Zya.Core.QueryService(
   -- * Query service that process query requests
   queryService
-  , handleRemoteMessage
+  
   ) where
 
 import GHC.Generics (Generic)
@@ -50,8 +50,6 @@ newtype RemoteMessageHandler a = RemoteMessageHandler {
     MonadIO
   )
 
-handleRemoteMessage1 :: RemoteMessageHandler ()
-handleRemoteMessage1 = undefined
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopic)  = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
@@ -147,8 +145,3 @@ queryService = do
   initializeProcess
   eventLoop
   return()
-
-
--- Some synonyms
-success :: Text 
-success = "Success"

@@ -8,10 +8,8 @@ import Control.Monad.Reader
 import Test.Tasty
 import Test.Tasty.HUnit as HU
 import Data.Text as Text
-import Data.Zya.Core.Writer
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
-import Data.Zya.Core.ServiceTypes
 import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
@@ -19,7 +17,7 @@ testBackend :: IO Backend
 testBackend = simpleBackend "localhost" "5000"
 
 type Version = [Int]
-isRecent :: (Eq a, Ord a) => a -> a -> Bool
+isRecent :: (Ord a) => a -> a -> Bool
 isRecent = (<)
 
 debugConnStrSqlite :: (DBType, ConnectionDetails)

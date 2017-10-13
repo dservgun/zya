@@ -563,15 +563,15 @@ queryMessageCount :: Server -> STM Int
 queryMessageCount serverL = readTVar (_messageValues serverL) >>= return . Map.size
 
 updateMessageValue :: Server -> MessageId -> PMessage -> STM PMessage 
-updateMessageValue serverL messageKey aMessage = do 
+updateMessageValue serverL messageId aMessage = do 
   readTVar (_messageValues serverL) >>= \x -> 
     writeTVar (_messageValues serverL) $ 
-      Map.insert messageKey aMessage x
+      Map.insert messageId aMessage x
   return aMessage
 
 queryMessageValue :: Server -> MessageId -> STM (Maybe PMessage) 
-queryMessageValue aServer messageKey = 
-  readTVar (_messageValues aServer) >>= \x -> return $ Map.lookup messageKey x
+queryMessageValue aServer messageKey1 = 
+  readTVar (_messageValues aServer) >>= \x -> return $ Map.lookup messageKey1 x
 
 queryMessageLocation :: Server -> MessageId -> STM (Maybe ProcessId)
 queryMessageLocation aServer messageId = 
