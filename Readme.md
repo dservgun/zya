@@ -8,6 +8,7 @@ A realtime webserver allowing users to store and forward custom messages.
 
 ## Helpful commands
 
+``` cabal sandbox init ```
 ``` cabal install --only-dependencies --enable-tests ```
 
 ### Variable naming conventions:

@@ -64,8 +64,9 @@ newtype ProtocolHandler a =
 readerThread :: ProtocolHandler () 
 readerThread = do
   (conn, app) <- ProtoHandler ask
-  liftIO $ WS.sendTextData conn ("hello world" :: Text)
-  return ()
+  runStderrLoggingT $ do 
+    liftIO $ WS.sendTextData conn ("hello world" :: Text)
+    ($(logDebug) "Test")
 protocolHandler :: ProtocolHandler WS.Connection
 protocolHandler = do 
   (conn, app) <- ProtoHandler ask 
