@@ -5,42 +5,42 @@ module Data.Zya.Core.TestWriter(
   testWriter
   ) where
 
-import GHC.Generics (Generic)
-import System.Environment(getArgs)
 
+
+import Control.Applicative((<$>), liftA2)
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Concurrent.STM
-import Control.Applicative((<$>), liftA2)
+import Control.Distributed.Process
+import Control.Distributed.Process.Backend.SimpleLocalnet
+import Control.Distributed.Process.Closure
+import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 import Control.Exception
-
 import Control.Lens
 import Control.Monad
 import Control.Monad.Catch
-import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Monad.State as State
+import Control.Monad.Trans
 import Control.Monad.Writer
 
-import Control.Distributed.Process
-import Control.Distributed.Process.Closure
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
-
-import Data.UUID.V1
-import Data.Maybe
 import Data.Binary
 import Data.Data
 import Data.Map
+import Data.Maybe
 import Data.Monoid((<>))
 import Data.Text(pack, unpack, Text)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
-import Data.Zya.Core.Service
-import Text.Printf
-import Data.Zya.Core.ServiceTypes
+import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.LocalMessageHandlingStrategy(runMessageWriter)
+import Data.Zya.Core.Service
+import Data.Zya.Core.ServiceTypes
 import Data.Zya.Utils.Logger as Logger
+
+import GHC.Generics (Generic)
+import System.Environment(getArgs)
+import Text.Printf
 
 newtype UUIDGenException = 
     UUIDGenException{_unReason :: String} deriving Show

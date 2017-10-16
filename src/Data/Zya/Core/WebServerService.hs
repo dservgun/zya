@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 
 -- A webservice for the cloud. 
@@ -13,6 +14,7 @@ module Data.Zya.Core.WebServerService
 where 
 
 
+
 import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM.Lifted
@@ -21,20 +23,26 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+import Control.Concurrent.Async as Async (waitSTM, wait, async, cancel, waitEither, waitBoth, waitAny
+                        , concurrently,asyncThreadId)
+
 import Control.Lens
 import Control.Monad (forever, void)
+import Control.Monad.Logger
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Time
+import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
-import Network.WebSockets.Connection as WS (Connection, sendTextData)
-import qualified Data.Text as Text (pack, unpack)
+import Network.WebSockets.Connection as WS (Connection, sendTextData, receiveData)
 import Text.Printf
 import Yesod.Core
 import Yesod.WebSockets
-import Control.Monad.Logger
+import qualified Data.Text as Text (pack, unpack)
+
+
 data App = App Server
 
 instance Yesod App
@@ -44,7 +52,6 @@ mkYesod "App" [parseRoutes|
 |]
 
 
-type YesodHandler = HandlerT App IO
 
 type Connection = Text
 newtype ProtocolHandler a = 
@@ -61,25 +68,47 @@ newtype ProtocolHandler a =
 
 -- At this point we can safely be in the io monad, though adding a monad logger might
 -- be beneficial.
-readerThread :: ProtocolHandler () 
-readerThread = do
-  (conn, app) <- ProtoHandler ask
-  runStderrLoggingT $ do 
-    liftIO $ WS.sendTextData conn ("hello world" :: Text)
-    ($(logDebug) "Test")
+-- readerThread :: ProtocolHandler () 
+readerThread (conn, app) = do
+  WS.sendTextData conn ("hello world" :: Text)
+--    ($(logDebug) "Test")
+  readerThread (conn, app)
+
+writerThread (conn, app) = do  
+  (command  :: Text ) <- liftIO $ (WS.receiveData conn)
+  writerThread (conn, app)
+
+removeConn :: ProtocolHandler WS.Connection 
+removeConn = do 
+  (conn, app) <- ProtoHandler ask 
+  return conn
+addConn :: ProtocolHandler WS.Connection 
+addConn = do 
+  (conn, app) <- ProtoHandler ask 
+  nextId <- (\x -> Text.pack $ show x) <$> liftIO nextUUID
+  r <- liftIO $ atomically $ addConnection app (ClientIdentifier nextId) conn 
+  return conn
 protocolHandler :: ProtocolHandler WS.Connection
 protocolHandler = do 
   (conn, app) <- ProtoHandler ask 
+  addConn
+  a <- liftIO $ Async.async (liftIO $ readerThread (conn, app))
+  b <- liftIO $ Async.async (liftIO $ writerThread (conn, app))
+--  b <- Async.async $ liftIO writerThread 
+  liftIO $ Async.waitAny [a, b]
   return conn
 
-app :: WebSocketsT YesodHandler ()
+type YesodHandler = HandlerT App IO
+
+app :: WebSocketsT (HandlerT App IO) ()
 app = do
     connection <- ask 
     App foundation <- getYesod
     x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation)
     return ()
 getHomeR :: HandlerT App IO Text
-getHomeR = 
+getHomeR = do
+  webSockets app 
   return ("Done processing." :: Text)
 
 

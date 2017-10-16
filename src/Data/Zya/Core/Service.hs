@@ -25,6 +25,9 @@ module Data.Zya.Core.Service
         , remoteServiceList
         , publishMessageKey
         , terminateAllProcesses
+    -- * Local caches 
+        , addConnection
+        , deleteConnection
     -- * server reader 
     , ServerReaderT
     -- * Message types.
@@ -71,31 +74,32 @@ module Data.Zya.Core.Service
     , queryMessageCount
     , Topic(..)
     , FairnessStrategy(..)
+    -- * Common types 
+    , ClientIdentifier(..)
     )
 where 
-import Data.Monoid((<>))
-import Data.Map as Map
-import Data.List as List
-import Control.Exception
-import Control.Monad
-import Control.Monad.Reader
-import Control.Concurrent.STM
-import Control.Distributed.Process
-import Text.Printf
-import Data.Binary
-import Data.Typeable
-import GHC.Generics (Generic)
+
 
 import Control.Applicative((<$>))
-
-import Control.Lens
-
+import Control.Concurrent.STM
+import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
-
+import Control.Exception
+import Control.Lens
+import Control.Monad
+import Control.Monad.Reader
+import Data.Binary
+import Data.List as List
+import Data.Map.Strict as Map
+import Data.Monoid((<>))
 import Data.Text(unpack, take, Text)
 import Data.Time(UTCTime, getCurrentTime)
-import Text.Printf
+import Data.Typeable
 import Data.Zya.Utils.Logger(debugMessage)
+import GHC.Generics (Generic)
+import Network.WebSockets.Connection as WS (Connection, sendTextData)
+import Text.Printf
+import Text.Printf
 
 
 ------------ Constants --------------
@@ -123,10 +127,14 @@ maxBytes = 10 * 1024 * 1024 * 1024 --
     * localWriters - Write position for a topic.
     * remoteWriters - Write position for a topic. 
     * services - A map of the services running on the network.
+    * statistics - A map of requests and responses for the network.
+    * proxyChannel - The single channel for inter process communication.
+    * myProcessId : 
     ** Note: There should exist only one write position per topic.
  -}
 data Server = Server {
     localClients :: TVar (Map ClientIdentifier [ClientState])
+    , localTBQueue :: TVar (Map ClientIdentifier (WS.Connection, TBQueue Text))
     , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
     , localWriters :: TVar (Map Topic Integer)
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
@@ -280,11 +288,13 @@ makeLenses ''ServerConfiguration
 {--| 
   * Initialization.
 --}
+
 newServerIO :: ProcessId -> IO Server 
 newServerIO =
   \m -> 
     Server 
       <$> newTVarIO Map.empty
+      <*> newTVarIO Map.empty
       <*> newTVarIO Map.empty
       <*> newTVarIO Map.empty
       <*> newTVarIO Map.empty
@@ -568,6 +578,27 @@ updateMessageValue serverL messageId aMessage = do
     writeTVar (_messageValues serverL) $ 
       Map.insert messageId aMessage x
   return aMessage
+
+
+{-- | Update the connection information with queue to merge events.
+--}
+addConnection :: Server -> ClientIdentifier -> 
+                    WS.Connection -> STM (ClientIdentifier, WS.Connection, TBQueue Text)
+addConnection serverL clientIdentifier aConnection = do 
+  readTVar (localTBQueue serverL) >>= \x -> do
+    -- TODO : Read the queue bounds from a reader.
+    queue <- newTBQueue 1 -- change this to a better number after testing.
+    writeTVar (localTBQueue serverL) $ 
+      Map.insert clientIdentifier (aConnection, queue) x
+    return (clientIdentifier, aConnection, queue)
+deleteConnection :: Server -> ClientIdentifier -> 
+      STM (ClientIdentifier, Maybe (WS.Connection, (TBQueue Text)))
+deleteConnection serverL aClientIdentifier = do
+  x <- readTVar (localTBQueue serverL)
+  let connPair = Map.lookup aClientIdentifier x 
+  writeTVar (localTBQueue serverL) $
+    Map.delete aClientIdentifier x 
+  return (aClientIdentifier, connPair)
 
 queryMessageValue :: Server -> MessageId -> STM (Maybe PMessage) 
 queryMessageValue aServer messageKey1 = 
