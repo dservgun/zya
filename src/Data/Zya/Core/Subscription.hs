@@ -103,6 +103,7 @@ remotable ['subscriptionService]
 simpleBackend :: String -> String -> IO Backend 
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
+
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
 cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName, DBType, ConnectionDetails, Maybe Int) -> IO ()
 cloudEntryPoint backend (sP, sName, dbType, connectionDetails, count)= do
@@ -119,7 +120,7 @@ parseArgs = do
       "Writer" -> (Writer, params, portNumber)
       "Reader" -> (Reader, params, portNumber)
       "QueryService" -> (QueryService, params, portNumber) 
-      "Webserver" -> (WebServer, params, portNumber)
+      "WebServer" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)
       "TestWriter" -> (TestWriter, params, portNumber)

@@ -9,13 +9,15 @@
 
 module Data.Zya.Core.WebServerService
   (
-    webService, getHomeR
+    webService, startWebServer
   )
 where 
 
 
 
 import Conduit
+import Control.Exception
+
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM.Lifted
 import Control.Distributed.Process as Process
@@ -28,6 +30,7 @@ import Control.Concurrent.Async as Async (waitSTM, wait, async, cancel, waitEith
 
 import Control.Lens
 import Control.Monad (forever, void)
+import Control.Monad.Catch as Catch
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
@@ -106,19 +109,22 @@ app = do
     App foundation <- getYesod
     x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation)
     return ()
+
 getHomeR :: HandlerT App IO Text
 getHomeR = do
   webSockets app 
   return ("Done processing." :: Text)
 
-
+ 
 startWebServer :: ServerReaderT ()
 startWebServer = do 
   serverConfiguration <- ask
   liftIO $ do 
     let sName = Text.unpack $ serverConfiguration^.serviceName
     let serverL = serverConfiguration^.server 
-    warp 3000 $ App serverL
+    Async.async $ warp 3000 $ App serverL
+  lift $ say $ printf "Webserver started\n"
+
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopic)  = do
@@ -127,7 +133,7 @@ handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopi
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("QueryService : Received Service Available message " <> (show aMessage) <> "\n")  
+  say $  printf ("WebServer : Received Service Available message " <> (show aMessage) <> "\n")  
   currentTime <- liftIO $ getCurrentTime
   _ <- liftIO $ atomically $ do 
       myPid <- getMyPid server
@@ -141,7 +147,7 @@ handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom ser
 
 handleRemoteMessage server dbType connectionString messageCount 
   aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do 
-    say $ printf (" Not Handling remote message " <> show aMessage)
+    say $ printf (" Not Handling remote message " <> show aMessage <> "\n")
     
 
 handleRemoteMessage server dbType connectionString messageCount
@@ -196,8 +202,9 @@ eventLoop = do
 
 webService :: ServerReaderT () 
 webService = do
-  startWebServer
   initializeProcess
+  Catch.catch startWebServer (\a@(SomeException e) -> throw a)
+  lift $ say $ printf "Calling event loop \n"
   eventLoop
 
   return()
