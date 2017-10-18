@@ -79,12 +79,13 @@ terminator = do
     exit pid $ TerminateProcess "Shutting down self"
 
 
-subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails, Maybe Int) -> Process ()
-subscription backend (sP, params, dbType, dbConnection, count) = do
+subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails, Maybe Int, Int) -> Process ()
+subscription backend (sP, params, dbType, dbConnection, count, portNumber) = do
   --eventLogTracer  
   myPid <- getSelfPid
   n <- newServer myPid
-  let readerParams = makeServerConfiguration n backend sP params dbType dbConnection count
+  let readerParams = makeServerConfiguration n backend sP params dbType dbConnection count portNumber
+
   say $ printf $ "Starting subscrpition " <> (show sP) <> " " <> (show params) <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
@@ -103,10 +104,13 @@ simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__rem
 
 
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
-cloudEntryPoint :: Backend -> (ServiceProfile, ServiceName, DBType, ConnectionDetails, Maybe Int) -> IO ()
-cloudEntryPoint backend (sP, sName, dbType, connectionDetails, count)= do
+cloudEntryPoint :: Backend -> 
+  (ServiceProfile, ServiceName, DBType, 
+    ConnectionDetails, Maybe Int, Int) -> IO ()
+cloudEntryPoint backend (sP, sName, dbType, connectionDetails, count, portNumber)= do
   node <- newLocalNode backend 
-  Node.runProcess node (subscription backend (sP, sName, dbType, connectionDetails, count))
+  Node.runProcess node 
+    (subscription backend (sP, sName, dbType, connectionDetails, count, portNumber))
 
 
 parseArgs :: IO (ServiceProfile, Text, String)
@@ -130,7 +134,7 @@ cloudMain = do
  backend <- simpleBackend "127.0.0.1" aPort
  let dbType = RDBMS Postgresql
  let connectionDetails = ConnectionDetails "this connection wont work"
- cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails, Nothing)
+ cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails, Nothing, -1)
 
 
 

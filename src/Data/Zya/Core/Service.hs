@@ -58,6 +58,7 @@ module Data.Zya.Core.Service
     , serviceName, dbType, connDetails
     , numberOfTestMessages
     , makeServerConfiguration
+    , webserverPort
     -- * Publisher details 
     , Publisher(..)
     -- * Some common handlers for all nodes
@@ -100,6 +101,9 @@ import GHC.Generics (Generic)
 import Network.WebSockets.Connection as WS (Connection, sendTextData)
 import Text.Printf
 import Text.Printf
+
+-- TODO: Need to deal with this.
+type WebServerEndPoint = Int 
 
 
 ------------ Constants --------------
@@ -281,6 +285,7 @@ data ServerConfiguration = ServerConfig{
   , _dbType :: DBType 
   , _connDetails :: ConnectionDetails
   , _numberOfTestMessages :: Maybe Int
+  , _webserverPort :: WebServerEndPoint
   }
 
 
@@ -311,10 +316,12 @@ newServer :: ProcessId -> Process Server
 newServer =  liftIO . newServerIO
 
 
-
 makeServerConfiguration :: 
-  Server -> Backend -> ServiceProfile -> ServiceName -> DBType -> ConnectionDetails -> Maybe Int -> ServerConfiguration
-makeServerConfiguration s b sp sName db cd aCount = ServerConfig s b sp sName db cd aCount 
+  Server -> Backend -> ServiceProfile -> 
+  ServiceName -> DBType -> ConnectionDetails -> Maybe Int -> 
+  WebServerEndPoint -> ServerConfiguration
+makeServerConfiguration s b sp sName db cd aCount anEndpoint = 
+    ServerConfig s b sp sName db cd aCount anEndpoint
 subscriptionService :: String -> Process () 
 subscriptionService aPort = return ()
 

@@ -122,12 +122,14 @@ getHomeR = do
 startWebServer :: ServerReaderT ()
 startWebServer = do 
   serverConfiguration <- ask
+
   lift $ say $ printf "Starting webservice \n"
   liftIO $ putStrLn "Starting webservice\n"
   liftIO $ do 
     let sName = Text.unpack $ serverConfiguration^.serviceName
     let serverL = serverConfiguration^.server 
-    Async.async $ warp 3000 $ App serverL
+    let webserverPortL = serverConfiguration^.webserverPort    
+    Async.async $ warp webserverPortL  $ App serverL
   lift $ say $ printf "Webserver started\n"
 
 

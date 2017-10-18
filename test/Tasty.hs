@@ -43,15 +43,15 @@ createTopicTestCase =  do
   --ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr, Nothing)
   let nWriters = 1
   let messages = 150 -- Messages to be published.
-  testWebService <- async $ cloudEntryPoint test (WebServer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
+  testWebService <- async $ cloudEntryPoint test (WebServer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, 30000)
   threadDelay (fromIntegral $ (10 ^ 6 * 3))
 
-  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
-  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
+  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages), -1)
+  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages), -1)
 
   writers <- forM [1..nWriters] $ \_ -> do 
-                async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
-  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages)
+                async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, -1)
+  testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
   -- Run for 30 seconds and quit.
   threadDelay (fromIntegral $ (10 ^ 6 * 30))
 
