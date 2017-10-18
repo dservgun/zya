@@ -28,7 +28,8 @@ debugConnStrPostgres :: (DBType, ConnectionDetails)
 debugConnStrPostgres = 
     (RDBMS Postgresql, ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432")
 
-debugConnStr = debugConnStrPostgres
+--debugConnStr = debugConnStrPostgres
+debugConnStr = debugConnStrSqlite
 newtype TServiceName = TServiceName {_unName :: String} deriving Show 
 debugServiceName :: Text 
 debugServiceName = 
@@ -45,13 +46,13 @@ createTopicTestCase =  do
   testWebService <- async $ cloudEntryPoint test (WebServer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
   threadDelay (fromIntegral $ (10 ^ 6 * 3))
 
-{-  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
+  query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
   query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages))
 
   writers <- forM [1..nWriters] $ \_ -> do 
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages)
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages)
--}  -- Run for 30 seconds and quit.
+  -- Run for 30 seconds and quit.
   threadDelay (fromIntegral $ (10 ^ 6 * 30))
 
 

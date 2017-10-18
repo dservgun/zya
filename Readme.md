@@ -32,3 +32,7 @@ I dont like 0 based arrays. Actually, I dont like this anyway, doesnt read well.
 #### Sub note: 
 If things are working, we dont need to go about changing conventions. Though each new refactoring, 
 which is almost a daily activity, I try to fix these as I go. 
+
+### Postgres commands
+If you need to restart.
+``` sudo /etc/init.d/postgresql restart ```

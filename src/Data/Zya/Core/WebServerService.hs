@@ -73,11 +73,14 @@ newtype ProtocolHandler a =
 -- be beneficial.
 -- readerThread :: ProtocolHandler () 
 readerThread (conn, app) = do
-  WS.sendTextData conn ("hello world" :: Text)
+  liftIO $ putStrLn "Reader thread."
+  WS.sendTextData conn ("hello world\n" :: Text)
 --    ($(logDebug) "Test")
+  liftIO $ threadDelay (10 ^ 6 * 3)
   readerThread (conn, app)
 
 writerThread (conn, app) = do  
+  liftIO $ putStrLn "Writer thread"
   (command  :: Text ) <- liftIO $ (WS.receiveData conn)
   writerThread (conn, app)
 
@@ -95,8 +98,8 @@ protocolHandler :: ProtocolHandler WS.Connection
 protocolHandler = do 
   (conn, app) <- ProtoHandler ask 
   addConn
-  a <- liftIO $ Async.async (liftIO $ readerThread (conn, app))
-  b <- liftIO $ Async.async (liftIO $ writerThread (conn, app))
+  a <- liftIO . liftIO $ Async.async (readerThread (conn, app))
+  b <- liftIO . liftIO $ Async.async (writerThread (conn, app))
 --  b <- Async.async $ liftIO writerThread 
   liftIO $ Async.waitAny [a, b]
   return conn
@@ -119,6 +122,8 @@ getHomeR = do
 startWebServer :: ServerReaderT ()
 startWebServer = do 
   serverConfiguration <- ask
+  lift $ say $ printf "Starting webservice \n"
+  liftIO $ putStrLn "Starting webservice\n"
   liftIO $ do 
     let sName = Text.unpack $ serverConfiguration^.serviceName
     let serverL = serverConfiguration^.server 
@@ -203,7 +208,7 @@ eventLoop = do
 webService :: ServerReaderT () 
 webService = do
   initializeProcess
-  Catch.catch startWebServer (\a@(SomeException e) -> throw a)
+  Catch.catch startWebServer (\a@(SomeException e) -> lift $ say $ printf $ "" <> show a <>"\n")
   lift $ say $ printf "Calling event loop \n"
   eventLoop
 

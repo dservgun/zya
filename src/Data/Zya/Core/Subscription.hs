@@ -37,6 +37,7 @@ import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
 import Data.Zya.Core.TestWriter
 import Data.Zya.Core.QueryService
+import Data.Zya.Core.WebServerService(webService)
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage = do 
@@ -52,9 +53,6 @@ handleMonitorNotification server notificationMessage =
 readerService :: ServerReaderT () 
 readerService = undefined
 
-
-webService :: ServerReaderT () 
-webService = undefined
 
 
 tester :: ServerReaderT () 
@@ -87,7 +85,7 @@ subscription backend (sP, params, dbType, dbConnection, count) = do
   myPid <- getSelfPid
   n <- newServer myPid
   let readerParams = makeServerConfiguration n backend sP params dbType dbConnection count
-  say $ printf $ "Starting subscrpition " <> (show sP) <> (show params) <> "\n"
+  say $ printf $ "Starting subscrpition " <> (show sP) <> " " <> (show params) <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
     Reader -> runReaderT readerService readerParams
