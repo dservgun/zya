@@ -459,13 +459,13 @@ getNextLocalMessage app clientIdentifier = do
 -- This presents a challenge: this snapshot needs to be backed by a
 -- persistent globally accessible store.
 publishLocalSnapshot :: Server -> ProcessId -> IO ()
-publishLocalSnapshot app processId = do
+publishLocalSnapshot app targetProcessId = do
   messageKeyL <- liftIO $ atomically $ readTVar $ messageKey app
   messageAsList <- return $ Map.assocs messageKeyL
   mapM_ (\(messageId, processId) ->
             liftIO $
               atomically $
-                fireRemote app processId $ MessageKeyStore (messageId, processId)) messageAsList
+                fireRemote app targetProcessId $ MessageKeyStore (messageId, processId)) messageAsList
 
   return ()
 
@@ -475,6 +475,7 @@ broadcastLocalQueues :: Server -> (ProcessId, MessageId) -> IO ()
 broadcastLocalQueues server (processIdL, messageIdL) = do
   localQueues <- atomically $ readTVar $ localTBQueue server
   let elems = Map.elems localQueues
+  putStrLn $ "Publishing to Local queues " <> (show processIdL) <> ", " <> (show messageIdL)
   mapM_ (\(conn, queue) -> atomically $ writeTBQueue queue (processIdL, messageIdL)) elems
   return ()
 
@@ -644,7 +645,7 @@ addConnection :: Server -> ClientIdentifier ->
 addConnection serverL clientIdentifier aConnection = do
   readTVar (localTBQueue serverL) >>= \x -> do
     -- TODO : Read the queue bounds from a reader.
-    queue <- newTBQueue 1 -- change this to a better number after testing.
+    queue <- newTBQueue 100 -- change this to a better number after testing.
     writeTVar (localTBQueue serverL) $
       Map.insert clientIdentifier (aConnection, queue) x
     return (clientIdentifier, aConnection, queue)
