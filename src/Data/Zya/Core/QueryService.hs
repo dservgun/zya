@@ -73,6 +73,9 @@ handleRemoteMessage server dbType connectionString messageCount
   aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do
     say $ printf ("Handling remote message " <> show aMessage <> "\n")
     _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
+    selfPid <- getSelfPid
+    publishMessageKey <- liftIO $ atomically $ publishMessageKey server selfPid messageId
+
     messagesProcessed <- liftIO $ atomically $ queryMessageCount server
     let shouldTerminate = liftA2 (>=) (pure messagesProcessed) (messageCount)
     _ <- case shouldTerminate of

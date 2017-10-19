@@ -88,8 +88,6 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
   say $ printf ("Persisted message with status " <> (show status) <> "\n")
   _ <- liftIO $ atomically $ updateMessageKey server selfPid messageId
-  publishMessageKey <- liftIO $ atomically $ publishMessageKey server selfPid messageId
-  say $ printf $ "Published message key store " <> (show publishMessageKey) <> "\n"
   posProcessId <- liftIO $ atomically $ do
         r <- queryMessageLocation server messageId
         case r of
