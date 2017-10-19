@@ -5,19 +5,20 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 
--- A webservice for the cloud. 
+-- A webservice for the cloud.
 
 module Data.Zya.Core.WebServerService
   (
     webService, startWebServer
   )
-where 
+where
 
 
 
 import Conduit
 import Control.Exception
 
+import Control.Monad.Catch as Catch
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM.Lifted
 import Control.Distributed.Process as Process
@@ -56,14 +57,13 @@ mkYesod "App" [parseRoutes|
 
 
 
-type Connection = Text
-newtype ProtocolHandler a = 
+newtype ProtocolHandler a =
       ProtoHandler {
         _runConn :: ReaderT (WS.Connection, Server) IO a
       }
-      deriving 
+      deriving
       (
-        Functor, 
+        Functor,
         Applicative,
         Monad,
         MonadIO)
@@ -71,64 +71,70 @@ newtype ProtocolHandler a =
 
 -- At this point we can safely be in the io monad, though adding a monad logger might
 -- be beneficial.
--- readerThread :: ProtocolHandler () 
-readerThread (conn, app) = do
-  liftIO $ putStrLn "Reader thread."
-  WS.sendTextData conn ("hello world\n" :: Text)
---    ($(logDebug) "Test")
-  liftIO $ threadDelay (10 ^ 6 * 3)
-  readerThread (conn, app)
+-- readerThread :: ProtocolHandler ()
+readerThread (conn, app, identifier) = do
+  liftIO $ do
+    putStrLn "Reader thread."
+    currentMessage <- atomically $ getNextLocalMessage app identifier
+    putStrLn $ "Sending " <> (show currentMessage)
+    WS.sendTextData conn (Text.pack $ show currentMessage)
+  readerThread (conn, app, identifier)
 
-writerThread (conn, app) = do  
+writerThread (conn, app, identifier) = do
   liftIO $ putStrLn "Writer thread"
-  (command  :: Text ) <- liftIO $ (WS.receiveData conn)
-  writerThread (conn, app)
+  (command :: Text) <-
+    (WS.receiveData conn) -- `Catch.catch` (\a -> atomically $ deleteConnection app identifier)
+  writerThread (conn, app, identifier)
 
-removeConn :: ProtocolHandler WS.Connection 
-removeConn = do 
-  (conn, app) <- ProtoHandler ask 
+removeConn :: ProtocolHandler WS.Connection
+removeConn = do
+  (conn, app) <- ProtoHandler ask
   return conn
-addConn :: ProtocolHandler WS.Connection 
-addConn = do 
-  (conn, app) <- ProtoHandler ask 
+addConn :: ProtocolHandler (WS.Connection, ClientIdentifier)
+addConn = do
+  (conn, app) <- ProtoHandler ask
   nextId <- (\x -> Text.pack $ show x) <$> liftIO nextUUID
-  r <- liftIO $ atomically $ addConnection app (ClientIdentifier nextId) conn 
-  return conn
+  r <- liftIO $ atomically $ addConnection app (ClientIdentifier nextId) conn
+  return (conn, ClientIdentifier nextId)
 protocolHandler :: ProtocolHandler WS.Connection
-protocolHandler = do 
-  (conn, app) <- ProtoHandler ask 
-  addConn
-  a <- liftIO . liftIO $ Async.async (readerThread (conn, app))
-  b <- liftIO . liftIO $ Async.async (writerThread (conn, app))
---  b <- Async.async $ liftIO writerThread 
+protocolHandler = do
+  (conn, app) <- ProtoHandler ask
+  -- liftIO $ WS.sendTextData conn ("Welcome.." :: Text)
+  (_ , cid@(ClientIdentifier identifier)) <- addConn
+  atomically $
+    getMyPid app >>= \ x -> putLocalMessage app cid (x, identifier)
+  a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
+  b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid))
+--  b <- Async.async $ liftIO writerThread
   liftIO $ Async.waitAny [a, b]
+  removeConn
   return conn
 
 type YesodHandler = HandlerT App IO
 
 app :: WebSocketsT (HandlerT App IO) ()
 app = do
-    connection <- ask 
+    connection <- ask
     App foundation <- getYesod
     x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation)
     return ()
 
 getHomeR :: HandlerT App IO Text
 getHomeR = do
-  webSockets app 
+  webSockets app
   return ("Done processing." :: Text)
 
- 
+
 startWebServer :: ServerReaderT ()
-startWebServer = do 
+startWebServer = do
   serverConfiguration <- ask
 
   lift $ say $ printf "Starting webservice \n"
   liftIO $ putStrLn "Starting webservice\n"
-  liftIO $ do 
+  liftIO $ do
     let sName = Text.unpack $ serverConfiguration^.serviceName
-    let serverL = serverConfiguration^.server 
-    let webserverPortL = serverConfiguration^.webserverPort    
+    let serverL = serverConfiguration^.server
+    let webserverPortL = serverConfiguration^.webserverPort
     Async.async $ warp webserverPortL  $ App serverL
   lift $ say $ printf "Webserver started\n"
 
@@ -140,22 +146,31 @@ handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopi
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("WebServer : Received Service Available message " <> (show aMessage) <> "\n")  
+  say $  printf ("WebServer : Received Service Available message " <> (show aMessage) <> "\n")
   currentTime <- liftIO $ getCurrentTime
-  _ <- liftIO $ atomically $ do 
+  _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
       sendRemote server pid $ (GreetingsFrom WebServer myPid, currentTime)
   return ()
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $  printf ("Not Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> (show aMessage) <> "\n")
+  liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
-handleRemoteMessage server dbType connectionString messageCount 
-  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do 
-    say $ printf (" Not Handling remote message " <> show aMessage <> "\n")
-    
+-- If the message has a tag, can cache and the server can also cache,
+-- perhaps we can cache the message.
+handleRemoteMessage server dbType connectionString messageCount
+  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do
+  say $ printf ("Not handling this message. Not a writer.\n")
+
+handleRemoteMessage server _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
+  myPid <- getSelfPid
+  currentTime <- liftIO getCurrentTime
+  _ <- liftIO $ broadcastLocalQueues server (processId, messageId)
+  say $ printf ("Message key store message processed..\n")
+  return()
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher (messageId, topic, message)) = do
@@ -165,52 +180,53 @@ handleRemoteMessage server dbType connectionString messageCount
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
-  say $ printf ("Received message " <> show aMessage <> "\n") 
+  say $ printf ("Received message " <> show aMessage <> "\n")
   return ()
 
 
-handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do 
+handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do
   say $ printf ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
-  
 
-handleRemoteMessage server dbType connectionString unhandledMessage _ = 
+
+handleRemoteMessage server dbType connectionString unhandledMessage _ =
   say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
   say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
-  void $ liftIO $ atomically $ removeProcess server pid 
+  void $ liftIO $ atomically $ removeProcess server pid
   terminate
 eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
-  lift $ do 
+  lift $ do
     let sName = Text.unpack $ serverConfiguration^.serviceName
-    let serverL = serverConfiguration^.server 
+    let serverL = serverConfiguration^.server
     let profileL = serverConfiguration^.serviceProfile
-    let dbTypeL = serverConfiguration^.dbType 
+    let dbTypeL = serverConfiguration^.dbType
     let connectionDetailsL = serverConfiguration^.connDetails
     let testMessageCount = serverConfiguration^.numberOfTestMessages
     spawnLocal (proxyProcess serverL)
     (forever $
       receiveWait
-        [ 
+        [
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL testMessageCount
         , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL WebServer
         , matchAny $ \_ -> return ()      -- discard unknown messages
-        ]) `Process.catchExit` 
-              (\pId (TerminateProcess aText) -> do 
+        ]) `Process.catchExit`
+              (\pId (TerminateProcess aText) -> do
                   say $ printf ("Terminating process " <> show aText <> " " <> show sName <> "\n")
                   return ())
 
-webService :: ServerReaderT () 
+webService :: ServerReaderT ()
 webService = do
   initializeProcess
   Catch.catch startWebServer (\a@(SomeException e) -> lift $ say $ printf $ "" <> show a <>"\n")
+
   lift $ say $ printf "Calling event loop \n"
   eventLoop
 

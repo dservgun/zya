@@ -5,7 +5,7 @@
 module Data.Zya.Core.QueryService(
   -- * Query service that process query requests
   queryService
-  
+
   ) where
 
 import GHC.Generics (Generic)
@@ -42,9 +42,9 @@ import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
 newtype RemoteMessageHandler a = RemoteMessageHandler {
-  runApp :: ReaderT (Server, DBType, ConnectionDetails, PMessage) Process a 
+  runApp :: ReaderT (Server, DBType, ConnectionDetails, PMessage) Process a
 } deriving (
-    Functor, 
+    Functor,
     Applicative,
     Monad,
     MonadIO
@@ -57,9 +57,9 @@ handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopi
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("QueryService : Received Service Available message " <> (show aMessage) <> "\n")  
+  say $  printf ("QueryService : Received Service Available message " <> (show aMessage) <> "\n")
   currentTime <- liftIO $ getCurrentTime
-  _ <- liftIO $ atomically $ do 
+  _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
       sendRemote server pid $ (GreetingsFrom QueryService myPid, currentTime)
@@ -69,20 +69,20 @@ handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom ser
   say $  printf ("Received message " <> (show aMessage) <> "\n")
   return ()
 
-handleRemoteMessage server dbType connectionString messageCount 
-  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do 
-    say $ printf ("Handling remote message " <> show aMessage)
+handleRemoteMessage server dbType connectionString messageCount
+  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do
+    say $ printf ("Handling remote message " <> show aMessage <> "\n")
     _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
     messagesProcessed <- liftIO $ atomically $ queryMessageCount server
     let shouldTerminate = liftA2 (>=) (pure messagesProcessed) (messageCount)
-    _ <- case shouldTerminate of 
-          Just True -> do 
-            terminateAllProcesses server 
+    _ <- case shouldTerminate of
+          Just True -> do
+            terminateAllProcesses server
           _ -> return ()
-    say $ printf("Total messages processed " 
-        <> (show messagesProcessed) <> " Max to be processed" 
+    say $ printf("Total messages processed "
+        <> (show messagesProcessed) <> " Max to be processed"
         <> (show messageCount) <> " " <> (show shouldTerminate) <> "\n")
-    
+
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher (messageId, topic, message)) = do
@@ -92,55 +92,55 @@ handleRemoteMessage server dbType connectionString messageCount
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
-  say $ printf ("Received message " <> show aMessage <> "\n") 
+  say $ printf ("Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
-  _ <- liftIO $ atomically $ do 
+  _ <- liftIO $ atomically $ do
         messageValue <- queryMessageValue server messageId
-        sendRemote server processId 
+        sendRemote server processId
           ((QueryMessage (messageId, processId, messageValue)), currentTime)
   return ()
 
 
-handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do 
+handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do
   say $ printf ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
-  
 
-handleRemoteMessage server dbType connectionString unhandledMessage _ = 
+
+handleRemoteMessage server dbType connectionString unhandledMessage _ =
   say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
   say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
-  void $ liftIO $ atomically $ removeProcess server pid 
+  void $ liftIO $ atomically $ removeProcess server pid
   terminate
 
 eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
-  lift $ do 
+  lift $ do
     let sName = unpack $ serverConfiguration^.serviceName
-    let serverL = serverConfiguration^.server 
+    let serverL = serverConfiguration^.server
     let profileL = serverConfiguration^.serviceProfile
-    let dbTypeL = serverConfiguration^.dbType 
+    let dbTypeL = serverConfiguration^.dbType
     let connectionDetailsL = serverConfiguration^.connDetails
     let testMessageCount = serverConfiguration^.numberOfTestMessages
     spawnLocal (proxyProcess serverL)
     (forever $
       receiveWait
-        [ 
+        [
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL testMessageCount
         , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL QueryService
         , matchAny $ \_ -> return ()      -- discard unknown messages
-        ]) `Process.catchExit` 
-              (\pId (TerminateProcess aText) -> do 
+        ]) `Process.catchExit`
+              (\pId (TerminateProcess aText) -> do
                   say $ printf ("Terminating process " <> show aText <> " " <> show sName <> "\n")
                   return ())
 
-queryService :: ServerReaderT () 
+queryService :: ServerReaderT ()
 queryService = do
   initializeProcess
   eventLoop

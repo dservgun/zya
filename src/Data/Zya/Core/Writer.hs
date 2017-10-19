@@ -40,14 +40,14 @@ import Data.Zya.Persistence.Persistence(DBType, persist)
 
 -- File path to actually do the logging.
 -- Use conduits.
-rootLocation :: FilePath 
-rootLocation = "./tmp" 
+rootLocation :: FilePath
+rootLocation = "./tmp"
 
 
 persistMessage :: MessageT
-persistMessage = do 
+persistMessage = do
   -- Insert the topic into persistent store.
-  -- return the status. Send the status to 
+  -- return the status. Send the status to
   -- some peers (need to decide that, could be all).
   p <- persist
   return $ CreateStatus "success??"
@@ -60,18 +60,20 @@ handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic)
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")  
+  say $  printf ("Received message " <> (show aMessage) <> "\n")
   currentTime <- liftIO $ getCurrentTime
-  _ <- liftIO $ atomically $ do 
+  _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
-      fireRemote server pid $ 
-                GreetingsFrom Writer myPid 
+      fireRemote server pid $
+                GreetingsFrom Writer myPid
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Writer : Received message " <> (show aMessage) <> "\n")
   liftIO $ atomically $ addService server serviceProfile pid
+  --publish local state
+  liftIO $ publishLocalSnapshot server pid
 
   return ()
 
@@ -85,50 +87,50 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
   say $ printf ("Persisted message with status " <> (show status) <> "\n")
-  _ <- liftIO $ atomically $ do 
-      _ <- updateMessageKey server selfPid messageId   
-      publishMessageKey server selfPid messageId
-  posProcessId <- liftIO $ atomically $ do 
+  _ <- liftIO $ atomically $ updateMessageKey server selfPid messageId
+  publishMessageKey <- liftIO $ atomically $ publishMessageKey server selfPid messageId
+  say $ printf $ "Published message key store " <> (show publishMessageKey) <> "\n"
+  posProcessId <- liftIO $ atomically $ do
         r <- queryMessageLocation server messageId
-        case r of 
+        case r of
           Just r1 -> return r
           Nothing -> findAvailableService server QueryService RoundRobin
   say $ printf "Message persisted successfully " <> (show status) <> " " <> "Using query service " <> (show posProcessId) <> "\n"
 
-  case posProcessId of 
+  case posProcessId of
     Just x -> liftIO $ atomically $ sendRemote server x (committedMessage, time)
     Nothing -> say $ printf ("No process id found for QueryService " <> "\n")
   return ()
-  where 
+  where
     committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
 
-handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess message) = do 
+handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess message) = do
   say $ printf ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
-handleRemoteMessage server dbType connectionString unhandledMessage = 
+handleRemoteMessage server dbType connectionString unhandledMessage =
   say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
   say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
-  void $ liftIO $ atomically $ removeProcess server pid 
+  void $ liftIO $ atomically $ removeProcess server pid
   terminate
 
 eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
-  lift $ do 
+  lift $ do
     let sName = unpack $ serverConfiguration^.serviceName
-    let serverL = serverConfiguration^.server 
+    let serverL = serverConfiguration^.server
     let profileL = serverConfiguration^.serviceProfile
-    let dbTypeL = serverConfiguration^.dbType 
+    let dbTypeL = serverConfiguration^.dbType
     let connectionDetailsL = serverConfiguration^.connDetails
     spawnLocal (proxyProcess serverL)
     forever $
       receiveWait
-        [ 
+        [
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL
         , match $ handleMonitorNotification serverL
         , matchIf (\(WhereIsReply l _) -> l == sName) $
@@ -136,7 +138,7 @@ eventLoop = do
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ] `Control.Distributed.Process.catch` (\e@(SomeException e1) -> liftIO $ putStrLn $ "Exception " <> show e <> "\n")
 
-writer :: ServerReaderT () 
+writer :: ServerReaderT ()
 writer = do
   initializeProcess
   eventLoop
@@ -144,5 +146,5 @@ writer = do
 
 
 -- Some synonyms
-success :: Text 
+success :: Text
 success = "Success"
