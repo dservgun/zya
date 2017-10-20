@@ -67,13 +67,16 @@ handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
+  liftIO $ publishLocalSnapshot server pid
+
   return ()
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do
     say $ printf ("Handling remote message " <> show aMessage <> "\n")
-    _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
     selfPid <- getSelfPid
+    _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
+    _ <- liftIO $ atomically $ updateMessageKey server selfPid messageId
     publishMessageKey <- liftIO $ atomically $ publishMessageKey server selfPid messageId
 
     messagesProcessed <- liftIO $ atomically $ queryMessageCount server
