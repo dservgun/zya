@@ -3,7 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes, TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- A webservice for the cloud.
 
@@ -35,11 +35,12 @@ import Control.Monad.Catch as Catch
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.Text as Text (Text, take)
 import Data.Time
 import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
+import Data.Typeable
 import Network.WebSockets.Connection as WS (Connection, sendTextData, receiveData)
 import Text.Printf
 import Yesod.Core
@@ -69,21 +70,34 @@ newtype ProtocolHandler a =
         MonadIO)
 
 
+newtype WebServiceErrorCall = WebServiceErrorCall Text deriving (Typeable)
+
+-- Note: How long should error logs be.
+instance Show WebServiceErrorCall where
+  show (WebServiceErrorCall aText) = "WebServiceErrorCall " <> (show $ Text.take 60 aText)
+
+
+handleConnectionException ::
+  (MonadIO m, Show a) => Server -> ClientIdentifier -> a -> m Text
+handleConnectionException app identifier a = do
+    (liftIO $ atomically $ deleteConnection app identifier)
+    return $ Text.pack (show a)
 -- At this point we can safely be in the io monad, though adding a monad logger might
 -- be beneficial.
 -- readerThread :: ProtocolHandler ()
 readerThread (conn, app, identifier) = do
   liftIO $ do
-    putStrLn "Reader thread."
     currentMessage <- atomically $ getNextLocalMessage app identifier
-    putStrLn $ "Sending " <> (show currentMessage)
     WS.sendTextData conn (Text.pack $ show currentMessage)
+      `Catch.catch`
+        (\a@(SomeException e) -> void $ handleConnectionException app identifier a)
   readerThread (conn, app, identifier)
 
 writerThread (conn, app, identifier) = do
   liftIO $ putStrLn "Writer thread"
   (command :: Text) <-
-    (WS.receiveData conn) -- `Catch.catch` (\a -> atomically $ deleteConnection app identifier)
+    WS.receiveData conn  `Catch.catch`
+            (\a@(SomeException e) -> handleConnectionException app identifier a)
   writerThread (conn, app, identifier)
 
 removeConn :: ProtocolHandler WS.Connection
