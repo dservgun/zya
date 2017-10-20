@@ -32,6 +32,7 @@ module Data.Zya.Core.Service
         , getNextLocalMessage
         , putLocalMessage
         , publishLocalSnapshot
+        , messagesTillNow
     -- * server reader
     , ServerReaderT
     -- * Message types.
@@ -468,6 +469,19 @@ publishLocalSnapshot app targetProcessId = do
                 fireRemote app targetProcessId $ MessageKeyStore (messageId, processId)) messageAsList
 
   return ()
+
+
+-- Put the messages received till now in the queue.
+messagesTillNow :: Server -> ClientIdentifier -> IO ()
+messagesTillNow server clientIdentifier = do
+  messageKeyL <- liftIO $ atomically $ readTVar $ messageKey server
+  messageAsList <- return $ Map.assocs messageKeyL
+  mapM_ (\(messageId, processId) ->
+            liftIO $
+              atomically $
+                putLocalMessage server clientIdentifier (processId, messageId)) messageAsList
+  return ()
+
 
 -- IO because we want to break up each individual sends, or have
 -- some control on how many message sends should we buffer.

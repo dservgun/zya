@@ -101,10 +101,10 @@ protocolHandler = do
   (conn, app) <- ProtoHandler ask
   -- liftIO $ WS.sendTextData conn ("Welcome.." :: Text)
   (_ , cid@(ClientIdentifier identifier)) <- addConn
-  atomically $
-    getMyPid app >>= \ x -> putLocalMessage app cid (x, identifier)
   a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
   b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid))
+  liftIO $ messagesTillNow app cid
+
 --  b <- Async.async $ liftIO writerThread
   liftIO $ Async.waitAny [a, b]
   removeConn
@@ -168,6 +168,7 @@ handleRemoteMessage server dbType connectionString messageCount
 handleRemoteMessage server _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
   currentTime <- liftIO getCurrentTime
+  liftIO $ atomically $ updateMessageKey server processId messageId
   _ <- liftIO $ broadcastLocalQueues server (processId, messageId)
   say $ printf ("Message key store message processed..\n")
   return()
