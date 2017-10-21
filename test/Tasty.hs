@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Concurrent.Async
 import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Monad.Reader
-import Test.Tasty
-import Test.Tasty.HUnit as HU
 import Data.Text as Text
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
-import Data.Zya.Persistence.Persistence(DBType, persist)
 import Data.Zya.Core.WebServerService
+import Data.Zya.Persistence.Persistence(DBType, persist)
+import Test.Tasty
+import Test.Tasty.HUnit as HU
 
 testBackend :: IO Backend
 testBackend = simpleBackend "localhost" "5000"
@@ -41,7 +41,7 @@ createTopicTestCase :: Assertion
 createTopicTestCase =  do
   test <- testBackend
   --ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr, Nothing)
-  let nWriters = 6
+  let nWriters = 1
   let messages = 100 -- Messages to be published.
   testWebService <- async $ cloudEntryPoint test (WebServer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, 30000)
   query1 <- async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages), -1)

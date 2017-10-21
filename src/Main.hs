@@ -1,15 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Concurrent.Async
 import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Monad.Reader
 import Data.Text as Text
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
-import Data.Zya.Persistence.Persistence(DBType, persist)
 import Data.Zya.Core.WebServerService
+import Data.Zya.Persistence.Persistence(DBType, persist)
 
 
 {-- |

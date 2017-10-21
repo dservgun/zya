@@ -1,4 +1,4 @@
-{--| 
+{--|
 
 Some setup instructions.
 #Creating users in postgres
@@ -9,7 +9,4 @@ sudo -u postgres psql
 
 
 --}
-
-import Distribution.Simple
-main = defaultMain
 

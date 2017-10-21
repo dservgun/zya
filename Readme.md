@@ -6,10 +6,6 @@ A realtime webserver allowing users to store and forward custom messages.
 
 ## [![Build Status](https://travis-ci.org/dservgun/zya.svg?branch=master)](https://travis-ci.org/dservgun/zya)
 
-## How do design distributed systems.
-At least the issue I am facing is that each service needs to identify its set of handlers slightly different.
-There is probably a need to define some requirements at the top of each service to outline what the
-core feature set is.
 
 ## Helpful commands
 

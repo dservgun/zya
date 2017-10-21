@@ -1,13 +1,13 @@
 module Data.Zya.Utils.Logger where
 
-import System.Log.Logger
-import System.Log.Handler.Syslog 
+import System.Log.Formatter
 import System.Log.Handler(setFormatter)
-import System.Log.Formatter 
+import System.Log.Handler.Syslog
+import System.Log.Logger
 
-setup componentRoot = 
-  openlog "ZyaLogs" [PID] USER DEBUG 
+setup componentRoot =
+  openlog "ZyaLogs" [PID] USER DEBUG
     >>= \s ->updateGlobalLogger componentRoot (addHandler s)
 
-debugMessage = debugM 
+debugMessage = debugM
 
