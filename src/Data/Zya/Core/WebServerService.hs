@@ -93,12 +93,17 @@ readerThread (conn, app, identifier) = do
         (\a@(SomeException e) -> void $ handleConnectionException app identifier a)
   readerThread (conn, app, identifier)
 
-writerThread (conn, app, identifier) = do
+writerThread (conn, app, identifier, exit)  = do
   liftIO $ putStrLn "Writer thread"
   (command :: Text) <-
     WS.receiveData conn  `Catch.catch`
-            (\a@(SomeException e) -> handleConnectionException app identifier a)
-  writerThread (conn, app, identifier)
+            (\a@(SomeException e) -> do
+                handleConnectionException app identifier a
+                writerThread (conn, app, identifier, True))
+  if exit then
+    return "Exiting thread."
+  else
+    writerThread (conn, app, identifier, exit)
 
 removeConn :: ProtocolHandler WS.Connection
 removeConn = do
@@ -116,7 +121,7 @@ protocolHandler = do
   -- liftIO $ WS.sendTextData conn ("Welcome.." :: Text)
   (_ , cid@(ClientIdentifier identifier)) <- addConn
   a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
-  b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid))
+  b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid, False))
   liftIO $ messagesTillNow app cid
 
 --  b <- Async.async $ liftIO writerThread
