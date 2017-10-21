@@ -18,10 +18,9 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
-import Control.Exception
+import Control.Exception.Safe
 import Control.Lens
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.Binary

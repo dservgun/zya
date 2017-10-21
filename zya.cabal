@@ -73,44 +73,45 @@ library
   -- Other library packages from which modules are imported.
   build-depends:
     base >=4.4 && < 5
-    , wai-websockets                 >= 3.0.0.5 && < 3.1
-    , yesod-websockets               >= 0.2.0 && < 0.3
-    , yesod-core                     >= 1.4 && < 1.5
-    , yesod-static                   >= 1.5 && < 1.6
-    , hslogger >= 1.2 && < 1.3
-    , text >= 1.2 && < 1.3
-    , time >= 1.5 && < 1.6
-    , mtl >= 2.2 && < 2.3
+    , array >= 0.5 && < 0.6
+    , async >= 2.1 && < 2.2
+    , binary >= 0.8.1.0 && < 0.9
+    , bytestring >= 0.10 && < 0.11
+    , conduit                        >= 1.2.4 && < 1.3
+    , conduit-combinators            >= 1.1 && < 1.2
     , containers >= 0.5 && < 0.6
-    , stm-lifted                     >= 0.1.0.0 && < 0.2
+    , Crypto >= 4.2 && < 4.3
     , distributed-process >= 0.7 && < 0.8
     , distributed-process-simplelocalnet >= 0.2  && < 0.3
     , distributed-static >= 0.3 && < 0.4
+    , exceptions >= 0.8 && < 0.9
+    , haskeline >= 0.7 && < 0.8
+    , hslogger >= 1.2 && < 1.3
+    , lens >= 4.15 && < 4.16
+    , monad-control >= 1.0 && < 1.1
+    , monad-logger >= 0.3 && < 0.4
+    , mtl >= 2.2 && < 2.3
     , network >= 2.6 && < 2.7
     , network-transport >= 0.5 && < 0.6
     , network-transport-tcp >= 0.5 && < 0.7
-    , binary >= 0.8.1.0 && < 0.9
-    , exceptions >= 0.8 && < 0.9
-    , template-haskell >= 2.9 && < 2.12
-    , stm >= 2.4 && < 2.5
-    , async >= 2.1 && < 2.2
-    , haskeline >= 0.7 && < 0.8
-    , conduit                        >= 1.2.4 && < 1.3
-    , conduit-combinators            >= 1.1 && < 1.2
     , persistent >= 2.7 && < 2.8
-    , persistent-template >= 2.5 && < 2.6
     , persistent-postgresql >= 2.6 && < 2.7
     , persistent-sqlite >= 2.6 && < 2.7
-    , bytestring >= 0.10 && < 0.11
+    , persistent-template >= 2.5 && < 2.6
     , resource-pool >= 0.2 && < 0.3
-    , Crypto >= 4.2 && < 4.3
-    , array >= 0.5 && < 0.6
+    , safe-exceptions >= 0.1 && < 0.2
+    , stm >= 2.4 && < 2.5
+    , stm-lifted                     >= 0.1.0.0 && < 0.2
+    , template-haskell >= 2.9 && < 2.12
+    , text >= 1.2 && < 1.3
+    , time >= 1.5 && < 1.6
     , transformers >= 0.5 && < 0.6
-    , monad-logger >= 0.3 && < 0.4
-    , lens >= 4.15 && < 4.16
-    , monad-control >= 1.0 && < 1.1
     , uuid >= 1.3 && < 1.4
+    , wai-websockets                 >= 3.0.0.5 && < 3.1
     , websockets >= 0.12 && < 0.13
+    , yesod-core                     >= 1.4 && < 1.5
+    , yesod-static                   >= 1.5 && < 1.6
+    , yesod-websockets               >= 0.2.0 && < 0.3
   -- Directories containing source files.
   hs-source-dirs:      src
   ghc-options:    -Wall
@@ -121,44 +122,45 @@ executable zya_reference
   main-is : Main.hs
   build-depends :
     base >=4.4 && < 5
-    , wai-websockets                 >= 3.0.0.5 && < 3.1
-    , yesod-websockets               >= 0.2.0 && < 0.3
-    , yesod-core                     >= 1.4 && < 1.5
-    , yesod-static                   >= 1.5 && < 1.6
-    , hslogger >= 1.2 && < 1.3
-    , text >= 1.2 && < 1.3
-    , time >= 1.5 && < 1.6
-    , mtl >= 2.2 && < 2.3
+    , array >= 0.5 && < 0.6
+    , async >= 2.1 && < 2.2
+    , binary >= 0.8.1.0 && < 0.9
+    , bytestring >= 0.10 && < 0.11
+    , conduit                        >= 1.2.4 && < 1.3
+    , conduit-combinators            >= 1.1 && < 1.2
     , containers >= 0.5 && < 0.6
-    , stm-lifted                     >= 0.1.0.0 && < 0.2
+    , Crypto >= 4.2 && < 4.3
     , distributed-process >= 0.7 && < 0.8
     , distributed-process-simplelocalnet >= 0.2  && < 0.3
     , distributed-static >= 0.3 && < 0.4
+    , exceptions >= 0.8 && < 0.9
+    , haskeline >= 0.7 && < 0.8
+    , hslogger >= 1.2 && < 1.3
+    , lens >= 4.15 && < 4.16
+    , monad-control >= 1.0 && < 1.1
+    , monad-logger >= 0.3 && < 0.4
+    , mtl >= 2.2 && < 2.3
     , network >= 2.6 && < 2.7
     , network-transport >= 0.5 && < 0.6
     , network-transport-tcp >= 0.5 && < 0.7
-    , binary >= 0.8.1.0 && < 0.9
-    , exceptions >= 0.8 && < 0.9
-    , template-haskell >= 2.9 && < 2.12
-    , stm >= 2.4 && < 2.5
-    , async >= 2.1 && < 2.2
-    , haskeline >= 0.7 && < 0.8
-    , conduit                        >= 1.2.4 && < 1.3
-    , conduit-combinators            >= 1.1 && < 1.2
     , persistent >= 2.7 && < 2.8
-    , persistent-template >= 2.5 && < 2.6
     , persistent-postgresql >= 2.6 && < 2.7
     , persistent-sqlite >= 2.6 && < 2.7
-    , bytestring >= 0.10 && < 0.11
+    , persistent-template >= 2.5 && < 2.6
     , resource-pool >= 0.2 && < 0.3
-    , Crypto >= 4.2 && < 4.3
-    , array >= 0.5 && < 0.6
+    , safe-exceptions >= 0.1 && < 0.2
+    , stm >= 2.4 && < 2.5
+    , stm-lifted                     >= 0.1.0.0 && < 0.2
+    , template-haskell >= 2.9 && < 2.12
+    , text >= 1.2 && < 1.3
+    , time >= 1.5 && < 1.6
     , transformers >= 0.5 && < 0.6
-    , monad-logger >= 0.3 && < 0.4
-    , lens >= 4.15 && < 4.16
-    , monad-control >= 1.0 && < 1.1
     , uuid >= 1.3 && < 1.4
+    , wai-websockets                 >= 3.0.0.5 && < 3.1
     , websockets >= 0.12 && < 0.13
+    , yesod-core                     >= 1.4 && < 1.5
+    , yesod-static                   >= 1.5 && < 1.6
+    , yesod-websockets               >= 0.2.0 && < 0.3
 
   ghc-options : -Wall
   default-language:   Haskell2010
@@ -167,23 +169,23 @@ test-suite Tasty
   type:   exitcode-stdio-1.0
   build-depends:
     base >= 4.7 && <  5
+    , async >= 2.1 && < 2.2
+    , binary >= 0.8 && < 0.9
+    , conduit >= 1.2 && < 1.3
+    , Crypto >= 4.2 && < 4.3
+    , distributed-process >= 0.7 && < 0.8
+    , distributed-process-simplelocalnet >= 0.2  && < 0.3
+    , distributed-static >= 0.3 && < 0.4
+    , heap >= 1.0 && < 1.1
+    , hslogger >= 1.2 && < 1.3
+    , mtl >= 2.2 && < 2.3
     , tasty >= 0.11 && < 0.12
     , tasty-hunit >= 0.9.1 && < 0.10
     , tasty-quickcheck >= 0.9.1 && < 0.10
     , tasty-smallcheck >= 0.8.1 && < 0.10
     , text >= 1.2 && < 1.3
     , time >= 1.5 && < 1.6
-    , mtl >= 2.2 && < 2.3
-    , distributed-process >= 0.7 && < 0.8
-    , distributed-process-simplelocalnet >= 0.2  && < 0.3
-    , distributed-static >= 0.3 && < 0.4
-    , binary >= 0.8 && < 0.9
     , zya >= 0.1.0.1 && < 0.2
-    , async >= 2.1 && < 2.2
-    , conduit >= 1.2 && < 1.3
-    , Crypto >= 4.2 && < 4.3
-    , heap >= 1.0 && < 1.1
-    , hslogger >= 1.2 && < 1.3
 
   hs-source-dirs: test
   ghc-options : -Wall
