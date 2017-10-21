@@ -43,7 +43,7 @@ build-type:          Simple
 extra-source-files:  Readme.md
 
 -- Constraint on the version of Cabal needed to build this package.
-cabal-version:       >=1.24
+cabal-version:       >=1.22
 Tested-With: GHC==8.0.1
 
 
