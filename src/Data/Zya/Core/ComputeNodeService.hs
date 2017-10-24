@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.ComputeNodeService(
   -- * Writers that handle log events
-  compute
+  computeService
   , handleRemoteMessage
   ) where
 
@@ -22,7 +22,7 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Reader
-import Control.Monad.Trans
+import Control.Monad.Trans as Trans
 import Data.Binary
 import Data.Data
 import Data.Monoid((<>))
@@ -35,7 +35,8 @@ import Data.Zya.Persistence.Persistence(DBType, persist)
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
 import Text.Printf
-
+import Data.Array.Accelerate as A
+import Data.Array.Accelerate.Interpreter as I
 
 
 
@@ -84,10 +85,12 @@ handleMonitorNotification server notificationMessage@(ProcessMonitorNotification
   void $ liftIO $ atomically $ removeProcess server pid
   terminate
 
+
+preludeEqual = (Prelude.==)
 eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
-  lift $ do
+  Trans.lift $ do
     let sName = unpack $ serverConfiguration^.serviceName
     let serverL = serverConfiguration^.server
     let profileL = serverConfiguration^.serviceProfile
@@ -99,13 +102,13 @@ eventLoop = do
         [
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL
         , match $ handleMonitorNotification serverL
-        , matchIf (\(WhereIsReply l _) -> l == sName) $
+        , matchIf (\(WhereIsReply l _) -> preludeEqual l sName) $
                 handleWhereIsReply serverL Writer
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ] `Control.Distributed.Process.catch` (\e@(SomeException e1) -> liftIO $ putStrLn $ "Exception " <> show e <> "\n")
 
-compute :: ServerReaderT ()
-compute = do
+computeService :: ServerReaderT ()
+computeService = do
   initializeProcess
   eventLoop
   return()
