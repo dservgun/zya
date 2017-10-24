@@ -267,6 +267,7 @@ data PMessage =
   | GreetingsFrom ServiceProfile ProcessId
   -- Send the message back to the process id
   | QueryMessage (MessageId, ProcessId, Maybe PMessage)
+  | ComputeNodeEvent (MessageId, ProcessId, Text)
   deriving (Typeable, Generic, Show)
 
 data FairnessStrategy = RoundRobin | FirstOne deriving (Show)
@@ -283,6 +284,7 @@ data ServiceProfile =
     | Terminator
     -- * A writer to test some messages to the system.
     | TestWriter
+    | ComputeNode
     deriving(Show, Generic, Typeable, Eq, Ord)
 
 

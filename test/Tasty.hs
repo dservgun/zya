@@ -9,6 +9,7 @@ import Data.Text as Text
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
 import Data.Zya.Core.WebServerService
+import Data.Zya.Core.ComputeNodeService
 import Data.Zya.Persistence.Persistence(DBType, persist)
 import Test.Tasty
 import Test.Tasty.HUnit as HU

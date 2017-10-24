@@ -58,6 +58,7 @@ library
     Data.Zya.Core.QueryService
     Data.Zya.Core.WebServerService
     Data.Zya.Core.TestWriter
+    Data.Zya.Core.ComputeNodeService
     Data.Zya.Core.LocalMessageHandlingStrategy
     Data.Zya.Persistence.Persistence
     Data.Zya.Persistence.Internal.FileSystem
@@ -122,6 +123,7 @@ executable zya_reference
   main-is : Main.hs
   build-depends :
     base >=4.4 && < 5
+    , accelerate >= 1.1 && < 1.2
     , array >= 0.5 && < 0.6
     , async >= 2.1 && < 2.2
     , binary >= 0.8.1.0 && < 0.9
@@ -169,6 +171,7 @@ test-suite Tasty
   type:   exitcode-stdio-1.0
   build-depends:
     base >= 4.7 && <  5
+    , accelerate >= 1.1 && < 1.2
     , async >= 2.1 && < 2.2
     , binary >= 0.8 && < 0.9
     , conduit >= 1.2 && < 1.3

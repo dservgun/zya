@@ -37,3 +37,4 @@ which is almost a daily activity, I try to fix these as I go.
 ### Postgres commands
 If you need to restart.
 ``` sudo /etc/init.d/postgresql restart ```
+
