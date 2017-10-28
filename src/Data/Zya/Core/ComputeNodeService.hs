@@ -1,3 +1,4 @@
+
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.ComputeNodeService(
@@ -48,12 +49,12 @@ handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic)
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
   say $  printf ("Received message " <> (show aMessage) <> "\n")
   currentTime <- liftIO $ getCurrentTime
-  _ <- liftIO $ atomically $ do
+  void . liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
       fireRemote server pid $
                 GreetingsFrom ComputeNode myPid
-  return ()
+
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
   say $  printf ("ComputeNode : Received message " <> (show aMessage) <> "\n")
@@ -65,7 +66,7 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
 
 
 
-handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
+handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
   time <- liftIO $ getCurrentTime
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")

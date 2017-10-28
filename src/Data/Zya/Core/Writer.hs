@@ -12,15 +12,14 @@ module Data.Zya.Core.Writer(
 
 import Control.Applicative((<$>))
 import Control.Concurrent.STM
-import Control.Distributed.Process
+import Control.Distributed.Process hiding(catch)
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
-import Control.Exception
+import Control.Exception.Safe
 import Control.Lens
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.Binary
@@ -45,12 +44,13 @@ rootLocation = "./tmp"
 
 persistMessage :: MessageT
 persistMessage = do
-  -- Insert the topic into persistent store.
-  -- return the status. Send the status to
-  -- some peers (need to decide that, could be all).
-  p <- persist
-  return $ CreateStatus "success??"
-
+    action `catch` (\a@(SomeException e) -> exception a)
+  where
+  action = do
+    persist
+    return $ CreateStatus ("Success" :: Text)
+  exception a  =
+      return $ CreateStatus $ "failure" <> (pack . show $ a)
 
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> PMessage -> Process ()
@@ -73,32 +73,37 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
   liftIO $ atomically $ addService server serviceProfile pid
   --publish local state
   liftIO $ publishLocalSnapshot server pid
-
   return ()
 
 
 
 -- When the write succeeds, find a query service to send the entire message to.
 -- Update a map with writer information for a process.
-handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher (messageId, topic, message)) = do
+handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
   time <- liftIO $ getCurrentTime
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
-  say $ printf ("Persisted message with status " <> (show status) <> "\n")
-  posProcessId <- liftIO $ atomically $ do
-        r <- queryMessageLocation server messageId
-        case r of
-          Just r1 -> return r
-          Nothing -> findAvailableService server QueryService RoundRobin
-  say $ printf "Message persisted successfully " <> (show status) <> " " <> "Using query service " <> (show posProcessId) <> "\n"
+  case status of
+    CreateStatus "Success" -> do
+        say $ printf ("Persisted message with status " <> (show status) <> "\n")
+        posProcessId <- liftIO $ atomically $ do
+              r <- queryMessageLocation server messageId
+              case r of
+                Just r1 -> return r
+                Nothing -> findAvailableService server QueryService RoundRobin
+        say $ printf "Message persisted successfully " <> (show status) <> " " <> "Using query service " <> (show posProcessId) <> "\n"
 
-  case posProcessId of
-    Just x -> liftIO $ atomically $ sendRemote server x (committedMessage, time)
-    Nothing -> say $ printf ("No process id found for QueryService " <> "\n")
-  return ()
-  where
-    committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
+        case posProcessId of
+          Just x -> liftIO $ atomically $ sendRemote server x (committedMessage, time)
+          Nothing -> say $ printf ("No process id found for QueryService " <> "\n")
+        return ()
+        where
+          committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
+    CreateStatus "failure" -> do
+        say $ printf ("Could not persist message")
+        liftIO $ atomically $ sendRemote server processId (CommitFailedMessage publisher (messageId, topic, message), time)
+
 
 handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess message) = do
   say $ printf ("Terminating self " <> show aMessage <> "\n")
@@ -132,7 +137,7 @@ eventLoop = do
         , matchIf (\(WhereIsReply l _) -> l == sName) $
                 handleWhereIsReply serverL Writer
         , matchAny $ \_ -> return ()      -- discard unknown messages
-        ] `Control.Distributed.Process.catch` (\e@(SomeException e1) -> liftIO $ putStrLn $ "Exception " <> show e <> "\n")
+        ] `catch` (\e@(SomeException e1) -> liftIO $ putStrLn $ "Exception " <> show e <> "\n")
 
 writer :: ServerReaderT ()
 writer = do

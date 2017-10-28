@@ -30,7 +30,7 @@ import Control.Concurrent.Async as Async (waitSTM, wait, async, cancel, waitEith
                         , concurrently,asyncThreadId)
 
 import Control.Lens
-import Control.Monad (forever, void)
+import Control.Monad (forever, void, guard)
 import Control.Monad.Catch as Catch
 import Control.Monad.Logger
 import Control.Monad.Trans.Reader
@@ -93,17 +93,17 @@ readerThread (conn, app, identifier) = do
         (\a@(SomeException e) -> void $ handleConnectionException app identifier a)
   readerThread (conn, app, identifier)
 
-writerThread (conn, app, identifier, exit)  = do
-  liftIO $ putStrLn "Writer thread"
+writerThread (conn, app, identifier, exit) = do
   (command :: Text) <-
     WS.receiveData conn  `Catch.catch`
-            (\a@(SomeException e) -> do
-                handleConnectionException app identifier a
-                writerThread (conn, app, identifier, True))
-  if exit then
-    return "Exiting thread."
-  else
-    writerThread (conn, app, identifier, exit)
+          (\a@(SomeException e) -> do
+              handleConnectionException app identifier a
+              writerThread (conn, app, identifier, True))
+  guard (exit == False)
+  writerThread(conn, app, identifier, exit)
+  putStrLn "Writer thread"
+  return ("writer thread." :: Text)
+
 
 removeConn :: ProtocolHandler WS.Connection
 removeConn = do
@@ -193,7 +193,7 @@ handleRemoteMessage server _ _ _ aMessage@(MessageKeyStore (messageId, processId
   return()
 
 handleRemoteMessage server dbType connectionString messageCount
-  aMessage@(WriteMessage publisher (messageId, topic, message)) = do
+  aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   return ()

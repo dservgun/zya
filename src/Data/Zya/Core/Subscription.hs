@@ -7,13 +7,11 @@ import System.Environment(getArgs)
 
 import Control.Concurrent.STM
 import Control.Applicative((<$>))
-import Control.Exception
-
 import Control.Lens
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.Trans
 import Control.Monad.Reader
+import Control.Exception.Safe
 
 import Control.Distributed.Process
 import Control.Distributed.Process.Closure
@@ -38,103 +36,99 @@ import Data.Zya.Core.Writer
 import Data.Zya.Core.TestWriter
 import Data.Zya.Core.QueryService
 import Data.Zya.Core.WebServerService(webService)
+import Data.Zya.Core.ComputeNodeService(computeService)
+
+newtype UnsupportedServiceException = UnsupportedServiceException {_unServiceType :: Maybe ServiceProfile} deriving(Show)
+instance Exception UnsupportedServiceException
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
-handleRemoteMessage server aMessage = do 
+handleRemoteMessage server aMessage = do
   selfPid <- getSelfPid
   say $ printf ("Received message " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server notificationMessage = 
+handleMonitorNotification server notificationMessage =
   say $ printf ("Monitor notification " <> (show notificationMessage) <> "\n")
-
-
-
-readerService :: ServerReaderT () 
-readerService = undefined
-
-
-
-tester :: ServerReaderT () 
-tester = do 
-  serverConfiguration <- ask 
-  return () -- To be defined
 
 
 
 
 
 {- | Terminate all processes calling exit on each -}
-terminator :: ServerReaderT () 
-terminator = do 
+terminator :: ServerReaderT ()
+terminator = do
   serverConfiguration <- ask
-  remoteProcesses <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
+  remoteProcessesL <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
 
   lift $ do
-    say $ printf "Terminator " <> (show $ serverConfiguration^.serviceProfile) 
+    say $ printf "Terminator " <> (show $ serverConfiguration^.serviceProfile)
           <> (show $ serverConfiguration^.serviceName)
           <> "\n"
-    forM_ remoteProcesses $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
+    forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
 
 
 subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails, Maybe Int, Int) -> Process ()
-subscription backend (sP, params, dbType, dbConnection, count, portNumber) = do
-  --eventLogTracer  
+subscription backendL (sP, params, dbTypeL, dbConnection, count, portNumber) = do
+  --eventLogTracer
   myPid <- getSelfPid
   n <- newServer myPid
-  let readerParams = makeServerConfiguration n backend sP params dbType dbConnection count portNumber
+  let readerParams = makeServerConfiguration n backendL sP params dbTypeL dbConnection count portNumber
 
   say $ printf $ "Starting subscrpition " <> (show sP) <> " " <> (show params) <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
-    Reader -> runReaderT readerService readerParams
+    Reader -> Control.Exception.Safe.throw $ UnsupportedServiceException $ Just Reader
     QueryService -> runReaderT queryService readerParams
     WebServer ->  runReaderT webService readerParams
     TopicAllocator -> runReaderT topicAllocator readerParams
     Terminator -> runReaderT terminator readerParams
     TestWriter -> runReaderT testWriter readerParams
+    ComputeNode -> runReaderT computeService readerParams
 
 
 remotable ['subscriptionService]
 
-simpleBackend :: String -> String -> IO Backend 
+simpleBackend :: String -> String -> IO Backend
 simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
 
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
-cloudEntryPoint :: Backend -> 
-  (ServiceProfile, ServiceName, DBType, 
+cloudEntryPoint :: Backend ->
+  (ServiceProfile, ServiceName, DBType,
     ConnectionDetails, Maybe Int, Int) -> IO ()
-cloudEntryPoint backend (sP, sName, dbType, connectionDetails, count, portNumber)= do
-  node <- newLocalNode backend 
-  Node.runProcess node 
-    (subscription backend (sP, sName, dbType, connectionDetails, count, portNumber))
+cloudEntryPoint backendL (sP, sName, dbTypeL, connectionDetails, count, portNumber)= do
+  node <- newLocalNode backendL
+  Node.runProcess node
+    (subscription backendL (sP, sName, dbTypeL, connectionDetails, count, portNumber))
 
 
 parseArgs :: IO (ServiceProfile, Text, String)
 parseArgs = do
-  [serviceName, lparams, portNumber] <- getArgs
+  [lserviceName, lparams, portNumber] <- getArgs
   let params = pack lparams
-  return $ 
-    case serviceName of 
+  return $
+    case lserviceName of
       "Writer" -> (Writer, params, portNumber)
       "Reader" -> (Reader, params, portNumber)
-      "QueryService" -> (QueryService, params, portNumber) 
+      "QueryService" -> (QueryService, params, portNumber)
       "WebServer" -> (WebServer, params, portNumber)
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)
       "TestWriter" -> (TestWriter, params, portNumber)
-      _  -> throw $ startupException $ pack $ "Invalid arguments " <> serviceName <> ":" <> lparams
+      _  ->
+          do
+            --liftIO $ say $ printf "Bailout" -- throw $ UnsupportedServiceException (Just TestWriter)
+            (Unknown, params, portNumber)
 
-cloudMain :: IO () 
-cloudMain = do 
+cloudMain :: IO ()
+cloudMain = do
  (sProfile, sName, aPort) <- parseArgs
- backend <- simpleBackend "127.0.0.1" aPort
- let dbType = RDBMS Postgresql
- let connectionDetails = ConnectionDetails "this connection wont work"
- cloudEntryPoint backend (sProfile, sName, dbType, connectionDetails, Nothing, -1)
+ backendL <- simpleBackend "127.0.0.1" aPort
+ let dbTypeL = RDBMS Postgresql
+ let connectionDetailsL = ConnectionDetails "this connection wont work"
+ cloudEntryPoint backendL (sProfile, sName, dbTypeL, connectionDetailsL, Nothing, -1)
 
 
 

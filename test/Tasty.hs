@@ -51,6 +51,8 @@ createTopicTestCase =  do
   writers <- forM [1..nWriters] $ \_ -> do
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, -1)
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
+  computeNode <- async $ cloudEntryPoint test (ComputeNodeService, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
+
   -- Run for 30 seconds and quit.
 
 

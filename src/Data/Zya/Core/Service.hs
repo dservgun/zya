@@ -206,13 +206,13 @@ newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
 newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show)
 instance Exception Error
 
-newtype StartUpException = StartUpException Text deriving (Typeable, Show)
+newtype StartUpException = StartUpException {_text :: Text} deriving (Typeable, Show)
 instance Exception StartUpException
 
 
 --- Database types
-data DBVendor = Postgresql | Sqlite
-data DBType = FileSystem | RDBMS DBVendor
+data DBVendor = Postgresql | Sqlite deriving(Show)
+data DBType = FileSystem | RDBMS DBVendor deriving(Show)
 newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
 newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
 {-| Internal type for persisting process messages -}
@@ -252,13 +252,14 @@ data PMessage =
   -- * Notifies a subscriber of the next message.
   | NotifyMessage Subscriber (MessageId, Text)
   -- * Writes a message on a topic.
-  | WriteMessage Publisher (MessageId, Topic, Text)
+  | WriteMessage Publisher ProcessId (MessageId, Topic, Text)
   -- * Message Key store information.
   -- UTCTime should probably be replaced with a vector clock.
   | MessageKeyStore (MessageId, ProcessId)
   -- * Commits an offset read for a subscriber.
   | CommitMessage Subscriber (MessageId, Text) -- Commit needs to know about the id that needs to be committed.
   | CommittedWriteMessage Publisher (MessageId, Topic, Text)
+  | CommitFailedMessage Publisher (MessageId, Topic, Text)
   -- * Announces that a current service profile is available on a node.
   | ServiceAvailable ServiceProfile ProcessId
   | TerminateProcess Text
@@ -285,6 +286,7 @@ data ServiceProfile =
     -- * A writer to test some messages to the system.
     | TestWriter
     | ComputeNode
+    | Unknown
     deriving(Show, Generic, Typeable, Eq, Ord)
 
 
@@ -377,10 +379,6 @@ proxyProcess aServer
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel aServer
 
 
--- Announce that a service has come up.
--- When a service receives this message, it needs to send some info
--- about itself to the new service. Will this result in n squared messages.
-
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
 --  say $ printf "Handling whereIsReply : "  <> (show serviceProfile) <> " " <> (show a) <> "\n"
@@ -420,14 +418,13 @@ sendRemote aServer pid (pmsg, utcTime) = do
     writeTChan (proxyChannel aServer) (send pid pmsg)
     _ <- updateRemoteServiceQueue aServer pid (pmsg, utcTime)
     return ()
--- Accessors. TODO: Use lenses. At times, possessives in method names
--- works.
+
 getMyPid :: Server -> STM ProcessId
 getMyPid = readTVar . myProcessId
 
 
 updateMyPid :: Server -> ProcessId -> STM ()
-updateMyPid aServer processId = writeTVar (myProcessId aServer) processId
+updateMyPid aServer processId = flip writeTVar processId $ myProcessId aServer
 
 proxyChannel :: Server -> TChan(Process())
 proxyChannel = _proxyChannel
@@ -447,6 +444,7 @@ putLocalMessage app clientIdentifier (pid, mid) = do
     Nothing -> throwSTM (QueueNotFound mid pid)
     Just (x, queue) -> writeTBQueue queue (pid, mid)
   return (pid, mid)
+
 getNextLocalMessage :: Server -> ClientIdentifier -> STM [(ProcessId, MessageId)]
 getNextLocalMessage app clientIdentifier = do
   queueMap <-readTVar $ localTBQueue app
@@ -463,6 +461,7 @@ getNextLocalMessage app clientIdentifier = do
 -- persistent globally accessible store.
 publishLocalSnapshot :: Server -> ProcessId -> IO ()
 publishLocalSnapshot app targetProcessId = do
+  liftIO $ putStrLn "Publishing local snapshot "
   messageKeyL <- liftIO $ atomically $ readTVar $ messageKey app
   messageAsList <- return $ Map.assocs messageKeyL
   mapM_ (\(messageId, processId) ->

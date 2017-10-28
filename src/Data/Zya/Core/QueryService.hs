@@ -75,7 +75,6 @@ handleRemoteMessage server dbType connectionString messageCount
     _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
     _ <- liftIO $ atomically $ updateMessageKey server selfPid messageId
     publishMessageKey <- liftIO $ atomically $ publishMessageKey server selfPid messageId
-
     messagesProcessed <- liftIO $ atomically $ queryMessageCount server
     say $ printf("Total messages processed "
         <> (show messagesProcessed) <> " Max to be processed"
@@ -83,7 +82,7 @@ handleRemoteMessage server dbType connectionString messageCount
 
 
 handleRemoteMessage server dbType connectionString messageCount
-  aMessage@(WriteMessage publisher (messageId, topic, message)) = do
+  aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
   say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
   return ()
