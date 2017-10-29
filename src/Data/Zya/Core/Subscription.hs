@@ -86,7 +86,7 @@ subscription backendL (sP, params, dbTypeL, dbConnection, count, portNumber) = d
     Terminator -> runReaderT terminator readerParams
     TestWriter -> runReaderT testWriter readerParams
     ComputeNode -> runReaderT computeService readerParams
-
+    _ -> Control.Exception.Safe.throw $ UnsupportedServiceException $ Just sP
 
 remotable ['subscriptionService]
 

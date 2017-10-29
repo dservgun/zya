@@ -461,7 +461,7 @@ getNextLocalMessage app clientIdentifier = do
 -- persistent globally accessible store.
 publishLocalSnapshot :: Server -> ProcessId -> IO ()
 publishLocalSnapshot app targetProcessId = do
-  liftIO $ putStrLn "Publishing local snapshot "
+  liftIO $ putStrLn "Publishing local snapshot"
   messageKeyL <- liftIO $ atomically $ readTVar $ messageKey app
   messageAsList <- return $ Map.assocs messageKeyL
   mapM_ (\(messageId, processId) ->
@@ -476,7 +476,7 @@ publishLocalSnapshot app targetProcessId = do
 messagesTillNow :: Server -> ClientIdentifier -> IO ()
 messagesTillNow server clientIdentifier = do
   messageKeyL <- liftIO $ atomically $ readTVar $ messageKey server
-  messageAsList <- return $ Map.assocs messageKeyL
+  let messageAsList = List.take 100 $ Map.assocs messageKeyL
   mapM_ (\(messageId, processId) ->
             liftIO $
               atomically $

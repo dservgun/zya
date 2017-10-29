@@ -101,7 +101,7 @@ writerThread (conn, app, identifier, exit) = do
               writerThread (conn, app, identifier, True))
   guard (exit == False)
   writerThread(conn, app, identifier, exit)
-  putStrLn "Writer thread"
+  putStrLn "Writer thread\n"
   return ("writer thread." :: Text)
 
 
@@ -118,7 +118,6 @@ addConn = do
 protocolHandler :: ProtocolHandler WS.Connection
 protocolHandler = do
   (conn, app) <- ProtoHandler ask
-  -- liftIO $ WS.sendTextData conn ("Welcome.." :: Text)
   (_ , cid@(ClientIdentifier identifier)) <- addConn
   a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
   b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid, False))

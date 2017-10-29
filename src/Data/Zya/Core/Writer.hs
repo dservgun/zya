@@ -87,11 +87,7 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   case status of
     CreateStatus "Success" -> do
         say $ printf ("Persisted message with status " <> (show status) <> "\n")
-        posProcessId <- liftIO $ atomically $ do
-              r <- queryMessageLocation server messageId
-              case r of
-                Just r1 -> return r
-                Nothing -> findAvailableService server QueryService RoundRobin
+        posProcessId <- liftIO $ atomically $ findAvailableService server QueryService RoundRobin
         say $ printf "Message persisted successfully " <> (show status) <> " " <> "Using query service " <> (show posProcessId) <> "\n"
 
         case posProcessId of
@@ -101,7 +97,7 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
         where
           committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
     CreateStatus "failure" -> do
-        say $ printf ("Could not persist message")
+        say $ printf ("Could not persist message\n")
         liftIO $ atomically $ sendRemote server processId (CommitFailedMessage publisher (messageId, topic, message), time)
 
 
