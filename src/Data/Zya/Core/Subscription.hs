@@ -2,11 +2,9 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.Subscription where
 
-import GHC.Generics (Generic)
 import System.Environment(getArgs)
 
 import Control.Concurrent.STM
-import Control.Applicative((<$>))
 import Control.Lens
 import Control.Monad
 import Control.Monad.Trans
@@ -18,19 +16,12 @@ import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 
---If debug: how to set debug flags
-import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog, eventLogTracer)
 
-import Data.Binary
-import Data.Data
 import Data.Monoid((<>))
-import Data.Text(pack, unpack, Text)
-import Data.Time(UTCTime, getCurrentTime)
-import Data.Typeable
+import Data.Text(pack, Text)
 import Data.Zya.Core.Service
 
 import Text.Printf
-import Data.Zya.Core.ServiceTypes
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.Writer
 import Data.Zya.Core.TestWriter

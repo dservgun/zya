@@ -108,17 +108,11 @@ import Data.Zya.Utils.Logger(debugMessage)
 import GHC.Generics (Generic)
 import Network.WebSockets.Connection as WS (Connection)
 import Text.Printf
+import Data.Zya.Core.Internal.MessageDistribution
 
 -- TODO: Need to deal with this.
 type WebServerEndPoint = Int
 
-{-- |
-  Begin -> All messages in some order, need not be timeordered.
-  End -> All new messages from now.
-  Last n -> A few messages to get some context on the topic.
---}
-newtype Page = Page {_uInt :: Int} deriving(Typeable, Show)
-data MessageDistributionStrategy = Begin | End | Last (Int, Page) deriving (Typeable, Show)
 
 
 ------------ Constants --------------
