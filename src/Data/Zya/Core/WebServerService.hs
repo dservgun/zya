@@ -60,7 +60,7 @@ mkYesod "App" [parseRoutes|
 
 newtype ProtocolHandler a =
       ProtoHandler {
-        _runConn :: ReaderT (WS.Connection, Server) IO a
+        _runConn :: ReaderT (WS.Connection, Server, MessageDistributionStrategy) IO a
       }
       deriving
       (
@@ -101,31 +101,35 @@ writerThread (conn, app, identifier, exit) = do
               writerThread (conn, app, identifier, True))
   guard (exit == False)
   writerThread(conn, app, identifier, exit)
-  putStrLn "Writer thread\n"
   return ("writer thread." :: Text)
 
 
-removeConn :: ProtocolHandler WS.Connection
-removeConn = do
-  (conn, app) <- ProtoHandler ask
-  return conn
+removeConn :: ClientIdentifier -> ProtocolHandler(WS.Connection, ClientIdentifier)
+removeConn clientIdentifier = do
+  (conn, app, _) <- ProtoHandler ask
+  _ <- liftIO $ atomically $ deleteConnection app clientIdentifier
+  return (conn, clientIdentifier)
+
+
 addConn :: ProtocolHandler (WS.Connection, ClientIdentifier)
 addConn = do
-  (conn, app) <- ProtoHandler ask
+  (conn, app, _) <- ProtoHandler ask
   nextId <- (\x -> Text.pack $ show x) <$> liftIO nextUUID
   r <- liftIO $ atomically $ addConnection app (ClientIdentifier nextId) conn
   return (conn, ClientIdentifier nextId)
+
+
+
 protocolHandler :: ProtocolHandler WS.Connection
 protocolHandler = do
-  (conn, app) <- ProtoHandler ask
+  (conn, app, strategy) <- ProtoHandler ask
   (_ , cid@(ClientIdentifier identifier)) <- addConn
   a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
   b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid, False))
-  liftIO $ messagesTillNow app cid
-
---  b <- Async.async $ liftIO writerThread
+  liftIO $ messagesTillNow app cid strategy
   liftIO $ Async.waitAny [a, b]
-  removeConn
+  (removedConn, rId) <- removeConn cid
+
   return conn
 
 type YesodHandler = HandlerT App IO
@@ -134,7 +138,8 @@ app :: WebSocketsT (HandlerT App IO) ()
 app = do
     connection <- ask
     App foundation <- getYesod
-    x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation)
+    -- get the last 20 pages.
+    x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation, Last (20,(Page 10)))
     return ()
 
 getHomeR :: HandlerT App IO Text

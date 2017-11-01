@@ -42,12 +42,12 @@ newtype UnsupportedServiceException = UnsupportedServiceException {_unServiceTyp
 instance Exception UnsupportedServiceException
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
-handleRemoteMessage server aMessage = do
+handleRemoteMessage _ aMessage = do
   selfPid <- getSelfPid
   say $ printf ("Received message " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server notificationMessage =
+handleMonitorNotification _ notificationMessage =
   say $ printf ("Monitor notification " <> (show notificationMessage) <> "\n")
 
 

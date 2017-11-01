@@ -82,6 +82,9 @@ module Data.Zya.Core.Service
     , FairnessStrategy(..)
     -- * Common types
     , ClientIdentifier(..)
+    -- * Message distribution strategies
+    , MessageDistributionStrategy(..)
+    , Page(..)
     )
 where
 
@@ -98,32 +101,29 @@ import Data.Binary
 import Data.List as List
 import Data.Map.Strict as Map
 import Data.Monoid((<>))
-import Data.Text(unpack, take, Text)
+import Data.Text(unpack, Text)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Utils.Logger(debugMessage)
 import GHC.Generics (Generic)
-import Network.WebSockets.Connection as WS (Connection, sendTextData)
-import Text.Printf
+import Network.WebSockets.Connection as WS (Connection)
 import Text.Printf
 
 -- TODO: Need to deal with this.
 type WebServerEndPoint = Int
 
+{-- |
+  Begin -> All messages in some order, need not be timeordered.
+  End -> All new messages from now.
+  Last n -> A few messages to get some context on the topic.
+--}
+newtype Page = Page {_uInt :: Int} deriving(Typeable, Show)
+data MessageDistributionStrategy = Begin | End | Last (Int, Page) deriving (Typeable, Show)
+
 
 ------------ Constants --------------
 peerTimeout :: Int
 peerTimeout = 1000000
-
-
-
---MAX_BYTES :: Integer
-{--|
-  Some constants. Messages cant be bigger than maxBytes??
---}
-maxBytes :: Integer
-maxBytes = 10 * 1024 * 1024 * 1024 --
-
 
 
 
@@ -178,7 +178,6 @@ data QueueNotFound =
 instance Exception MissingProcessException
 instance Exception QueueNotFound
 
-type PageSize = Integer
 
 type ServiceName = Text
 type Location = Integer
@@ -472,16 +471,26 @@ publishLocalSnapshot app targetProcessId = do
   return ()
 
 
+
+
+
 -- Put the messages received till now in the queue.
-messagesTillNow :: Server -> ClientIdentifier -> IO ()
-messagesTillNow server clientIdentifier = do
+messagesTillNow :: Server -> ClientIdentifier -> MessageDistributionStrategy -> IO MessageDistributionStrategy
+messagesTillNow server clientIdentifier strategy = do
   messageKeyL <- liftIO $ atomically $ readTVar $ messageKey server
-  let messageAsList = List.take 100 $ Map.assocs messageKeyL
+
+  let messageAsList = filterMessages messageKeyL strategy
   mapM_ (\(messageId, processId) ->
             liftIO $
               atomically $
                 putLocalMessage server clientIdentifier (processId, messageId)) messageAsList
-  return ()
+  return strategy
+  where
+    filterMessages aMap strategy =
+        case strategy of
+          Begin -> Map.assocs aMap
+          End -> Map.assocs $ Map.empty
+          Last (n, (Page p)) -> List.take (n * p) $ Map.assocs aMap
 
 
 -- IO because we want to break up each individual sends, or have
