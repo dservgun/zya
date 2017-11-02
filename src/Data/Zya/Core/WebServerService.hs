@@ -19,20 +19,13 @@ import Conduit
 import Control.Exception
 
 import Control.Monad.Catch as Catch
-import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM.Lifted
 import Control.Distributed.Process as Process
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Closure
-import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
 import Control.Concurrent.Async as Async (waitSTM, wait, async, cancel, waitEither, waitBoth, waitAny
                         , concurrently,asyncThreadId)
 
 import Control.Lens
-import Control.Monad (forever, void, guard)
-import Control.Monad.Catch as Catch
-import Control.Monad.Logger
+import Control.Monad (forever, void)
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
 import Data.Text as Text (Text, take)
@@ -45,6 +38,7 @@ import Network.WebSockets.Connection as WS (Connection, sendTextData, receiveDat
 import Text.Printf
 import Yesod.Core
 import Yesod.WebSockets
+import Data.Zya.Core.Internal.WebserviceProtocolHandler
 import qualified Data.Text as Text (pack, unpack)
 
 
@@ -56,81 +50,6 @@ mkYesod "App" [parseRoutes|
 / HomeR GET
 |]
 
-
-
-newtype ProtocolHandler a =
-      ProtoHandler {
-        _runConn :: ReaderT (WS.Connection, Server, MessageDistributionStrategy) IO a
-      }
-      deriving
-      (
-        Functor,
-        Applicative,
-        Monad,
-        MonadIO)
-
-
-newtype WebServiceErrorCall = WebServiceErrorCall Text deriving (Typeable)
-
--- Note: How long should error logs be.
-instance Show WebServiceErrorCall where
-  show (WebServiceErrorCall aText) = "WebServiceErrorCall " <> (show $ Text.take 60 aText)
-
-
-handleConnectionException ::
-  (MonadIO m, Show a) => Server -> ClientIdentifier -> a -> m Text
-handleConnectionException app identifier a = do
-    (liftIO $ atomically $ deleteConnection app identifier)
-    return $ Text.pack (show a)
--- At this point we can safely be in the io monad, though adding a monad logger might
--- be beneficial.
--- readerThread :: ProtocolHandler ()
-readerThread (conn, app, identifier) = do
-  liftIO $ do
-    currentMessage <- atomically $ getNextLocalMessage app identifier
-    WS.sendTextData conn (Text.pack $ show currentMessage)
-      `Catch.catch`
-        (\a@(SomeException e) -> void $ handleConnectionException app identifier a)
-  readerThread (conn, app, identifier)
-
-writerThread (conn, app, identifier, exit) = do
-  (command :: Text) <-
-    WS.receiveData conn  `Catch.catch`
-          (\a@(SomeException e) -> do
-              handleConnectionException app identifier a
-              writerThread (conn, app, identifier, True))
-  guard (exit == False)
-  writerThread(conn, app, identifier, exit)
-  return ("writer thread." :: Text)
-
-
-removeConn :: ClientIdentifier -> ProtocolHandler(WS.Connection, ClientIdentifier)
-removeConn clientIdentifier = do
-  (conn, app, _) <- ProtoHandler ask
-  _ <- liftIO $ atomically $ deleteConnection app clientIdentifier
-  return (conn, clientIdentifier)
-
-
-addConn :: ProtocolHandler (WS.Connection, ClientIdentifier)
-addConn = do
-  (conn, app, _) <- ProtoHandler ask
-  nextId <- (\x -> Text.pack $ show x) <$> liftIO nextUUID
-  r <- liftIO $ atomically $ addConnection app (ClientIdentifier nextId) conn
-  return (conn, ClientIdentifier nextId)
-
-
-
-protocolHandler :: ProtocolHandler WS.Connection
-protocolHandler = do
-  (conn, app, strategy) <- ProtoHandler ask
-  (_ , cid@(ClientIdentifier identifier)) <- addConn
-  a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
-  b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid, False))
-  liftIO $ messagesTillNow app cid strategy
-  liftIO $ Async.waitAny [a, b]
-  (removedConn, rId) <- removeConn cid
-
-  return conn
 
 type YesodHandler = HandlerT App IO
 
