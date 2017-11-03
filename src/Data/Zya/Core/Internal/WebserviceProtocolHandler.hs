@@ -8,20 +8,20 @@
 
 module Data.Zya.Core.Internal.WebserviceProtocolHandler where
 
+
+
 import Conduit
-import Control.Exception
-
 import Control.Concurrent.Async as Async (async, cancel, concurrently, waitAny)
-
-import Control.Monad.Catch as Catch
 import Control.Concurrent.STM.Lifted
+import Control.Exception
 import Control.Monad (void, guard)
+import Control.Monad.Catch as Catch
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
 import Data.Text as Text (Text, take, pack)
+import Data.Typeable
 import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.Service
-import Data.Typeable
 import Network.WebSockets.Connection as WS (Connection, sendTextData, receiveData)
 
 
@@ -39,7 +39,7 @@ newtype ProtocolHandler a =
 
 newtype WebServiceErrorCall = WebServiceErrorCall Text deriving (Typeable)
 
--- Note: How long should error logs be.
+-- Note: How long should error log lines be.
 instance Show WebServiceErrorCall where
   show (WebServiceErrorCall aText) = "WebServiceErrorCall " <> (show $ Text.take 60 aText)
 

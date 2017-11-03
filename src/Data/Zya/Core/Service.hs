@@ -109,6 +109,7 @@ import GHC.Generics (Generic)
 import Network.WebSockets.Connection as WS (Connection)
 import Text.Printf
 import Data.Zya.Core.Internal.MessageDistribution
+import Data.Zya.Core.Internal.LocalMessage
 
 -- TODO: Need to deal with this.
 type WebServerEndPoint = Int
@@ -180,7 +181,6 @@ type ErrorCode = Text
 newtype Request = Request {unRequest :: Text} deriving Show
 newtype Response = Response {unResponse :: Text} deriving Show
 newtype ClientIdentifier = ClientIdentifier {unClid :: Text} deriving (Show, Ord, Eq)
-newtype Topic = Topic {unTopic :: Text} deriving (Show, Ord, Eq, Generic)
 data ClientState = ClientState {
     topicCS :: Topic
     , readPos :: Integer
@@ -191,9 +191,6 @@ type Start = Integer
 type End = Integer
 
 
--- The message id is unique among all the processes.
-type MessageId = Text
-data OffsetHint = Beginning | Latest | MessageRange (Start , End) deriving (Show, Typeable, Generic)
 
 newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
 newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show)
@@ -211,31 +208,9 @@ newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
 {-| Internal type for persisting process messages -}
 type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
---------------Application types ---
-type CommitOffset = Integer
-data User = User {
-  login :: Login
-  , topics :: [(Topic, CommitOffset)]
-} deriving (Show, Typeable, Generic)
-data OpenIdProvider = Google | Facebook | LinkedIn deriving (Show, Typeable, Generic)
-{- | Email needs to be validated. TODO
--}
-type Email = Text
-{- | Support for login based on the email id and the open id.
--}
-data Login = Login {
-    email :: Email
-    , openId :: OpenIdProvider
-} deriving (Show, Typeable, Generic)
 
 
 
-data Subscriber =
-  Subscriber {
-    topic :: Topic
-    , user :: User
-    , reader :: OffsetHint
-} deriving (Show, Typeable, Generic)
 
 data Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
 
@@ -716,12 +691,7 @@ startupException :: Text -> StartUpException
 startupException = StartUpException
 
 
-instance Binary Login
-instance Binary OpenIdProvider
-instance Binary User
-instance Binary OffsetHint
-instance Binary Subscriber
-instance Binary Publisher
+
 instance Binary PMessage
-instance Binary Topic
 instance Binary ServiceProfile
+instance Binary Publisher
