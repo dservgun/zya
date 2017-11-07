@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 module Data.Zya.Core.Internal.LocalMessage
   (
     createMessageSummary
@@ -29,6 +30,10 @@ import Data.Text
 import Data.Typeable
 import Data.Zya.Core.Internal.MessageDistribution
 import Control.Distributed.Process
+import Control.Monad.Trans
+import Control.Monad.Writer
+import Control.Monad.Reader
+import Control.Monad.State
 --------------Application types ---
 
 data OpenIdProvider = Google | Facebook | LinkedIn deriving (Show, Typeable, Generic, ToJSON, FromJSON)
@@ -99,8 +104,24 @@ login aUser aDevice = undefined
 
 
 
+{-newtype ProtocolHandler a =
+      ProtoHandler {
+        _runConn :: ReaderT (WS.Connection, Server, MessageDistributionStrategy) IO a
+      }
+      deriving
+      (
+        Functor,
+        Applicative,
+        Monad,
+        MonadIO)
+-}
 
-
+type Command = Text
+type Server = Text
+newtype LocalMessageHandler a =
+    LocalMessageHandler {
+      _runHandler :: ReaderT (Command, ProcessId, Server, MessageDistributionStrategy) (StateT [Command] IO) a
+    } deriving(Functor, Applicative, Monad, MonadIO)
 
 
 
