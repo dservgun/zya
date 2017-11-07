@@ -88,7 +88,6 @@ stickyProcess a b = fromMaybe False $ liftA2 (==) a b
 runMessageWriter :: PMessage -> Server -> Process ()
 runMessageWriter aMessage server = do
   initWriter <- liftIO $ atomically $ findAvailableWriter server
-  runReaderT (runStateT (runServerState $ sendMessage aMessage server) initWriter) (Writer, RoundRobin)
-  return ()
-
+  void $
+    runReaderT (runStateT (runServerState $ sendMessage aMessage server) initWriter) (Writer, RoundRobin)
 

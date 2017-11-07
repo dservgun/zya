@@ -23,6 +23,7 @@ import Data.Typeable
 import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.Service
 import Network.WebSockets.Connection as WS (Connection, sendTextData, receiveData)
+import Data.Zya.Core.Internal.LocalMessage
 
 
 newtype ProtocolHandler a =
@@ -72,6 +73,7 @@ readerThread :: forall (m :: * -> *) b . MonadIO m =>
 readerThread (conn, app, identifier) = do
   liftIO $ do
     currentMessage <- atomically $ getNextLocalMessage app identifier
+
     WS.sendTextData conn (Text.pack $ show currentMessage)
       `Catch.catch`
         (\a@(SomeException _) -> void $ handleConnectionException app identifier a)
@@ -84,6 +86,10 @@ writerThread (conn, app, identifier, exit) = do
           (\a@(SomeException _) -> do
               _ <- handleConnectionException app identifier a
               writerThread (conn, app, identifier, True))
+
+  _ <- liftIO $ atomically $ do
+      selfPid <- getMyPid app
+      putLocalMessage app identifier (selfPid, command)
   guard (exit == False)
   _ <- writerThread(conn, app, identifier, exit)
   return command
@@ -100,3 +106,16 @@ protocolHandler = do
   _ <- removeConn cid
 
   return conn
+
+
+
+
+localMessage :: LocalMessage -> ProtocolHandler LocalMessage
+localMessage login@(Login aKind userName deviceList timeStamp) = undefined
+localMessage logout@(Logout akind userName device timeStamp) = undefined
+localMessage session@(Session aKind userName device timestamp topics) = undefined
+localMessage topics@(Topics aKind userName device timestamp tpics) = undefined
+localMessage publish@(Publish aKind userName device timestamp topic messageId messagePayload) = undefined
+localMessage commit@(Commit aKind userName device topic messageId timeStamp) = undefined
+
+

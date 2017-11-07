@@ -49,7 +49,17 @@ data LocalMessage =
 
 ```
 
+### Some notes about distribution of messages
 
+Almost all messages need to be replicated. There are 2 kinds of messages as I see:
+  * Messages among members of the cloud.
+  * Messages that the external world uses to interact with the cloud.
+    ** For example, when a user logs in, the login session and state needs to be replicated so
+    that when a cluster of servers need to replicate, we start from the last committed state.
+    ** Login messages need to be replicated. First to ensure that all of the devices the user has logged
+    on are appropriately distributed.
+    ** If we are using a sticky strategy, then existing sessions need to update the devices for the login.
+    ** Empty device list is most likely an error.
 
 
 ### AllTopics - Query

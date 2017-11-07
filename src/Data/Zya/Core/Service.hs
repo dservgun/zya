@@ -101,7 +101,7 @@ import Data.Binary
 import Data.List as List
 import Data.Map.Strict as Map
 import Data.Monoid((<>))
-import Data.Text(unpack, Text)
+import Data.Text(unpack, Text, pack)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Utils.Logger(debugMessage)
@@ -138,7 +138,7 @@ peerTimeout = 1000000
  -}
 data Server = Server {
     localClients :: TVar (Map ClientIdentifier [ClientState])
-    , localTBQueue :: TVar (Map ClientIdentifier (WS.Connection, TBQueue (ProcessId, MessageId)))
+    , localTBQueue :: TVar (Map ClientIdentifier (WS.Connection, TBQueue LocalMessage))
     , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
     , localWriters :: TVar (Map Topic Integer)
     , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
@@ -404,16 +404,16 @@ messageKey :: Server -> TVar (Map MessageId ProcessId)
 messageKey s = _messageKey s
 
 
-putLocalMessage :: Server -> ClientIdentifier -> (ProcessId, MessageId) -> STM(ProcessId, MessageId)
+putLocalMessage :: Server -> ClientIdentifier -> (ProcessId, MessageId) -> STM LocalMessage
 putLocalMessage app clientIdentifier (pid, mid) = do
   queueMap <- readTVar $ localTBQueue app
   let result = Map.lookup clientIdentifier queueMap
   case result of
     Nothing -> throwSTM (QueueNotFound mid pid)
-    Just (x, queue) -> writeTBQueue queue (pid, mid)
-  return (pid, mid)
+    Just (x, queue) -> writeTBQueue queue $ createMessageSummaryP mid pid
+  return $ createMessageSummary mid (pack . show $ pid)
 
-getNextLocalMessage :: Server -> ClientIdentifier -> STM [(ProcessId, MessageId)]
+getNextLocalMessage :: Server -> ClientIdentifier -> STM [LocalMessage]
 getNextLocalMessage app clientIdentifier = do
   queueMap <-readTVar $ localTBQueue app
   let result = Map.lookup clientIdentifier queueMap
@@ -451,7 +451,7 @@ messagesTillNow server clientIdentifier strategy = do
   let messageAsList = filterMessages messageKeyL strategy
   mapM_ (\(messageId, processId) ->
             liftIO $
-              atomically $
+              atomically $ do
                 putLocalMessage server clientIdentifier (processId, messageId)) messageAsList
   return strategy
   where
@@ -469,7 +469,8 @@ broadcastLocalQueues server (processIdL, messageIdL) = do
   localQueues <- atomically $ readTVar $ localTBQueue server
   let elems = Map.elems localQueues
   putStrLn $ "Publishing to Local queues " <> (show processIdL) <> ", " <> (show messageIdL)
-  mapM_ (\(conn, queue) -> atomically $ writeTBQueue queue (processIdL, messageIdL)) elems
+  mapM_ (\(conn, queue) -> atomically $ writeTBQueue queue
+        (createMessageSummary messageIdL (pack $ show processIdL))) elems
   return ()
 
 -- Query a process id for its service profile
@@ -634,7 +635,7 @@ updateMessageValue serverL messageId aMessage = do
 {-- | Update the connection information with queue to merge events.
 --}
 addConnection :: Server -> ClientIdentifier ->
-                    WS.Connection -> STM (ClientIdentifier, WS.Connection, TBQueue (ProcessId, MessageId))
+                    WS.Connection -> STM (ClientIdentifier, WS.Connection, TBQueue LocalMessage)
 addConnection serverL clientIdentifier aConnection = do
   readTVar (localTBQueue serverL) >>= \x -> do
     -- TODO : Read the queue bounds from a reader.
