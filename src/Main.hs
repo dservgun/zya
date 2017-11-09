@@ -36,8 +36,7 @@ startServices =  do
         async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages), -1)
 
   threadDelay(10 ^ 6 * 3 :: Int)
-  writers <- forM [1..nWriters] $ \_ -> do
-                async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, -1)
+  writers <- forM [1..nWriters] $ \_ -> async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, -1)
 
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
   webServers <-

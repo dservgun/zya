@@ -11,7 +11,7 @@ module Data.Zya.Core.Internal.WebserviceProtocolHandler where
 
 
 import Conduit
-import Control.Concurrent.Async as Async (async, cancel, concurrently, waitAny)
+import Control.Concurrent.Async as Async (async, waitAny)
 import Control.Concurrent.STM.Lifted
 import Control.Exception
 import Control.Monad (void, guard)

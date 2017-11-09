@@ -1,7 +1,7 @@
 {--|
 
 Some setup instructions.
-#Creating users in postgres
+Creating users in postgres
 
 sudo -u postgres psql
  > CREATE USER test password 'test';
