@@ -64,6 +64,10 @@ library
     Data.Zya.Persistence.Internal.FileSystem
     Data.Zya.Persistence.Internal.Postgres
     Data.Zya.Persistence.Internal.Sqlite
+    Data.Zya.Core.Internal.ServerTypes
+    Data.Zya.Core.Internal.WebserviceProtocolHandler
+    Data.Zya.Core.Internal.LocalMessage 
+    Data.Zya.Core.Internal.MessageDistribution 
     Data.Zya.Utils.Logger
 
   -- Modules included in this library but not exported.

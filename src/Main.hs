@@ -68,8 +68,8 @@ debugConnStrPostgres =
     (RDBMS Postgresql, ConnectionDetails "host=localhost dbname=zya_debug user=zya_debug password=zya_debug port=5432")
 
 debugConnStr :: (DBType, ConnectionDetails)
-debugConnStr = debugConnStrPostgres
---debugConnStr = debugConnStrSqlite
+--debugConnStr = debugConnStrPostgres
+debugConnStr = debugConnStrSqlite
 newtype TServiceName = TServiceName {_unName :: String} deriving Show
 debugServiceName :: Text
 debugServiceName =

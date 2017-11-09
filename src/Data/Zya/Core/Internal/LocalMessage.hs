@@ -29,53 +29,12 @@ import GHC.Generics
 import Data.Text
 import Data.Typeable
 import Data.Zya.Core.Internal.MessageDistribution
+import Data.Zya.Core.Internal.ServerTypes
 import Control.Distributed.Process
 import Control.Monad.Trans
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.State
---------------Application types ---
-
-data OpenIdProvider = Google | Facebook | LinkedIn deriving (Show, Typeable, Generic, ToJSON, FromJSON)
-{- | Email needs to be validated. TODO
--}
-
-type Email = Text
-{- | Support for login based on the email id and the open id.
--}
-
-
-
-newtype Device = Device {_undevice :: Text} deriving(Show, Generic, ToJSON, FromJSON)
-newtype UserName = UserName {_unUserName :: Text} deriving (Show, Generic, ToJSON, FromJSON)
-
--- The message id is unique among all the processes.
-type MessageId = Text
-
-
-{--
-  We use time stamp despite as a way to present some form of ordering. The values are at
-  best approximate.
---}
-newtype DeviceTimeStamp = DeviceTimeStamp{ _undevices :: (Device, UTCTime)} deriving (Show, Generic, ToJSON, FromJSON)
-data LocalMessage =
-    Login{_kind :: Text, _userName :: UserName, _devices :: [DeviceTimeStamp], _timestamp :: UTCTime}
-  | Logout {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime}
-  | Session {_kind :: Text, userName :: UserName , device :: Device, _timestamp :: UTCTime, _topics :: [Topic]}
-  | Topics {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime, topics :: [Topic]}
-  | Publish{_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime
-                , topic :: Topic, messageId :: Text, messaggePayload :: Text}
-  | Commit {_kind :: Text, userName :: UserName, device :: Device, topic :: Topic, _messageId :: MessageId, timestamp :: UTCTime}
-  | MessageSummary {_kind :: Text, _messageId :: Text, _processId :: Text}
-    deriving(Generic, ToJSON, FromJSON, Show)
-
-
--- GreyLists have a smaller timeout. Cloud logical time equivalent to 60 seconds?
-newtype GreyList = GreyList {_unGrey :: (UserName, Device)} deriving(Show, Generic, ToJSON, FromJSON)
-
--- Black list have a logical timeout of 24 hours.
-newtype BlackList = BlackList {_unBlack :: (UserName, Device, UTCTime)} deriving(Show, Generic, ToJSON, FromJSON)
-
 
 -- | Constructors.
 createMessageSummaryP :: Text -> ProcessId -> LocalMessage
@@ -116,15 +75,17 @@ login aUser aDevice = undefined
         MonadIO)
 -}
 
-type Command = Text
-type Server = Text
 newtype LocalMessageHandler a =
     LocalMessageHandler {
       _runHandler :: ReaderT (Command, ProcessId, Server, MessageDistributionStrategy) (StateT [Command] IO) a
-    } deriving(Functor, Applicative, Monad, MonadIO)
+    } deriving(Functor, Applicative, Monad, MonadIO, MonadReader(Command, ProcessId, Server, MessageDistributionStrategy), MonadState [Command])
 
 
+handleMessages :: Command -> LocalMessageHandler Command
+handleMessages = \ message -> do 
+    (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
 
+    return message
 instance Binary OpenIdProvider
 
 

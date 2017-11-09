@@ -6,6 +6,7 @@ import Control.Concurrent.Async
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Monad.Reader
 import Data.Text as Text
+import Data.Zya.Core.Internal.ServerTypes as ServerTypes
 import Data.Zya.Core.Service
 import Data.Zya.Core.Subscription
 import Data.Zya.Core.WebServerService
@@ -51,7 +52,7 @@ createTopicTestCase =  do
   writers <- forM [1..nWriters] $ \_ -> do
                 async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, -1)
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
-  computeNode <- async $ cloudEntryPoint test (ComputeNodeService, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
+  computeNode <- async $ cloudEntryPoint test (ComputeNode, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
 
   -- Run for 30 seconds and quit.
 

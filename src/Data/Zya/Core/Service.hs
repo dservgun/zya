@@ -93,7 +93,7 @@ import Control.Applicative((<$>))
 import Control.Concurrent.STM
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Exception
+import Control.Exception.Safe
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
@@ -110,6 +110,9 @@ import Network.WebSockets.Connection as WS (Connection)
 import Text.Printf
 import Data.Zya.Core.Internal.MessageDistribution
 import Data.Zya.Core.Internal.LocalMessage
+import Data.Zya.Core.Internal.ServerTypes as ServerTypes
+
+
 
 -- TODO: Need to deal with this.
 type WebServerEndPoint = Int
@@ -121,83 +124,6 @@ peerTimeout :: Int
 peerTimeout = 1000000
 
 
-
----------- Basic types  ----
-
-
-{- | The server unifies remote and local processes to manage logging messages.
-    * localClients - For each client identifier, list of topics and their read positions.
-    * remoteClients - For each process id the state of the topics.
-    * localWriters - Write position for a topic.
-    * remoteWriters - Write position for a topic.
-    * services - A map of the services running on the network.
-    * statistics - A map of requests and responses for the network.
-    * proxyChannel - The single channel for inter process communication.
-    * myProcessId :
-    ** Note: There should exist only one write position per topic.
- -}
-data Server = Server {
-    localClients :: TVar (Map ClientIdentifier [ClientState])
-    , localTBQueue :: TVar (Map ClientIdentifier (WS.Connection, TBQueue LocalMessage))
-    , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
-    , localWriters :: TVar (Map Topic Integer)
-    , remoteWriters :: TVar (Map (ProcessId, Topic) Integer)
-    , remoteServiceList :: TVar (Map (ProcessId, ServiceProfile) UTCTime)
-    ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
-    , statistics :: TVar (Map ProcessId ([Request], [Response]))
-    , _proxyChannel :: TChan(Process())
-    , _myProcessId :: TVar (ProcessId)
-    , _messageKey :: TVar (Map MessageId ProcessId)
-    -- The location of the message in the cluster of query services
-    , _messageLocation :: TVar(Map MessageId ProcessId)
-    -- Except for query services, the rest of the processes wont be populating
-    -- this cache. This should be modeled as a service level cache,
-    -- that each kind of service should handle.
-    , _messageValues :: TVar(Map MessageId PMessage)
-}
-
-
-{--|
-  An exception condition when process id was expected to be present.
---}
-data MissingProcessException =
-              MissingProcessException
-                {_unProcess :: ProcessId
-                , message :: Text} deriving (Show, Typeable)
-
-data QueueNotFound =
-  QueueNotFound {
-      _messageId :: MessageId
-    ,_processId :: ProcessId
-  } deriving (Show, Typeable)
-instance Exception MissingProcessException
-instance Exception QueueNotFound
-
-
-type ServiceName = Text
-type Location = Integer
-type ErrorCode = Text
-
-newtype Request = Request {unRequest :: Text} deriving Show
-newtype Response = Response {unResponse :: Text} deriving Show
-newtype ClientIdentifier = ClientIdentifier {unClid :: Text} deriving (Show, Ord, Eq)
-data ClientState = ClientState {
-    topicCS :: Topic
-    , readPos :: Integer
-} deriving(Show, Ord, Eq)
-
-
-type Start = Integer
-type End = Integer
-
-
-
-newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
-newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show)
-instance Exception Error
-
-newtype StartUpException = StartUpException {_text :: Text} deriving (Typeable, Show)
-instance Exception StartUpException
 
 
 --- Database types
@@ -211,51 +137,6 @@ type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 
 
-
-data Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
-
-data PMessage =
-  -- Returns a set of subscribers handled by a process.
-  MsgServerInfo Bool ProcessId [Subscriber]
-  -- * Notifies a subscriber of the next message.
-  | NotifyMessage Subscriber (MessageId, Text)
-  -- * Writes a message on a topic.
-  | WriteMessage Publisher ProcessId (MessageId, Topic, Text)
-  -- * Message Key store information.
-  -- UTCTime should probably be replaced with a vector clock.
-  | MessageKeyStore (MessageId, ProcessId)
-  -- * Commits an offset read for a subscriber.
-  | CommitMessage Subscriber (MessageId, Text) -- Commit needs to know about the id that needs to be committed.
-  | CommittedWriteMessage Publisher (MessageId, Topic, Text)
-  | CommitFailedMessage Publisher (MessageId, Topic, Text)
-  -- * Announces that a current service profile is available on a node.
-  | ServiceAvailable ServiceProfile ProcessId
-  | TerminateProcess Text
-  | CreateTopic Text
-  -- * When a service becomes available, this message greets the service.
-  | GreetingsFrom ServiceProfile ProcessId
-  -- Send the message back to the process id
-  | QueryMessage (MessageId, ProcessId, Maybe PMessage)
-  | ComputeNodeEvent (MessageId, ProcessId, Text)
-  deriving (Typeable, Generic, Show)
-
-data FairnessStrategy = RoundRobin | FirstOne deriving (Show)
-
-
-{- | Supported services -}
-data ServiceProfile =
-    WebServer
-    | Reader
-    | Writer
-    | QueryService
-    | TopicAllocator
-    -- * Terminate all processes. This may not be needed.
-    | Terminator
-    -- * A writer to test some messages to the system.
-    | TestWriter
-    | ComputeNode
-    | Unknown
-    deriving(Show, Generic, Typeable, Eq, Ord)
 
 
 type ServerReaderT = ReaderT ServerConfiguration Process
