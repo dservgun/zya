@@ -11,7 +11,6 @@ import Control.Exception
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
-import Data.Binary
 import Data.List as List
 import Data.Map.Strict as Map
 import Data.Monoid((<>))

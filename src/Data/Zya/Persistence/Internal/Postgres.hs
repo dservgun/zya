@@ -39,11 +39,10 @@ persistZ = do
   -- save the message.
   let c = c8Pack connStr
   insertResult <-
-      runStderrLoggingT $ withPostgresqlPool c 10 $ \pool -> liftIO $ do
+      runStderrLoggingT $ withPostgresqlPool c 10 $ \pool -> liftIO $
         flip runSqlPersistMPool pool $ do
           runMigration migrateAll
           currentTime <- liftIO getCurrentTime
-          messageId <- insert $ Message (Data.Text.pack $ show message) currentTime
-          return messageId
-  return $ CreateStatus $ Data.Text.pack $ (show message <> " " <> show insertResult)
+          insert $ Message (Data.Text.pack $ show message) currentTime
+  return $ CreateStatus $ Data.Text.pack $ show message <> " " <> show insertResult
 

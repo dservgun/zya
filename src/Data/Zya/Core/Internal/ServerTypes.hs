@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
@@ -35,7 +34,7 @@ type Command = Text
 -- The message id is unique among all the processes.
 type MessageId = Text
 
-data Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
+newtype Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
 
 data PMessage =
   -- Returns a set of subscribers handled by a process.
@@ -173,7 +172,7 @@ data Server = Server {
     ,  services :: TVar (Map (ProcessId, ServiceProfile) Integer)
     , statistics :: TVar (Map ProcessId ([Request], [Response]))
     , _proxyChannel :: TChan(Process())
-    , _myProcessId :: TVar (ProcessId)
+    , _myProcessId :: TVar ProcessId
     , _messageKey :: TVar (Map MessageId ProcessId)
     -- The location of the message in the cluster of query services
     , _messageLocation :: TVar(Map MessageId ProcessId)

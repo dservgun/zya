@@ -3,7 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes, TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 -- A webservice for the cloud.
 
@@ -42,7 +41,7 @@ import Data.Zya.Core.Internal.WebserviceProtocolHandler
 import qualified Data.Text as Text (pack, unpack)
 
 
-data App = App Server
+newtype App = App Server
 
 instance Yesod App
 
@@ -58,7 +57,7 @@ app = do
     connection <- ask
     App foundation <- getYesod
     -- get the last 20 pages.
-    x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation, Last (20,(Page 10)))
+    x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation, Last (20, Page 10))
     return ()
 
 getHomeR :: HandlerT App IO Text
@@ -83,42 +82,42 @@ startWebServer = do
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopic)  = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> show aMessage <> "\n")
   return ()
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("WebServer : Received Service Available message " <> (show aMessage) <> "\n")
-  currentTime <- liftIO $ getCurrentTime
+  say $  printf ("WebServer : Received Service Available message " <> show aMessage <> "\n")
+  currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid $ (GreetingsFrom WebServer myPid, currentTime)
+      sendRemote server pid (GreetingsFrom WebServer myPid, currentTime)
   return ()
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> show aMessage <> "\n")
   liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 -- If the message has a tag, can cache and the server can also cache,
 -- perhaps we can cache the message.
 handleRemoteMessage server dbType connectionString messageCount
-  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do
-  say $ printf ("Not handling this message. Not a writer.\n")
+  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = 
+    say $ printf "Not handling this message. Not a writer.\n"
 
 handleRemoteMessage server _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
   currentTime <- liftIO getCurrentTime
   liftIO $ atomically $ updateMessageKey server processId messageId
   _ <- liftIO $ broadcastLocalQueues server (processId, messageId)
-  say $ printf ("Message key store message processed..\n")
+  say $ printf "Message key store message processed..\n"
   return()
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
   return ()
 
 
@@ -133,12 +132,12 @@ handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess 
 
 
 handleRemoteMessage server dbType connectionString unhandledMessage _ =
-  say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  say $  printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid
   terminate
 eventLoop :: ServerReaderT ()
@@ -152,8 +151,8 @@ eventLoop = do
     let connectionDetailsL = serverConfiguration^.connDetails
     let testMessageCount = serverConfiguration^.numberOfTestMessages
     spawnLocal (proxyProcess serverL)
-    (forever $
-      receiveWait
+    forever
+      (receiveWait
         [
         match $ handleRemoteMessage serverL dbTypeL connectionDetailsL testMessageCount
         , match $ handleMonitorNotification serverL

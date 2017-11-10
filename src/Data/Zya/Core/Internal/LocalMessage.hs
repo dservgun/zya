@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 module Data.Zya.Core.Internal.LocalMessage
@@ -36,6 +35,8 @@ import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.State
 
+
+-- TODO: MessageId needs to be a newtype.
 -- | Constructors.
 createMessageSummaryP :: Text -> ProcessId -> LocalMessage
 createMessageSummaryP messageId processIdL = createMessageSummary messageId $ pack . show $ processIdL
@@ -82,9 +83,9 @@ newtype LocalMessageHandler a =
 
 
 handleMessages :: Command -> LocalMessageHandler Command
-handleMessages = \ message -> do 
+handleMessages message = do 
     (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
-
+    -- TODO : Complete the implementation.
     return message
 instance Binary OpenIdProvider
 

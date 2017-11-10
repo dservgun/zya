@@ -5,12 +5,12 @@ import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Node (initRemoteTable)
-import Control.Distributed.Static hiding (initRemoteTable)
+import Control.Distributed.Static
 import Data.ByteString
 import Data.Text
 import Data.Text.Encoding
 import Language.Haskell.TH
-import Network.Socket hiding (shutdown)
+import Network.Socket
 import Network.Transport
 import System.Environment
 

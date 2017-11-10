@@ -9,7 +9,6 @@
 {-# LANGUAGE TypeFamilies               #-}
 
 module Data.Zya.Persistence.Internal.Sqlite where
-import Control.Monad.IO.Class
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Logger(runStderrLoggingT)
 import Control.Monad.Trans.Control
@@ -43,7 +42,7 @@ persistZ = do
 
 
 internalPersist :: (MonadBaseControl IO m, MonadIO m, Show a) => String -> a -> m  CreateStatus
-internalPersist connStr message = do
+internalPersist connStr message =
       runSqlite (Data.Text.pack connStr) $ do
         c <- ask
         runMigration migrateAll

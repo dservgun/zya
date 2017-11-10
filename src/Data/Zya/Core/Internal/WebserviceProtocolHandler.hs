@@ -1,7 +1,6 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE QuasiQuotes, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -42,7 +41,7 @@ newtype WebServiceErrorCall = WebServiceErrorCall Text deriving (Typeable)
 
 -- Note: How long should error log lines be.
 instance Show WebServiceErrorCall where
-  show (WebServiceErrorCall aText) = "WebServiceErrorCall " <> (show $ Text.take 60 aText)
+  show (WebServiceErrorCall aText) = "WebServiceErrorCall " <> show (Text.take 60 aText)
 
 
 removeConn :: ClientIdentifier -> ProtocolHandler(WS.Connection, ClientIdentifier)
@@ -55,7 +54,7 @@ removeConn clientIdentifier = do
 addConn :: ProtocolHandler (WS.Connection, ClientIdentifier)
 addConn = do
   (conn, app, _) <- ProtoHandler ask
-  nextId <- (\x -> Text.pack $ show x) <$> liftIO nextUUID
+  nextId <- Text.pack . show <$> liftIO nextUUID
   _ <- liftIO $ atomically $ addConnection app (ClientIdentifier nextId) conn
   return (conn, ClientIdentifier nextId)
 
@@ -63,7 +62,7 @@ addConn = do
 handleConnectionException ::
   (MonadIO m, Show a) => Server -> ClientIdentifier -> a -> m Text
 handleConnectionException app identifier a = do
-    _ <- (liftIO $ atomically $ deleteConnection app identifier)
+    _ <- liftIO $ atomically $ deleteConnection app identifier
     return $ Text.pack (show a)
 -- At this point we can safely be in the io monad, though adding a monad logger might
 -- be beneficial.
@@ -79,7 +78,8 @@ readerThread (conn, app, identifier) = do
         (\a@(SomeException _) -> void $ handleConnectionException app identifier a)
   readerThread (conn, app, identifier)
 
-writerThread :: (Connection, Server, ClientIdentifier, Bool) -> IO (Text)
+-- TODO Create some status or something. Dont return a text.
+writerThread :: (Connection, Server, ClientIdentifier, Bool) -> IO Text
 writerThread (conn, app, identifier, exit) = do
   (command :: Text) <-
     WS.receiveData conn  `Catch.catch`
@@ -90,7 +90,7 @@ writerThread (conn, app, identifier, exit) = do
   _ <- liftIO $ atomically $ do
       selfPid <- getMyPid app
       putLocalMessage app identifier (selfPid, command)
-  guard (exit == False)
+  guard (not exit)
   _ <- writerThread(conn, app, identifier, exit)
   return command
 

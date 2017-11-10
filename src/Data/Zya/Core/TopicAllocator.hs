@@ -62,9 +62,8 @@ handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n")
-  _ <- liftIO $ atomically $ do 
-    addService server serviceProfile pid
+  say $ printf ("Received message " <> show aMessage <> "\n")
+  _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 
@@ -73,11 +72,11 @@ handleRemoteMessage server aMessage@(TerminateProcess message) = do
   getSelfPid >>= flip exit (show aMessage)
 
 handleRemoteMessage server unhandledMessage = 
-  say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  say $ printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid 
   terminate
 
@@ -95,8 +94,8 @@ topicAllocationEventLoop = do
     -- TODO: Replace with trace logs.
     say $ 
       printf "Updating topic allocator profile : " 
-          <> (serviceNameStr)  <> ":"
-          <> (show (profile)) <> "\n"
+          <> serviceNameStr  <> ":"
+          <> show profile <> "\n"
     forever $
       receiveWait
         [ 
