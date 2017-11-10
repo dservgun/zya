@@ -8,6 +8,6 @@ setup componentRoot =
   openlog "ZyaLogs" [PID] USER DEBUG
     >>= \s ->updateGlobalLogger componentRoot (addHandler s)
 
-debug :: String -> String -> IO 
+debugMessage :: String -> String -> IO ()
 debugMessage = debugM
 

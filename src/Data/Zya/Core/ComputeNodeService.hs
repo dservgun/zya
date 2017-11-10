@@ -1,5 +1,4 @@
 
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.ComputeNodeService(
   -- * Writers that handle log events
@@ -17,7 +16,7 @@ import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Debug(traceOn, systemLoggerTracer, logfileTracer,traceLog)
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+import Control.Distributed.Process.Node as Node
 import Control.Exception
 import Control.Lens
 import Control.Monad
@@ -43,12 +42,12 @@ import Data.Array.Accelerate.Interpreter as I
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString aMessage@(CreateTopic aTopic) = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")
+  say $  printf ("Received message " <> show aMessage <> "\n")
   return ()
 
 handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("Received message " <> (show aMessage) <> "\n")
-  currentTime <- liftIO $ getCurrentTime
+  say $  printf ("Received message " <> show aMessage <> "\n")
+  currentTime <- liftIO getCurrentTime
   void . liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
@@ -57,7 +56,7 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
 
 
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $  printf ("ComputeNode : Received message " <> (show aMessage) <> "\n")
+  say $  printf ("ComputeNode : Received message " <> show aMessage <> "\n")
   liftIO $ atomically $ addService server serviceProfile pid
   --publish local state
   liftIO $ publishLocalSnapshot server pid
@@ -68,8 +67,8 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
 
 handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  time <- liftIO $ getCurrentTime
-  say $  printf ("Received message " <> "Processor " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
+  time <- liftIO getCurrentTime
+  say $  printf ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
 
 
 handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess message) = do
@@ -77,12 +76,12 @@ handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess me
   getSelfPid >>= flip exit (show aMessage)
 
 handleRemoteMessage server dbType connectionString unhandledMessage =
-  say $  printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  say $  printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  say $  printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid
   terminate
 

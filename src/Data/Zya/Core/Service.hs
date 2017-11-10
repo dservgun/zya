@@ -159,8 +159,7 @@ makeLenses ''ServerConfiguration
 --}
 
 newServerIO :: ProcessId -> IO Server
-newServerIO =
-  \m ->
+newServerIO m =
     Server
       <$> newTVarIO Map.empty
       <*> newTVarIO Map.empty
@@ -184,8 +183,7 @@ makeServerConfiguration ::
   Server -> Backend -> ServiceProfile ->
   ServiceName -> DBType -> ConnectionDetails -> Maybe Int ->
   WebServerEndPoint -> ServerConfiguration
-makeServerConfiguration s b sp sName db cd aCount anEndpoint =
-    ServerConfig s b sp sName db cd aCount anEndpoint
+makeServerConfiguration = ServerConfig
 subscriptionService :: String -> Process ()
 subscriptionService aPort = return ()
 
@@ -205,7 +203,7 @@ initializeProcess = do
 
   peers0 <- liftIO $ findPeers backendl peerTimeout
 
-  liftIO $ debugMessage "Data.Zya.Core.TestWriter" ("Initializing process " <> (show serviceNameS) <> "\n")
+  liftIO $ debugMessage "Data.Zya.Core.TestWriter" ("Initializing process " <> show serviceNameS <> "\n")
   let peers = List.filter (/= mynode) peers0
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid
@@ -217,7 +215,7 @@ initializeProcess = do
 
 {- | Terminate all processes calling exit on each -}
 terminateAllProcesses :: Server -> Process ()
-terminateAllProcesses =  \lServer ->  do
+terminateAllProcesses lServer = do
   serverConfiguration <- ask
   remoteProcessesL <- liftIO $ atomically $ remoteProcesses lServer
   forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
@@ -236,10 +234,10 @@ handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
     currentTime <- getCurrentTime
     atomically $ do
       mySpId <- readTVar $ myProcessId aServer
-      sendRemote aServer pid $ (ServiceAvailable aServiceProfile mySpId, currentTime)
+      sendRemote aServer pid (ServiceAvailable aServiceProfile mySpId, currentTime)
       return mySpId
   say $ printf
-        ("Sending info about self " <> " " <> (show mSpid) <> ":" <> (show pid) <> (show aServiceProfile)
+        ("Sending info about self " <> " " <> show mSpid <> ":" <> show pid <> show aServiceProfile
             <> "\n")
 handleWhereIsReply _ _ (WhereIsReply _ Nothing) = return ()
 
@@ -282,7 +280,7 @@ myProcessId :: Server -> TVar ProcessId
 myProcessId = _myProcessId
 
 messageKey :: Server -> TVar (Map MessageId ProcessId)
-messageKey s = _messageKey s
+messageKey = _messageKey
 
 
 putLocalMessage :: Server -> ClientIdentifier -> (ProcessId, MessageId) -> STM LocalMessage
@@ -312,7 +310,7 @@ publishLocalSnapshot :: Server -> ProcessId -> IO ()
 publishLocalSnapshot app targetProcessId = do
   liftIO $ putStrLn "Publishing local snapshot"
   messageKeyL <- liftIO $ atomically $ readTVar $ messageKey app
-  messageAsList <- return $ Map.assocs messageKeyL
+  let messageAsList = Map.assocs messageKeyL
   mapM_ (\(messageId, processId) ->
             liftIO $
               atomically $
@@ -332,8 +330,8 @@ messagesTillNow server clientIdentifier strategy = do
   let messageAsList = filterMessages messageKeyL strategy
   mapM_ (\(messageId, processId) ->
             liftIO $
-              atomically $ do
-                putLocalMessage server clientIdentifier (processId, messageId)) messageAsList
+              atomically $ putLocalMessage server 
+                              clientIdentifier (processId, messageId)) messageAsList
   return strategy
   where
     filterMessages aMap strategy =
