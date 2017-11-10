@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 
 module Data.Zya.Persistence.Internal.Sqlite where
-import Control.Monad.IO.Class(liftIO)
+import Control.Monad.IO.Class(liftIO, MonadIO)
 import Control.Monad.Logger(runStderrLoggingT)
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Reader
