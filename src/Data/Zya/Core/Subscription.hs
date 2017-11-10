@@ -50,14 +50,13 @@ terminator :: ServerReaderT ()
 terminator = do
   serverConfiguration <- ask
   remoteProcessesL <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
-  lift $
-      printf "Terminator " 
-          <> show (serverConfiguration ^. serviceProfile)
-          <> show (serverConfiguration^.serviceName)
-          <> "\n"
-  forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
-  pid <- getSelfPid -- the state is not update in the terminator, at least for now.
-  exit pid $ TerminateProcess "Shutting down self"
+  lift $ do 
+    say $ printf "Terminator " <> show (serverConfiguration ^. serviceProfile)
+      <> show (serverConfiguration^.serviceName)
+      <> "\n"
+    forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
+    pid <- getSelfPid -- the state is not update in the terminator, at least for now.
+    exit pid $ TerminateProcess "Shutting down self"
 
 
 subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails, Maybe Int, Int) -> Process ()

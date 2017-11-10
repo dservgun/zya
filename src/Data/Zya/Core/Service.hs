@@ -424,7 +424,7 @@ queryFallbackservice serverL serviceProfileL =
           Map.keys $
             Map.filterWithKey(\(_, sProfile) _ -> sProfile == serviceProfileL) servicesL
     case entries of
-      h : t -> Just $ fst h
+      h : t -> return $ Just $ fst h
       _ ->  return Nothing
 
 
