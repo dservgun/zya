@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.TopicAllocator(
   -- * The cloud service allocating topics to writers and readers.
@@ -21,7 +20,7 @@ import Control.Monad.Reader
 import Control.Distributed.Process
 import Control.Distributed.Process.Closure
 import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+import Control.Distributed.Process.Node as Node
 
 import Data.Binary
 import Data.Data
@@ -38,7 +37,7 @@ import Data.Zya.Core.ServiceTypes
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n")
+  say $ printf ("Received message " <> show aMessage <> "\n")
   -- Check for writers and then send a message to the writer.
   availableWriter <- 
     liftIO $ do 
@@ -48,18 +47,18 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
         Just a ->  atomically $ sendRemote server a (aMessage, currentTime)
         Nothing -> return ()
       return availableWriter
-  say $ printf ("Sent message to writer " <> (show availableWriter) <> "\n")
+  say $ printf ("Sent message to writer " <> show availableWriter <> "\n")
   return ()
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n") 
+  say $ printf ("Received message " <> show aMessage <> "\n") 
   liftIO $ do 
       currentTime <- liftIO getCurrentTime
       atomically $ do 
         myPid <- getMyPid server
         addService server serviceProfile pid
-        sendRemote server pid ((GreetingsFrom TopicAllocator myPid), currentTime)
+        sendRemote server pid (GreetingsFrom TopicAllocator myPid, currentTime)
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
