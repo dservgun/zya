@@ -330,15 +330,16 @@ messagesTillNow server clientIdentifier strategy = do
   let messageAsList = filterMessages messageKeyL strategy
   mapM_ (\(messageId, processId) ->
             liftIO $
-              atomically $ putLocalMessage server 
-                              clientIdentifier (processId, messageId)) messageAsList
+              atomically 
+                $ putLocalMessage server 
+                    clientIdentifier (processId, messageId)) messageAsList
   return strategy
   where
     filterMessages aMap strategy =
         case strategy of
           Begin -> Map.assocs aMap
-          End -> Map.assocs $ Map.empty
-          Last (n, (Page p)) -> List.take (n * p) $ Map.assocs aMap
+          End -> Map.assocs Map.empty
+          Last (n, Page p) -> List.take (n * p) $ Map.assocs aMap
 
 
 -- IO because we want to break up each individual sends, or have
@@ -347,15 +348,14 @@ broadcastLocalQueues :: Server -> (ProcessId, MessageId) -> IO ()
 broadcastLocalQueues server (processIdL, messageIdL) = do
   localQueues <- atomically $ readTVar $ localTBQueue server
   let elems = Map.elems localQueues
-  putStrLn $ "Publishing to Local queues " <> (show processIdL) <> ", " <> (show messageIdL)
+  putStrLn $ "Publishing to Local queues " <> show processIdL <> ", " <> show messageIdL
   mapM_ (\(conn, queue) -> atomically $ writeTBQueue queue
         (createMessageSummary messageIdL (pack $ show processIdL))) elems
   return ()
 
 -- Query a process id for its service profile
 queryProcessId :: Server -> ProcessId -> STM(Maybe (ProcessId, ServiceProfile))
-queryProcessId  =
-  \lServer pid -> do
+queryProcessId lServer pid = do
     servicesL <- readTVar $ services lServer
     let result = keys $ Map.filterWithKey(\(procId, _) _ -> procId == pid) servicesL
     case result of
@@ -413,24 +413,20 @@ isSingleton _ = False
   , though find the one with the least number of topics or messages or both.
 -}
 findAvailableWriter :: Server -> STM (Maybe ProcessId)
-findAvailableWriter = \serverL -> findAvailableService serverL Writer RoundRobin
+findAvailableWriter serverL = findAvailableService serverL Writer RoundRobin
 
 
 queryFallbackservice :: Server -> ServiceProfile -> STM (Maybe ProcessId)
-queryFallbackservice = \serverL serviceProfileL ->
+queryFallbackservice serverL serviceProfileL =
   do
     servicesL <- readTVar $ services serverL
     let entries =
           Map.keys $
             Map.filterWithKey(\(_, sProfile) _ -> sProfile == serviceProfileL) servicesL
+    case entries of
+      h : t -> Just $ fst h
+      _ ->  return Nothing
 
-    res <-
-        case entries of
-          h : t -> do
-            return . Just $ fst h
-          _ ->  return Nothing
-
-    return res
 
 
 
@@ -494,14 +490,15 @@ updateMessageKey aServer processId messageId = do
    | Since the message key is a map, this value will ignore duplicates that may have been processed.
 --}
 queryMessageKeyCount :: Server -> STM Int
-queryMessageKeyCount = \serverL -> readTVar (messageKey serverL) >>= return . Map.size
+queryMessageKeyCount serverL = Map.size <$> readTVar (messageKey serverL)
 
 {-- | Query the local message counts. This count is different from the actual messages processed as far as
     | the current process is concerned. Use ** queryMessageKeyCount ** to get an estimate of how many messages
     | got processed by the cloud.
 --}
 queryMessageCount :: Server -> STM Int
-queryMessageCount serverL = readTVar (_messageValues serverL) >>= return . Map.size
+queryMessageCount serverL = 
+    Map.size <$> readTVar (_messageValues serverL)
 
 updateMessageValue :: Server -> MessageId -> PMessage -> STM PMessage
 updateMessageValue serverL messageId aMessage = do
@@ -515,14 +512,14 @@ updateMessageValue serverL messageId aMessage = do
 --}
 addConnection :: Server -> ClientIdentifier ->
                     WS.Connection -> STM (ClientIdentifier, WS.Connection, TBQueue LocalMessage)
-addConnection serverL clientIdentifier aConnection = do
+addConnection serverL clientIdentifier aConnection =
   readTVar (localTBQueue serverL) >>= \x -> do
     -- TODO : Read the queue bounds from a reader.
     queue <- newTBQueue 100 -- change this to a better number after testing.
     writeTVar (localTBQueue serverL) $
       Map.insert clientIdentifier (aConnection, queue) x
     return (clientIdentifier, aConnection, queue)
-deleteConnection :: Server -> ClientIdentifier -> STM (Maybe(Connection))
+deleteConnection :: Server -> ClientIdentifier -> STM (Maybe Connection)
 deleteConnection serverL aClientIdentifier = do
   x <- readTVar (localTBQueue serverL)
   let connPair = Map.lookup aClientIdentifier x

@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.TestWriter(
   -- * The cloud service used to test readers and writers.
@@ -14,7 +13,7 @@ import Control.Concurrent.STM
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Closure
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+import Control.Distributed.Process.Node as Node
 import Control.Exception
 import Control.Lens
 import Control.Monad
@@ -82,7 +81,7 @@ eventLoop = do
 
 handleRemoteMessage :: Server -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server aCount aMessage@(CreateTopic aTopic) = do
-  liftIO $ Logger.debugMessage "Zya.core.TestWriter" $ printf ("Received message " <> (show aMessage) <> "\n")
+  liftIO $ Logger.debugMessage "Zya.core.TestWriter" $ printf ("Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   availableWriter <- liftIO $ atomically $ findAvailableWriter server
   case availableWriter of
@@ -92,40 +91,40 @@ handleRemoteMessage server aCount aMessage@(CreateTopic aTopic) = do
 
 
 handleRemoteMessage server aCount aMessage@(ServiceAvailable serviceProfile pid) = do
-  liftIO $ Logger.debugMessage "Zya.Core.TestWriter" ("TestWriter : Received message " <> (show aMessage) <> "\n")
-  say $ printf ("TestWriter : Received message " <> (show aMessage) <> "\n")
+  liftIO $ Logger.debugMessage "Zya.Core.TestWriter" ("TestWriter : Received message " <> show aMessage <> "\n")
+  say $ printf ("TestWriter : Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
       addService server serviceProfile pid
-      sendRemote server pid ((GreetingsFrom TestWriter myPid), currentTime)
+      sendRemote server pid (GreetingsFrom TestWriter myPid, currentTime)
   return ()
 
-handleRemoteMessage server aCount aMessage@(QueryMessage (messageId, processId, message)) = do
+handleRemoteMessage server aCount aMessage@(QueryMessage (messageId, processId, message)) =
   say $ printf ("Query Message handler : Received message " <> show message <> "\n")
 
 handleRemoteMessage serverL aCount aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
   liftIO $ debugMessage "Data.Zya.Core.TestWriter" ("Test writer : Updating process key "
-                <> (show messageId) <> "->" <> (show processId) <> "\n")
+                <> show messageId <> "->" <> show processId <> "\n")
   currentTime <- liftIO getCurrentTime
   void $ liftIO $ atomically $ updateMessageKey serverL processId messageId
   _ <- liftIO $ atomically $
-            sendRemote serverL processId ((QueryMessage (messageId, myPid, Nothing)), currentTime)
-  say $ printf ("Message key store message processed..\n")
+            sendRemote serverL processId (QueryMessage (messageId, myPid, Nothing), currentTime)
+  say $ printf "Message key store message processed..\n"
   return()
 
 
 
 
 handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) = do
-  say $ printf ("Received message " <> (show aMessage) <> "\n")
+  say $ printf ("Received message " <> show aMessage <> "\n")
   p <- liftIO $ atomically $ addService serverL serviceProfileL pid
   say $ printf "Added service " <> show p <> show serviceProfileL <> "\n"
   case serviceProfileL of
-    Writer -> do
+    Writer -> 
       case aCount of
-        Just count -> do
+        Just count -> 
           forM_ [1..count] $ \currentCount -> do
             say $ printf "Test Writer -> Writing message " <> show currentCount <> "\n"
             getNextMessage >>= flip runMessageWriter serverL
@@ -144,12 +143,12 @@ handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) 
           return $
             WriteMessage
               (Publisher topic)
-              (myProcessId)
+              myProcessId
               (pack $ show nId , topic, pack ("This is a test " <> show nId <> " : " <> show pid))
         Nothing -> throw $ UUIDGenException "No next id."
 
 handleRemoteMessage _ _ unhandledMessage =
-  say $ printf ("Received unhandled message  " <> (show unhandledMessage) <> "\n")
+  say $ printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()

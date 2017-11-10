@@ -35,11 +35,11 @@ instance Exception UnsupportedServiceException
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage _ aMessage = do
   selfPid <- getSelfPid
-  say $ printf ("Received message " <> (show selfPid) <> " " <> (show aMessage) <> "\n")
+  say $ printf ("Received message " <> show selfPid <> " " <> show aMessage <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification _ notificationMessage =
-  say $ printf ("Monitor notification " <> (show notificationMessage) <> "\n")
+  say $ printf ("Monitor notification " <> show notificationMessage <> "\n")
 
 
 
@@ -50,14 +50,14 @@ terminator :: ServerReaderT ()
 terminator = do
   serverConfiguration <- ask
   remoteProcessesL <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
-
-  lift $ do
-    say $ printf "Terminator " <> (show $ serverConfiguration^.serviceProfile)
-          <> (show $ serverConfiguration^.serviceName)
+  lift $
+      printf "Terminator " 
+          <> show (serverConfiguration ^. serviceProfile)
+          <> show (serverConfiguration^.serviceName)
           <> "\n"
-    forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
-    pid <- getSelfPid -- the state is not update in the terminator, at least for now.
-    exit pid $ TerminateProcess "Shutting down self"
+  forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
+  pid <- getSelfPid -- the state is not update in the terminator, at least for now.
+  exit pid $ TerminateProcess "Shutting down self"
 
 
 subscription :: Backend -> (ServiceProfile, Text, DBType, ConnectionDetails, Maybe Int, Int) -> Process ()
@@ -67,7 +67,7 @@ subscription backendL (sP, params, dbTypeL, dbConnection, count, portNumber) = d
   n <- newServer myPid
   let readerParams = makeServerConfiguration n backendL sP params dbTypeL dbConnection count portNumber
 
-  say $ printf $ "Starting subscrpition " <> (show sP) <> " " <> (show params) <> "\n"
+  say $ printf $ "Starting subscrpition " <> show sP <> " " <> show params <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
     Reader -> Control.Exception.Safe.throw $ UnsupportedServiceException $ Just Reader
@@ -82,7 +82,7 @@ subscription backendL (sP, params, dbTypeL, dbConnection, count, portNumber) = d
 remotable ['subscriptionService]
 
 simpleBackend :: String -> String -> IO Backend
-simpleBackend = \a p -> initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
+simpleBackend a p = initializeBackend a p $ Data.Zya.Core.Subscription.__remoteTable initRemoteTable
 
 
 -- | For  example 'cloudEntryPoint (simpleBackend "localhost" "50000") (TopicAllocator, "ZYA")  '
@@ -108,10 +108,7 @@ parseArgs = do
       "TopicAllocator" -> (TopicAllocator, params, portNumber)
       "Terminator" -> (Terminator, params, portNumber)
       "TestWriter" -> (TestWriter, params, portNumber)
-      _  ->
-          do
-            --liftIO $ say $ printf "Bailout" -- throw $ UnsupportedServiceException (Just TestWriter)
-            (Unknown, params, portNumber)
+      _  -> (Unknown, params, portNumber)
 
 cloudMain :: IO ()
 cloudMain = do
