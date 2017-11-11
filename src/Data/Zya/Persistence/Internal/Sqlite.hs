@@ -10,10 +10,8 @@
 
 module Data.Zya.Persistence.Internal.Sqlite where
 import Control.Monad.IO.Class(liftIO, MonadIO)
-import Control.Monad.Logger(runStderrLoggingT)
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Reader
-import Data.Bifunctor
 import Data.ByteString.Char8
 import Data.Text
 import Data.Time
@@ -36,8 +34,8 @@ c8Pack = Data.ByteString.Char8.pack
 
 persistZ :: MessageT
 persistZ = do
-  (dbType, ConnectionDetails connStr, message) <- ask
-  internalPersist connStr message
+  (dbTypeL, ConnectionDetails connStr, message) <- ask
+  _ <- internalPersist connStr message
   return $ CreateStatus $ Data.Text.pack $ show message
 
 

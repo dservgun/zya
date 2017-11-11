@@ -4,16 +4,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Data.Zya.Core.Internal.ServerTypes where 
+
 import Control.Concurrent.STM
 import Control.Distributed.Process
-import Data.Time(UTCTime, getCurrentTime)
-import Data.Map
 import Control.Exception.Safe
-import Data.Text
-import Network.WebSockets as WS (Connection)
-import Data.Zya.Core.Internal.MessageDistribution
 import Data.Aeson
+import Data.Map
+import Data.Text
+import Data.Time(UTCTime)
+import Data.Zya.Core.Internal.MessageDistribution
 import GHC.Generics (Generic)
+import Network.WebSockets as WS (Connection)
 
 ---------- Basic types  ----
 
@@ -35,7 +36,7 @@ type Command = Text
 -- The message id is unique among all the processes.
 type MessageId = Text
 
-newtype Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
+data Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
 
 data PMessage =
   -- Returns a set of subscribers handled by a process.
@@ -86,9 +87,9 @@ type ServiceName = Text
 type Location = Integer
 type ErrorCode = Text
 
-newtype Request = Request {unRequest :: Text} deriving Show
-newtype Response = Response {unResponse :: Text} deriving Show
-newtype ClientIdentifier = ClientIdentifier {unClid :: Text} deriving (Show, Ord, Eq)
+data Request = Request {unRequest :: Text} deriving Show
+data Response = Response {unResponse :: Text} deriving Show
+data ClientIdentifier = ClientIdentifier {unClid :: Text} deriving (Show, Ord, Eq)
 data ClientState = ClientState {
     topicCS :: Topic
     , readPos :: Integer
@@ -100,11 +101,11 @@ type End = Integer
 
 
 
-newtype Message = Message (UTCTime, Text) deriving (Typeable, Show)
-newtype Error =  Error (ErrorCode, Text) deriving (Typeable, Show)
+data Message = Message (UTCTime, Text) deriving (Typeable, Show)
+data Error =  Error (ErrorCode, Text) deriving (Typeable, Show)
 instance Exception Error
 
-newtype StartUpException = StartUpException {_text :: Text} deriving (Typeable, Show)
+data StartUpException = StartUpException {_text :: Text} deriving (Typeable, Show)
 instance Exception StartUpException
 
 --------------Application types ---
@@ -119,15 +120,15 @@ type Email = Text
 
 
 
-newtype Device = Device {_undevice :: Text} deriving(Eq, Ord, Show, Generic, ToJSON, FromJSON)
-newtype UserName = UserName {_unUserName :: Text} deriving (Show, Generic, ToJSON, FromJSON)
+data Device = Device {_undevice :: Text} deriving(Eq, Ord, Show, Generic, ToJSON, FromJSON)
+data UserName = UserName {_unUserName :: Text} deriving (Show, Generic, ToJSON, FromJSON)
 
 
 {--
   We use time stamp despite as a way to present some form of ordering. The values are at
   best approximate.
 --}
-newtype DeviceTimeStamp = DeviceTimeStamp{ _undevices :: (Device, UTCTime)} deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+data DeviceTimeStamp = DeviceTimeStamp{ _undevices :: (Device, UTCTime)} deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 data LocalMessage =
     Login{_kind :: Text, _userName :: UserName, _devices :: [DeviceTimeStamp], _timestamp :: UTCTime}
   | Logout {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime}
@@ -141,10 +142,10 @@ data LocalMessage =
 
 
 -- GreyLists have a smaller timeout. Cloud logical time equivalent to 60 seconds?
-newtype GreyList = GreyList {_unGrey :: (UserName, Device)} deriving(Show, Generic, ToJSON, FromJSON)
+data GreyList = GreyList {_unGrey :: (UserName, Device)} deriving(Show, Generic, ToJSON, FromJSON)
 
 -- Black list have a logical timeout of 24 hours.
-newtype BlackList = BlackList {_unBlack :: (UserName, Device, UTCTime)} deriving(Show, Generic, ToJSON, FromJSON)
+data BlackList = BlackList {_unBlack :: (UserName, Device, UTCTime)} deriving(Show, Generic, ToJSON, FromJSON)
 
 
 

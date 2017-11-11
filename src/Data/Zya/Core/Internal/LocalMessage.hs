@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Zya.Core.Internal.LocalMessage
   (
     createMessageSummary
@@ -20,18 +20,12 @@ where
   PMessage. Use LocalMessage when integrating an external client (not a member of the cloud)
 --}
 
-import Data.Aeson
-import Data.HashMap.Strict as HM
 import Data.Time(UTCTime)
-import Data.Binary
-import GHC.Generics
 import Data.Text
-import Data.Typeable
 import Data.Zya.Core.Internal.MessageDistribution
 import Data.Zya.Core.Internal.ServerTypes
 import Control.Distributed.Process
 import Control.Monad.Trans
-import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.State
 
@@ -39,10 +33,10 @@ import Control.Monad.State
 -- TODO: MessageId needs to be a newtype.
 -- | Constructors.
 createMessageSummaryP :: Text -> ProcessId -> LocalMessage
-createMessageSummaryP messageId processIdL = createMessageSummary messageId $ pack . show $ processIdL
+createMessageSummaryP messageIdL processIdL = createMessageSummary messageIdL $ pack . show $ processIdL
 
 createMessageSummary :: Text -> Text -> LocalMessage
-createMessageSummary messageId processId = MessageSummary "MessageSummary" messageId processId
+createMessageSummary messageIdL processIdL = MessageSummary "MessageSummary" messageIdL processIdL
 
 {-- |
   Commit a message: update the read status of the message in the store. Replicate
@@ -76,17 +70,24 @@ login aUser aDevice = undefined
         MonadIO)
 -}
 
+type CPSM = (Command, ProcessId, Server, MessageDistributionStrategy)
 newtype LocalMessageHandler a =
-    LocalMessageHandler {
-      _runHandler :: ReaderT (Command, ProcessId, Server, MessageDistributionStrategy) (StateT [Command] IO) a
-    } deriving(Functor, Applicative, Monad, MonadIO, MonadReader(Command, ProcessId, Server, MessageDistributionStrategy), MonadState [Command])
+    LMessageHandler {
+      _runHandler :: ReaderT CPSM (StateT [Command] IO) a
+    } deriving(
+        Applicative, 
+        Functor, 
+        Monad, MonadIO, 
+        MonadReader CPSM, 
+        MonadState [Command])
+
 
 
 handleMessages :: Command -> LocalMessageHandler Command
-handleMessages message = do 
+handleMessages messageL = do 
     (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
+    lastCommand <- get
     -- TODO : Complete the implementation.
-    return message
-instance Binary OpenIdProvider
+    return messageL
 
 

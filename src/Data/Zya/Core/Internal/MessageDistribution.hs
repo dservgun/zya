@@ -2,26 +2,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 module Data.Zya.Core.Internal.MessageDistribution where
 
-
-import Control.Applicative((<$>))
-import Control.Concurrent.STM
-import Control.Distributed.Process
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Exception
-import Control.Lens
-import Control.Monad
-import Control.Monad.Reader
-import Data.List as List
-import Data.Map.Strict as Map
-import Data.Monoid((<>))
-import Data.Text(unpack, Text)
-import Data.Time(UTCTime, getCurrentTime)
+import Data.Text
 import Data.Typeable
-import Data.Zya.Utils.Logger(debugMessage)
 import Data.Aeson
 import GHC.Generics (Generic)
-import Network.WebSockets.Connection as WS (Connection)
-import Text.Printf
 import Data.Binary
 
 type CommitOffset = Integer

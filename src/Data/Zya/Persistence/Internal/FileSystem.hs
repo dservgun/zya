@@ -1,5 +1,3 @@
-module Data.Zya.Persistence.Internal.FileSystem 
-  (persist)
-where
+module Data.Zya.Persistence.Internal.FileSystem where 
 
-persist = undefined
+type ThisClass = String
