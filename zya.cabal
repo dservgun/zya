@@ -114,7 +114,7 @@ library
     , stm-lifted                     >= 0.1.0.0 && < 0.2
     , template-haskell >= 2.9 && < 2.12
     , text >= 1.2 && < 1.3
-    , time >= 1.5 && < 1.6
+    , time >= 1.5 && < 1.7
     , transformers >= 0.5 && < 0.6
     , unordered-containers >= 0.2 && < 0.3
     , uuid >= 1.3 && < 1.4
@@ -169,7 +169,7 @@ executable zya_reference
     , stm-lifted  >= 0.1.0.0 && < 0.2
     , template-haskell >= 2.9 && < 2.12
     , text >= 1.2 && < 1.3
-    , time >= 1.5 && < 1.6
+    , time >= 1.5 && < 1.7
     , transformers >= 0.5 && < 0.6
     , unordered-containers >= 0.2 && < 0.3
     , uuid >= 1.3 && < 1.4
@@ -204,7 +204,7 @@ test-suite Tasty
     , tasty-quickcheck >= 0.9.1 && < 0.10
     , tasty-smallcheck >= 0.8.1 && < 0.10
     , text >= 1.2 && < 1.3
-    , time >= 1.5 && < 1.6
+    , time >= 1.5 && < 1.7
     , zya >= 0.1.0.1 && < 0.2
 
 
