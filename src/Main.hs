@@ -22,6 +22,17 @@ main :: IO ()
 main = startServices
 
 
+-- | A start service blue print should be 
+-- something like below: 
+-- Create 20 Writers using Postgres connection, 20 with sqllite
+-- Create 40 WebServices, Create 20 compute node. 
+-- Allow Max 100 WebServices, 100 Writers.
+-- Minimum services required is 70% of each service.
+-- For example,  if the service count is less than 28, the system
+-- needs to send a kill signal to all the components so 
+-- as to enable recovery.
+  
+
 startServices :: IO ()
 startServices =  do
   test <- testBackend
@@ -50,7 +61,7 @@ startServices =  do
 
 
 
-
+-- A test backend
 testBackend :: IO Backend
 testBackend = simpleBackend "localhost" "5000"
 

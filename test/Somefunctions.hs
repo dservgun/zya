@@ -9,6 +9,8 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
 import Control.Concurrent.STM
+import Control.Monad.Cont 
+import Control.Monad.Logic
 import Data.Text as Text hiding(foldl, map, foldr, zipWith)
 
 import Data.Set as Set hiding(foldl, map, foldr)
@@ -194,6 +196,21 @@ type family JSONParser a where
   JSONParser MessageRequest = MessageResponse
 
 
-data family XList a
-data instance XList char = XCons !Char !(XList Char) | Nil
-data instance XList () = XListunit !Int
+
+calculateLength :: [a] -> Cont r Int
+calculateLength l = return (Prelude.length l)
+
+double :: Int -> Cont r Int 
+double n = return (n * 2)
+
+
+choices :: MonadPlus m => [a] -> m a 
+choices = msum . map return 
+
+evensLogic :: Logic Int 
+evensLogic = do 
+    n <- choices [1..]
+    if n `mod` 2 == 0
+        then return n 
+        else mzero 
+evensList = observeAll evensLogic

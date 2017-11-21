@@ -28,7 +28,8 @@ import Control.Distributed.Process
 import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Monad.State
-
+import Data.Aeson 
+import Data.Text.Encoding
 
 -- TODO: MessageId needs to be a newtype.
 -- | Constructors.
@@ -70,23 +71,46 @@ login aUser aDevice = undefined
         MonadIO)
 -}
 
+
 type CPSM = (Command, ProcessId, Server, MessageDistributionStrategy)
 newtype LocalMessageHandler a =
     LMessageHandler {
-      _runHandler :: ReaderT CPSM (StateT [Command] IO) a
+      _runHandler :: ReaderT CPSM (StateT Command IO) a
     } deriving(
         Applicative, 
         Functor, 
         Monad, MonadIO, 
         MonadReader CPSM, 
-        MonadState [Command])
+        MonadState Command)
+
+handleLogin aLocalMessage = undefined 
+handleLogout aLocalMessage = undefined 
+handleSession aLocalMessage = undefined 
+handleTopics aLocalMessage = undefined 
+handlePublish aLocalMessage = undefined
+handleCommit aLocalMessage = undefined 
+handleMessageSummary aLocalMessage = undefined    
 
 
+happyPath :: LocalMessage -> LocalMessageHandler LocalMessage 
+happyPath aLocalMessage = do 
+  case aLocalMessage of 
+      Login _ _ _ _ -> handleLogin aLocalMessage 
+      Logout _ _ _ _ -> handleLogout aLocalMessage 
+      Session _ _ _ _ _ -> handleSession aLocalMessage 
+      Topics _ _ _ _ _ -> handleTopics aLocalMessage 
+      Publish _ _ _ _ _ _ _  -> handlePublish aLocalMessage 
+      Commit _ _ _ _ _ _ -> handleCommit aLocalMessage 
+      MessageSummary _ _ _ -> handleMessageSummary aLocalMessage
 
 handleMessages :: Command -> LocalMessageHandler Command
 handleMessages messageL = do 
     (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
-    lastCommand <- get
+    lastCommand <- eitherDecodeStrict . encodeUtf8 <$> get :: LocalMessageHandler (Either String LocalMessage)
+    commandHandler <- 
+      case lastCommand of 
+        Right localMessage -> happyPath localMessage >> return lastCommand
+        Left errorMessage -> return lastCommand
     -- TODO : Complete the implementation.
     return messageL
 
