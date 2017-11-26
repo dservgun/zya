@@ -138,13 +138,14 @@ executable zya_client_reference
   main-is : ReferenceClient.hs 
   build-depends : 
     base >= 4.4 && < 5
-    , text >= 1.2 && < 1.3
+    , aeson >= 1.2  && < 1.3
     , async >= 2.1 && < 2.2
-    , websockets >= 0.12 && < 0.13
     , monad-control >= 1.0 && < 1.1
     , monad-logger >= 0.3 && < 0.4
     , mtl >= 2.2 && < 2.3
     , network >= 2.6 && < 2.7
+    , text >= 1.2 && < 1.3
+    , websockets >= 0.12 && < 0.13
 
   ghc-options : -Wall -rtsopts +RTS -sstderr -RTS
   default-language:   Haskell2010

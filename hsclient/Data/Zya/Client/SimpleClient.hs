@@ -10,14 +10,18 @@ import qualified	Data.Text as T
 import qualified 	Data.Text.IO as T 
 import qualified 	Network.WebSockets as WS
 import Data.Monoid
+import Data.Aeson
+import Data.Text.Encoding(encodeUtf8)
 
-
+parseJson :: T.Text -> Either String Value 
+parseJson = eitherDecodeStrict . encodeUtf8 
 app :: WS.ClientApp () 
 app conn = do 
 	putStrLn "Connected!"
 	_ <- forkIO $ forever $ do 
-		msg <- WS.receiveData conn 
-		liftIO $ T.putStrLn msg 
+          msg <- WS.receiveData conn 
+          liftIO $ putStrLn $ show msg
+          liftIO $ putStrLn $ show $ parseJson msg 
 
 	let loop = do 
 		line <- T.getLine

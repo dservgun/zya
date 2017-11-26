@@ -18,6 +18,7 @@ import Control.Monad.Catch as Catch
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
 import Data.Text as Text (Text, take, pack)
+import Data.Aeson
 import Data.Typeable
 import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.Service
@@ -73,7 +74,7 @@ readerThread (conn, app, identifier) = do
   liftIO $ do
     currentMessage <- atomically $ getNextLocalMessage app identifier
 
-    WS.sendTextData conn (Text.pack $ show currentMessage)
+    WS.sendTextData conn (encode currentMessage)
       `Catch.catch`
         (\a@(SomeException _) -> void $ handleConnectionException app identifier a)
   readerThread (conn, app, identifier)
