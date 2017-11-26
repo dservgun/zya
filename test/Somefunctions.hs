@@ -214,3 +214,18 @@ evensLogic = do
         then return n 
         else mzero 
 evensList = observeAll evensLogic
+
+
+traverseTest :: [Either String Int] -> [Int]
+traverseTest aList = 
+    Prelude.concat $ traverse accumulate aList 
+    where 
+      accumulate :: Either String Int -> [Int] 
+      accumulate (Left aString) = [0]
+      accumulate (Right anInt)  = [anInt]
+
+
+reverse1 :: [a] -> [a]
+reverse1 [] = [] 
+reverse1 (h : t) = (reverse1 t) <> [h]
+

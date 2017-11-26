@@ -101,7 +101,7 @@ protocolHandler = do
   (_ , cid@(ClientIdentifier _)) <- addConn
   a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
   b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid, False))
-  _ <- liftIO $ messagesTillNow app cid strategy
+--  _ <- liftIO $ messagesTillNow app cid strategy
   _ <- liftIO $ Async.waitAny [a, b]
   _ <- removeConn cid
 

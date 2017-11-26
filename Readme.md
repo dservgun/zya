@@ -44,3 +44,5 @@ If you need to restart.
 This worked for me.  : ``` Linux pop-os 4.13.0-16-generic #19-Ubuntu SMP Wed Oct 11 18:35:14 UTC 2017 x86_64 x86_64 x86_64 GNU/Linux ```
 
 
+### Curl commands for websockets
+``` $ curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: echo.websocket.org" -H "Origin: http://localhost:30001"  ```

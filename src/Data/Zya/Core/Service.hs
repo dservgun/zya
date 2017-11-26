@@ -135,10 +135,6 @@ newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
 type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 
-
-
-
-
 type ServerReaderT = ReaderT ServerConfiguration Process
 
 data ServerConfiguration = ServerConfig{

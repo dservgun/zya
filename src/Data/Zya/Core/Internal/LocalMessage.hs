@@ -83,15 +83,6 @@ newtype LocalMessageHandler a =
         MonadReader CPSM, 
         MonadState Command)
 
-handleLogin aLocalMessage = undefined 
-handleLogout aLocalMessage = undefined 
-handleSession aLocalMessage = undefined 
-handleTopics aLocalMessage = undefined 
-handlePublish aLocalMessage = undefined
-handleCommit aLocalMessage = undefined 
-handleMessageSummary aLocalMessage = undefined    
-
-
 happyPath :: LocalMessage -> LocalMessageHandler LocalMessage 
 happyPath aLocalMessage = do 
   case aLocalMessage of 
@@ -102,6 +93,21 @@ happyPath aLocalMessage = do
       Publish _ _ _ _ _ _ _  -> handlePublish aLocalMessage 
       Commit _ _ _ _ _ _ -> handleCommit aLocalMessage 
       MessageSummary _ _ _ -> handleMessageSummary aLocalMessage
+
+
+
+handleLogin :: LocalMessage -> LocalMessageHandler LocalMessage
+handleLogin aLocalMessage = do 
+  (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
+  return aLocalMessage
+  
+handleLogout aLocalMessage = undefined 
+handleSession aLocalMessage = undefined 
+handleTopics aLocalMessage = undefined 
+handlePublish aLocalMessage = undefined
+handleCommit aLocalMessage = undefined 
+handleMessageSummary aLocalMessage = undefined    
+
 
 handleMessages :: Command -> LocalMessageHandler Command
 handleMessages messageL = do 
