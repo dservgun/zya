@@ -165,7 +165,9 @@ data ServiceProfile =
     deriving(Show, Generic, Typeable, Eq, Ord)
 
 data Server = Server {
+    -- Clients connected to webserver, term is being used to differentiate from remote clients.
     localClients :: TVar (Map ClientIdentifier [ClientState])
+    -- A bounded queue per client identifier.
     , localTBQueue :: TVar (Map ClientIdentifier (WS.Connection, TBQueue LocalMessage))
     , remoteClients :: TVar (Map (ProcessId, ClientIdentifier) [ClientState])
     , localWriters :: TVar (Map Topic Integer)
