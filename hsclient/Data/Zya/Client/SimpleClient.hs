@@ -12,7 +12,7 @@ import qualified 	Network.WebSockets as WS
 import Data.Monoid
 import Data.Aeson
 import Data.Text.Encoding(encodeUtf8)
-
+import System.Environment(getArgs)
 parseJson :: T.Text -> Either String Value 
 parseJson = eitherDecodeStrict . encodeUtf8 
 app :: WS.ClientApp () 
@@ -31,4 +31,6 @@ app conn = do
 
 
 mainApp :: IO () 
-mainApp = withSocketsDo $ WS.runClient "localhost" 30001 "/" app
+mainApp = do 
+	[portNumber] <- map read <$> getArgs
+	withSocketsDo $ WS.runClient "localhost" portNumber "/" app

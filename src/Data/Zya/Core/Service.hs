@@ -180,6 +180,8 @@ makeServerConfiguration ::
   ServiceName -> DBType -> ConnectionDetails -> Maybe Int ->
   WebServerEndPoint -> ServerConfiguration
 makeServerConfiguration = ServerConfig
+
+-- A dummy function to allow the service to run remotely.
 subscriptionService :: String -> Process ()
 subscriptionService aPort = return ()
 
