@@ -110,7 +110,7 @@ handleRemoteMessage server _ _ _ aMessage@(MessageKeyStore (messageId, processId
   myPid <- getSelfPid
   currentTime <- liftIO getCurrentTime
   liftIO $ atomically $ updateMessageKey server processId messageId
-  _ <- liftIO $ broadcastLocalQueues server (processId, messageId)
+  _ <- liftIO $ sendWelcomeMessages (processId, messageId, server)
   say $ printf "Message key store message processed..\n"
   return()
 

@@ -3,13 +3,15 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
+
 module Data.Zya.Core.Internal.ServerTypes where 
 
 import Control.Concurrent.STM
 import Control.Distributed.Process
 import Control.Exception.Safe
+
 import Data.Aeson
-import Data.Map
+import Data.Map as Map
 import Data.Text
 import Data.Time(UTCTime)
 import Data.Zya.Core.Internal.MessageDistribution
@@ -19,7 +21,7 @@ import Network.WebSockets as WS (Connection)
 ---------- Basic types  ----
 
 
-{- | The server unifies remote and local processes to manage logging messages.
+{-- | The server unifies remote and local processes to manage logging messages.
     * localClients - For each client identifier, list of topics and their read positions.
     * remoteClients - For each process id the state of the topics.
     * localWriters - Write position for a topic.
@@ -149,7 +151,7 @@ data BlackList = BlackList {_unBlack :: (UserName, Device, UTCTime)} deriving(Sh
 
 
 
-{- | Supported services -}
+{-- | Supported services -}
 data ServiceProfile =
     WebServer
     | Reader
@@ -185,3 +187,5 @@ data Server = Server {
     -- that each kind of service should handle.
     , _messageValues :: TVar(Map MessageId PMessage)
 }
+
+

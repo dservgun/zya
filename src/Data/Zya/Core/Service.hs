@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, TemplateHaskell, DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Zya.Core.Service
     (
         -- * The supported service profiles
@@ -8,6 +10,7 @@ module Data.Zya.Core.Service
         , newServer
         , newServerIO
         , Server
+        , sendWelcomeMessages -- useful for early tests of a connection.
         , proxyChannel
         , myProcessId
         , updateMyPid
@@ -28,7 +31,6 @@ module Data.Zya.Core.Service
     -- * Local caches
         , addConnection
         , deleteConnection
-        , broadcastLocalQueues
         , getNextLocalMessage
         , putLocalMessage
         , publishLocalSnapshot
@@ -242,6 +244,32 @@ handleWhereIsReply _ _ (WhereIsReply _ Nothing) = return ()
 
 
 
+type ProcessTriple = (ProcessId, MessageId, Server)
+newtype BroadcastMessageT a = BroadcastMessageT {
+  _unServer :: ReaderT ProcessTriple IO a 
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadReader ProcessTriple)
+
+
+bMessage :: (WS.Connection, TBQueue LocalMessage) -> BroadcastMessageT ()
+bMessage (conn, queue) = do 
+  (processIdL, messageIdL, server) <- ask
+  liftIO $ atomically $ writeTBQueue queue (createMessageSummary messageIdL (pack $ show processIdL))
+  return ()
+
+sendWelcomeMessage :: BroadcastMessageT () 
+sendWelcomeMessage = do 
+  (processIdL, messageIdL, server) <- ask 
+  localQueues <- liftIO $ atomically $ readTVar $ localTBQueue server 
+  mapM_ bMessage $ Map.elems localQueues
+
+
+runBroadcastMessage :: BroadcastMessageT () -> (ProcessId, MessageId, Server) -> IO ()
+runBroadcastMessage broad (pId, messageId, server) = runReaderT (_unServer broad) (pId, messageId, server)
+
+
+sendWelcomeMessages :: (ProcessId, MessageId, Server) -> IO ()
+sendWelcomeMessages = runBroadcastMessage sendWelcomeMessage 
+
 {--|
 Update a service queue for round robin or any other strategy.
 --}
@@ -340,16 +368,6 @@ messagesTillNow server clientIdentifier strategy = do
           Last (n, Page p) -> List.take (n * p) $ Map.assocs aMap
 
 
--- IO because we want to break up each individual sends, or have
--- some control on how many message sends should we buffer.
-broadcastLocalQueues :: Server -> (ProcessId, MessageId) -> IO ()
-broadcastLocalQueues server (processIdL, messageIdL) = do
-  localQueues <- atomically $ readTVar $ localTBQueue server
-  let elems = Map.elems localQueues
-  putStrLn $ "Publishing to Local queues " <> show processIdL <> ", " <> show messageIdL
-  mapM_ (\(conn, queue) -> atomically $ writeTBQueue queue
-        (createMessageSummary messageIdL (pack $ show processIdL))) elems
-  return ()
 
 -- Query a process id for its service profile
 queryProcessId :: Server -> ProcessId -> STM(Maybe (ProcessId, ServiceProfile))
@@ -517,6 +535,7 @@ addConnection serverL clientIdentifier aConnection =
     writeTVar (localTBQueue serverL) $
       Map.insert clientIdentifier (aConnection, queue) x
     return (clientIdentifier, aConnection, queue)
+
 deleteConnection :: Server -> ClientIdentifier -> STM (Maybe Connection)
 deleteConnection serverL aClientIdentifier = do
   x <- readTVar (localTBQueue serverL)
