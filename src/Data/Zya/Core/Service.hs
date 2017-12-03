@@ -250,17 +250,18 @@ newtype BroadcastMessageT a = BroadcastMessageT {
   } deriving (Functor, Applicative, Monad, MonadIO, MonadReader ProcessTriple)
 
 
-bMessage :: (WS.Connection, TBQueue LocalMessage) -> BroadcastMessageT ()
-bMessage (conn, queue) = do 
+bMessage :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
+bMessage (conn, queue) constructor = do 
   (processIdL, messageIdL, server) <- ask
-  liftIO $ atomically $ writeTBQueue queue (createMessageSummary messageIdL (pack $ show processIdL))
-  return ()
+  let mess = constructor messageIdL processIdL 
+  liftIO $ atomically $ writeTBQueue queue $ mess 
+  return mess
 
 sendWelcomeMessage :: BroadcastMessageT () 
 sendWelcomeMessage = do 
   (processIdL, messageIdL, server) <- ask 
   localQueues <- liftIO $ atomically $ readTVar $ localTBQueue server 
-  mapM_ bMessage $ Map.elems localQueues
+  mapM_ (flip bMessage createMessageSummaryP) $ Map.elems localQueues
 
 
 runBroadcastMessage :: BroadcastMessageT () -> (ProcessId, MessageId, Server) -> IO ()
