@@ -38,7 +38,7 @@ startServices =  do
   test <- testBackend
   --ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr, Nothing)
   let nWriters = 6
-  let messages = 100 -- Messages to be published.
+  let messages = 1000 -- Messages to be published.
   let startPort = 30000
   let nWebServers = 5
   let nQueryServices = 3 :: Int

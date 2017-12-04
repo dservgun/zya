@@ -46,3 +46,11 @@ This worked for me.  : ``` Linux pop-os 4.13.0-16-generic #19-Ubuntu SMP Wed Oct
 
 ### Curl commands for websockets
 ``` $ curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Host: echo.websocket.org" -H "Origin: http://localhost:30001"  ```
+
+#### Some more setup commands
+When we see postgresql errors, it is most likely on ubuntu due to missing libraries: 
+```
+  sudo apt-get install liblz-dev
+  sudo apt-get install c2hs cpphs hscolour hugs
+  sudo apt-get install postgresql-server-dev-all
+```

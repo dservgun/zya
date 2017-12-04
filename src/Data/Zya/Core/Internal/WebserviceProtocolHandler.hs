@@ -10,6 +10,7 @@ module Data.Zya.Core.Internal.WebserviceProtocolHandler where
 
 
 import Conduit
+import Control.Applicative
 import Control.Concurrent.Async as Async (async, waitAny)
 import Control.Concurrent.STM.Lifted
 import Control.Exception
@@ -65,19 +66,21 @@ handleConnectionException ::
 handleConnectionException app identifier a = do
     _ <- liftIO $ atomically $ deleteConnection app identifier
     return $ Text.pack (show a)
--- At this point we can safely be in the io monad, though adding a monad logger might
--- be beneficial.
--- readerThread :: ProtocolHandler ()
-readerThread :: forall (m :: * -> *) b . MonadIO m =>
-    (Connection, Server, ClientIdentifier) -> m b
-readerThread (conn, app, identifier) = do
+
+
+readerThread :: forall (m :: * -> *) b . (MonadIO m, Monad m, Alternative m) =>
+    (Connection, Server, ClientIdentifier, Bool) -> m b
+readerThread (conn, app, identifier, exit) = do
   liftIO $ do
     currentMessage <- atomically $ getNextLocalMessage app identifier
-
     WS.sendTextData conn (encode currentMessage)
       `Catch.catch`
-        (\a@(SomeException _) -> void $ handleConnectionException app identifier a)
-  readerThread (conn, app, identifier)
+        (\a@(SomeException _) -> do 
+            _ <- handleConnectionException app identifier a
+            readerThread(conn, app, identifier, True)
+            )
+  guard (not exit)
+  readerThread (conn, app, identifier, exit)
 
 -- TODO Create some status or something. Dont return a text.
 writerThread :: (Connection, Server, ClientIdentifier, Bool) -> IO Text
@@ -100,9 +103,8 @@ protocolHandler :: ProtocolHandler WS.Connection
 protocolHandler = do
   (conn, app, strategy) <- ProtoHandler ask
   (_ , cid@(ClientIdentifier _)) <- addConn
-  a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid))
+  a <- liftIO . liftIO $ Async.async (readerThread (conn, app, cid, False))
   b <- liftIO . liftIO $ Async.async (writerThread (conn, app, cid, False))
---  _ <- liftIO $ messagesTillNow app cid strategy
   _ <- liftIO $ Async.waitAny [a, b]
   _ <- removeConn cid
 
