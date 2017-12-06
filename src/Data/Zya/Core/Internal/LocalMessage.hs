@@ -1,8 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Zya.Core.Internal.LocalMessage
   (
+    Command,
     createMessageSummary
     , createMessageSummaryP
     , MessageId
@@ -23,13 +26,44 @@ where
 import Data.Time(UTCTime)
 import Data.Text
 import Data.Zya.Core.Internal.MessageDistribution
-import Data.Zya.Core.Internal.ServerTypes
 import Control.Distributed.Process
 import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Aeson 
-import Data.Text.Encoding
+import Data.Text.Encoding(encodeUtf8)
+import GHC.Generics (Generic)
+
+
+
+
+{--
+  We use time stamp despite as a way to present some form of ordering. The values are at
+  best approximate.
+--}
+data DeviceTimeStamp = DeviceTimeStamp{ _undevices :: (Device, UTCTime)} deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+
+type Command = Text
+-- The message id is unique among all the processes.
+type MessageId = Text
+
+
+
+data Device = Device {_undevice :: Text} deriving(Eq, Ord, Show, Generic, ToJSON, FromJSON)
+data UserName = UserName {_unUserName :: Text} deriving (Show, Generic, ToJSON, FromJSON)
+
+
+data LocalMessage =
+    Login{_kind :: Text, _userName :: UserName, _devices :: [DeviceTimeStamp], _timestamp :: UTCTime}
+  | Logout {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime}
+  | Session {_kind :: Text, userName :: UserName , device :: Device, _timestamp :: UTCTime, _topics :: [Topic]}
+  | Topics {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime, topics :: [Topic]}
+  | Publish{_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime
+                , topic :: Topic, messageId :: Text, messaggePayload :: Text}
+  | Commit {_kind :: Text, userName :: UserName, device :: Device, topic :: Topic, _messageId :: MessageId, timestamp :: UTCTime}
+  | MessageSummary {_kind :: Text, _messageIdS :: Text, _processIdS :: Text}
+    deriving(Generic, ToJSON, FromJSON, Show)
+
 
 -- TODO: MessageId needs to be a newtype.
 -- | Constructors.
@@ -57,67 +91,5 @@ commitMessage aUserName aDevice aTopic aMessageId timeStamp =
 login :: UserName -> Device -> LocalMessage
 login aUser aDevice = undefined
 
-
-
-{-newtype ProtocolHandler a =
-      ProtoHandler {
-        _runConn :: ReaderT (WS.Connection, Server, MessageDistributionStrategy) IO a
-      }
-      deriving
-      (
-        Functor,
-        Applicative,
-        Monad,
-        MonadIO)
--}
-
-
-type CPSM = (Command, ProcessId, Server, MessageDistributionStrategy)
-newtype LocalMessageHandler a =
-    LMessageHandler {
-      _runHandler :: ReaderT CPSM (StateT Command IO) a
-    } deriving(
-        Applicative, 
-        Functor, 
-        Monad, MonadIO, 
-        MonadReader CPSM, 
-        MonadState Command)
-
-happyPath :: LocalMessage -> LocalMessageHandler LocalMessage 
-happyPath aLocalMessage = do 
-  case aLocalMessage of 
-      Login _ _ _ _ -> handleLogin aLocalMessage 
-      Logout _ _ _ _ -> handleLogout aLocalMessage 
-      Session _ _ _ _ _ -> handleSession aLocalMessage 
-      Topics _ _ _ _ _ -> handleTopics aLocalMessage 
-      Publish _ _ _ _ _ _ _  -> handlePublish aLocalMessage 
-      Commit _ _ _ _ _ _ -> handleCommit aLocalMessage 
-      MessageSummary _ _ _ -> handleMessageSummary aLocalMessage
-
-
-
-handleLogin :: LocalMessage -> LocalMessageHandler LocalMessage
-handleLogin aLocalMessage = do 
-  (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
-  return aLocalMessage
-  
-handleLogout aLocalMessage = undefined 
-handleSession aLocalMessage = undefined 
-handleTopics aLocalMessage = undefined 
-handlePublish aLocalMessage = undefined
-handleCommit aLocalMessage = undefined 
-handleMessageSummary aLocalMessage = undefined    
-
-
-handleMessages :: Command -> LocalMessageHandler Command
-handleMessages messageL = do 
-    (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
-    lastCommand <- eitherDecodeStrict . encodeUtf8 <$> get :: LocalMessageHandler (Either String LocalMessage)
-    commandHandler <- 
-      case lastCommand of 
-        Right localMessage -> happyPath localMessage >> return lastCommand
-        Left errorMessage -> return lastCommand
-    -- TODO : Complete the implementation.
-    return messageL
 
 

@@ -7,9 +7,6 @@
 module Data.Zya.Core.LocalMessageHandlingStrategy (sendMessage, runMessageWriter) where
 
 
-
-
-
 import Control.Applicative((<$>), liftA2)
 import Control.Concurrent
 import Control.Concurrent.Async
@@ -26,9 +23,12 @@ import Control.Monad.Reader
 import Control.Monad.State as State
 import Control.Monad.Trans
 import Control.Monad.Writer
+import Data.Aeson 
 import Data.Binary
 import Data.Maybe
+import Data.Text.Encoding(encodeUtf8)
 import Data.Time(UTCTime, getCurrentTime)
+import Data.Zya.Core.Internal.LocalMessage
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
 import GHC.Generics (Generic)
@@ -86,4 +86,57 @@ runMessageWriter aMessage server = do
   initWriter <- liftIO $ atomically $ findAvailableWriter server
   void $
     runReaderT (runStateT (runServerState $ sendMessage aMessage server) initWriter) (Writer, RoundRobin)
+
+
+
+type CPSM = (Command, ProcessId, Server, MessageDistributionStrategy)
+
+newtype LocalMessageHandler a =
+    LMessageHandler {
+      _runHandler :: ReaderT CPSM (StateT Command IO) a
+    } deriving(
+        Applicative, 
+        Functor, 
+        Monad, MonadIO, 
+        MonadReader CPSM, 
+        MonadState Command)
+
+happyPath :: LocalMessage -> LocalMessageHandler LocalMessage 
+happyPath aLocalMessage = do 
+  case aLocalMessage of 
+      Login _ _ _ _ -> handleLogin aLocalMessage 
+      Logout _ _ _ _ -> handleLogout aLocalMessage 
+      Session _ _ _ _ _ -> handleSession aLocalMessage 
+      Topics _ _ _ _ _ -> handleTopics aLocalMessage 
+      Publish _ _ _ _ _ _ _  -> handlePublish aLocalMessage 
+      Commit _ _ _ _ _ _ -> handleCommit aLocalMessage 
+      MessageSummary _ _ _ -> handleMessageSummary aLocalMessage
+
+
+
+handleLogin :: LocalMessage -> LocalMessageHandler LocalMessage
+handleLogin aLocalMessage = do 
+  (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
+
+  return aLocalMessage
+  
+handleLogout aLocalMessage = undefined 
+handleSession aLocalMessage = undefined 
+handleTopics aLocalMessage = undefined 
+handlePublish aLocalMessage = undefined
+handleCommit aLocalMessage = undefined 
+handleMessageSummary aLocalMessage = undefined    
+
+
+handleMessages :: Command -> LocalMessageHandler Command
+handleMessages messageL = do 
+    (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask
+    lastCommand <- eitherDecodeStrict . encodeUtf8 <$> State.get :: LocalMessageHandler (Either String LocalMessage)
+    commandHandler <- 
+      case lastCommand of 
+        Right localMessage -> happyPath localMessage >> return lastCommand
+        Left errorMessage -> return lastCommand
+    -- TODO : Complete the implementation.
+    return messageL
+
 

@@ -15,6 +15,7 @@ import Data.Map as Map
 import Data.Text
 import Data.Time(UTCTime)
 import Data.Zya.Core.Internal.MessageDistribution
+import Data.Zya.Core.Internal.LocalMessage
 import GHC.Generics (Generic)
 import Network.WebSockets as WS (Connection)
 
@@ -34,9 +35,6 @@ import Network.WebSockets as WS (Connection)
  -}
 
 
-type Command = Text
--- The message id is unique among all the processes.
-type MessageId = Text
 
 data Publisher = Publisher {_unPublish :: Topic} deriving (Show, Typeable, Generic)
 
@@ -121,26 +119,6 @@ type Email = Text
 -}
 
 
-
-data Device = Device {_undevice :: Text} deriving(Eq, Ord, Show, Generic, ToJSON, FromJSON)
-data UserName = UserName {_unUserName :: Text} deriving (Show, Generic, ToJSON, FromJSON)
-
-
-{--
-  We use time stamp despite as a way to present some form of ordering. The values are at
-  best approximate.
---}
-data DeviceTimeStamp = DeviceTimeStamp{ _undevices :: (Device, UTCTime)} deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
-data LocalMessage =
-    Login{_kind :: Text, _userName :: UserName, _devices :: [DeviceTimeStamp], _timestamp :: UTCTime}
-  | Logout {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime}
-  | Session {_kind :: Text, userName :: UserName , device :: Device, _timestamp :: UTCTime, _topics :: [Topic]}
-  | Topics {_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime, topics :: [Topic]}
-  | Publish{_kind :: Text, _userName :: UserName, _device :: Device, _timestamp :: UTCTime
-                , topic :: Topic, messageId :: Text, messaggePayload :: Text}
-  | Commit {_kind :: Text, userName :: UserName, device :: Device, topic :: Topic, _messageId :: MessageId, timestamp :: UTCTime}
-  | MessageSummary {_kind :: Text, _messageIdS :: Text, _processIdS :: Text}
-    deriving(Generic, ToJSON, FromJSON, Show)
 
 
 -- GreyLists have a smaller timeout. Cloud logical time equivalent to 60 seconds?

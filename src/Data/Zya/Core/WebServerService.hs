@@ -20,25 +20,20 @@ import Control.Exception
 import Control.Monad.Catch as Catch
 import Control.Concurrent.STM.Lifted
 import Control.Distributed.Process as Process
-import Control.Concurrent.Async as Async (waitSTM, wait, async, cancel, waitEither, waitBoth, waitAny
-                        , concurrently,asyncThreadId)
+import Control.Concurrent.Async as Async(async)
 
 import Control.Lens
 import Control.Monad (forever, void)
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
-import Data.Text as Text (Text, take)
+import Data.Text as Text (Text, unpack)
 import Data.Time
-import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.Service
-import Data.Zya.Core.ServiceTypes
-import Data.Typeable
-import Network.WebSockets.Connection as WS (Connection, sendTextData, receiveData)
+import Network.WebSockets.Connection as WS (sendTextData, receiveData)
 import Text.Printf
 import Yesod.Core
 import Yesod.WebSockets
 import Data.Zya.Core.Internal.WebserviceProtocolHandler
-import qualified Data.Text as Text (pack, unpack)
 
 
 newtype App = App Server
@@ -57,7 +52,7 @@ app = do
     connection <- ask
     App foundation <- getYesod
     -- get the last 20 pages.
-    x <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation, Last (20, Page 10))
+    _ <- liftIO $ runReaderT (_runConn protocolHandler) (connection, foundation, Last (20, Page 10))
     return ()
 
 getHomeR :: HandlerT App IO Text
@@ -71,9 +66,8 @@ startWebServer = do
   serverConfiguration <- ask
 
   lift $ say $ printf "Starting webservice \n"
-  liftIO $ putStrLn "Starting webservice\n"
-  liftIO $ do
-    let sName = Text.unpack $ serverConfiguration^.serviceName
+  _ <- liftIO $ putStrLn "Starting webservice\n"
+  _ <- liftIO $ do
     let serverL = serverConfiguration^.server
     let webserverPortL = serverConfiguration^.webserverPort
     Async.async $ warp webserverPortL  $ App serverL
@@ -81,64 +75,64 @@ startWebServer = do
 
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
-handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopic)  = do
+handleRemoteMessage serverL _ _ _ aMessage@(CreateTopic _)  = do
   say $  printf ("Received message " <> show aMessage <> "\n")
   return ()
 
 
-handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
+handleRemoteMessage serverL _ connectionString _ aMessage@(ServiceAvailable serviceProfileL pid) = do
   say $  printf ("WebServer : Received Service Available message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
-      myPid <- getMyPid server
-      addService server serviceProfile pid
-      sendRemote server pid (GreetingsFrom WebServer myPid, currentTime)
+      myPid <- getMyPid serverL
+      _ <- addService serverL serviceProfileL pid
+      sendRemote serverL pid (GreetingsFrom WebServer myPid, currentTime)
   return ()
 
-handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
+handleRemoteMessage serverL _ _ _ aMessage@(GreetingsFrom serviceProfileL pid) = do
   say $  printf ("Received message " <> show aMessage <> "\n")
-  liftIO $ atomically $ addService server serviceProfile pid
+  _ <- liftIO $ atomically $ addService serverL serviceProfileL pid
   return ()
 
 -- If the message has a tag, can cache and the server can also cache,
 -- perhaps we can cache the message.
-handleRemoteMessage server dbType connectionString messageCount
+handleRemoteMessage serverL _ _ messageCount
   aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = 
     say $ printf "Not handling this message. Not a writer.\n"
 
-handleRemoteMessage server _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
+handleRemoteMessage serverL _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
   currentTime <- liftIO getCurrentTime
-  liftIO $ atomically $ updateMessageKey server processId messageId
-  _ <- liftIO $ sendWelcomeMessages (processId, messageId, server)
+  liftIO $ atomically $ updateMessageKey serverL processId messageId
+  _ <- liftIO $ sendWelcomeMessages (processId, messageId, serverL)
   say $ printf "Message key store message processed..\n"
   return()
 
-handleRemoteMessage server dbType connectionString messageCount
+handleRemoteMessage serverL dbType connectionString messageCount
   aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
   say $  printf ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
   return ()
 
 
-handleRemoteMessage server dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
+handleRemoteMessage _ dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
   say $ printf ("Received message " <> show aMessage <> "\n")
   return ()
 
 
-handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do
+handleRemoteMessage _ dbType connectionString _ aMessage@(TerminateProcess message) = do
   say $ printf ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
 
-handleRemoteMessage server dbType connectionString unhandledMessage _ =
+handleRemoteMessage _ dbType connectionString unhandledMessage _ =
   say $  printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
-handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
+handleMonitorNotification serverL notificationMessage@(ProcessMonitorNotification _ pid _) = do
   say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
-  void $ liftIO $ atomically $ removeProcess server pid
+  void $ liftIO $ atomically $ removeProcess serverL pid
   terminate
 eventLoop :: ServerReaderT ()
 eventLoop = do
@@ -146,7 +140,6 @@ eventLoop = do
   lift $ do
     let sName = Text.unpack $ serverConfiguration^.serviceName
     let serverL = serverConfiguration^.server
-    let profileL = serverConfiguration^.serviceProfile
     let dbTypeL = serverConfiguration^.dbType
     let connectionDetailsL = serverConfiguration^.connDetails
     let testMessageCount = serverConfiguration^.numberOfTestMessages
