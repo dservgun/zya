@@ -46,6 +46,9 @@ newtype UUIDGenException =
 instance Exception UUIDGenException
 
 
+componentName :: Text 
+componentName = "Zya.Core.TestWriter"
+
 
 {-| Test writer to send a few messages -}
 -- Find an available writer, if none found, error out.
@@ -81,7 +84,7 @@ eventLoop = do
 
 handleRemoteMessage :: Server -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server aCount aMessage@(CreateTopic aTopic) = do
-  liftIO $ Logger.debugMessage "Zya.core.TestWriter" $ printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ Logger.debugMessage  $ pack ("Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   availableWriter <- liftIO $ atomically $ findAvailableWriter server
   case availableWriter of
@@ -89,9 +92,8 @@ handleRemoteMessage server aCount aMessage@(CreateTopic aTopic) = do
     Nothing -> say $ printf $
                       "No writer found. Dropping this message " <> show aMessage <> "\n"
 
-
 handleRemoteMessage server aCount aMessage@(ServiceAvailable serviceProfile pid) = do
-  liftIO $ Logger.debugMessage "Zya.Core.TestWriter" ("TestWriter : Received message " <> show aMessage <> "\n")
+  liftIO $ Logger.debugMessage  $ pack ("TestWriter : Received message " <> show aMessage <> "\n")
   say $ printf ("TestWriter : Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
@@ -105,8 +107,7 @@ handleRemoteMessage server aCount aMessage@(QueryMessage (messageId, processId, 
 
 handleRemoteMessage serverL aCount aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
-  liftIO $ debugMessage "Data.Zya.Core.TestWriter" ("Test writer : Updating process key "
-                <> show messageId <> "->" <> show processId <> "\n")
+  liftIO $ debugMessage  $ pack ("Test writer : Updating process key " <> show messageId <> "->" <> show processId <> "\n")
   currentTime <- liftIO getCurrentTime
   void $ liftIO $ atomically $ updateMessageKey serverL processId messageId
   _ <- liftIO $ atomically $

@@ -203,7 +203,7 @@ initializeProcess = do
 
   peers0 <- liftIO $ findPeers backendl peerTimeout
 
-  liftIO $ debugMessage "Data.Zya.Core.TestWriter" ("Initializing process " <> show serviceNameS <> "\n")
+  liftIO $ debugMessage $ pack ("Initializing process " <> show serviceNameS <> "\n")
   let peers = List.filter (/= mynode) peers0
   mypid <- lift getSelfPid
   lift $ register serviceNameS mypid
