@@ -8,8 +8,6 @@ module Data.Zya.Core.QueryService(
   ) where
 
 
-
-
 import Control.Applicative((<$>), liftA2, pure)
 import Control.Concurrent.STM
 import Control.Distributed.Process as Process
@@ -34,7 +32,7 @@ import Data.Zya.Persistence.Persistence(DBType, persist)
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
 import Text.Printf
-
+import Data.Zya.Utils.Logger
 
 
 newtype RemoteMessageHandler a = RemoteMessageHandler {
@@ -48,12 +46,12 @@ newtype RemoteMessageHandler a = RemoteMessageHandler {
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopic)  = do
-  say $  printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack ("Received message " <> show aMessage <> "\n")
   return ()
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $  printf ("QueryService : Received Service Available message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("QueryService : Received Service Available message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
@@ -62,20 +60,20 @@ handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable 
   return ()
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $  printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   liftIO $ publishLocalSnapshot server pid
 
   return ()
 
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = do
-    say $ printf ("Handling remote message " <> show aMessage <> "\n")
+    liftIO $ debugMessage $ pack  ("Handling remote message " <> show aMessage <> "\n")
     selfPid <- getSelfPid
     _ <- liftIO $ atomically $ updateMessageValue server messageId aMessage
     _ <- liftIO $ atomically $ updateMessageKey server selfPid messageId
     publishMessageKey <- liftIO $ atomically $ publishMessageKey server selfPid messageId
     messagesProcessed <- liftIO $ atomically $ queryMessageCount server
-    say $ printf("Total messages processed "
+    liftIO $ debugMessage $ pack ("Total messages processed "
         <> show messagesProcessed <> " Max to be processed"
         <> show messageCount <> " "  <> "\n")
 
@@ -83,12 +81,12 @@ handleRemoteMessage server dbType connectionString messageCount
 handleRemoteMessage server dbType connectionString messageCount
   aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  say $  printf ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
   return ()
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
-  say $ printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
         messageValue <- queryMessageValue server messageId
@@ -98,17 +96,17 @@ handleRemoteMessage server dbType connectionString _ aMessage@(QueryMessage (mes
 
 
 handleRemoteMessage server dbType connectionString _ aMessage@(TerminateProcess message) = do
-  say $ printf ("Terminating self " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
 
 handleRemoteMessage server dbType connectionString unhandledMessage _ =
-  say $  printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid
   terminate
 

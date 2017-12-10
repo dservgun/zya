@@ -83,7 +83,7 @@ handleRemoteMessage server dbType connectionString unhandledMessage =
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
+  liftIO $ debugMessage $ pack ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess server pid
   terminate
 

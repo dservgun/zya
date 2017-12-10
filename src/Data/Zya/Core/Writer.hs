@@ -29,6 +29,7 @@ import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
+import Data.Zya.Utils.Logger
 import Data.Zya.Persistence.Persistence(DBType, persist)
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
@@ -84,23 +85,23 @@ handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publis
   status <- liftIO $ runReaderT persistMessage (dbType, connectionString, aMessage)
   case status of
     CreateStatus "Success" -> do
-        say $ printf ("Persisted message with status " <> show status <> "\n")
+        liftIO $ debugMessage $ pack  ("Persisted message with status " <> show status <> "\n")
         posProcessId <- liftIO $ atomically $ findAvailableService server QueryService RoundRobin
-        say $ printf "Message persisted successfully " <> show status  <> " " <> "Using query service " <> show posProcessId <> "\n"
+        liftIO $ debugMessage $ pack  ("Message persisted successfully " <> show status  <> " " <> "Using query service " <> show posProcessId <> "\n")
 
         case posProcessId of
           Just x -> liftIO $ atomically $ sendRemote server x (committedMessage, time)
-          Nothing -> say $ printf ("No process id found for QueryService " <> "\n")
+          Nothing -> liftIO $ debugMessage $ pack  ("No process id found for QueryService " <> "\n")
         return ()
         where
           committedMessage = CommittedWriteMessage publisher (messageId, topic, message)
     CreateStatus "failure" -> do
-        say $ printf "Could not persist message\n"
+        liftIO $ debugMessage $ pack  "Could not persist message\n"
         liftIO $ atomically $ sendRemote server processId (CommitFailedMessage publisher (messageId, topic, message), time)
 
 
 handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess message) = do
-  say $ printf ("Terminating self " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
 handleRemoteMessage server dbType connectionString unhandledMessage =

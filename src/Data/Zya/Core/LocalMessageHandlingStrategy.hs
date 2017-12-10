@@ -26,15 +26,16 @@ import Control.Monad.Writer
 import Data.Aeson 
 import Data.Binary
 import Data.Maybe
+import Data.Text(pack, unpack)
 import Data.Text.Encoding(encodeUtf8)
 import Data.Time(UTCTime, getCurrentTime)
 import Data.Zya.Core.Internal.LocalMessage
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
+import Data.Zya.Utils.Logger
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
 import Text.Printf
-
 
 newtype AvailableServerState a =
   ServerState {
@@ -65,11 +66,11 @@ sendMessage aMessage server = do
   current <- liftIO $ atomically $ findAvailableService server serviceProfile strategy
   currentTime <- liftIO getCurrentTime
   let sticky = stickyProcess prevWriter current
-  when sticky $ liftPrintln ("Sticky process.." <> show prevWriter <> " : " <> show current)
+  when sticky $ liftLiftIO $ infoMessage $ pack ("Sticky process.." <> show prevWriter <> " : " <> show current)
   -- make this into fmap.
   case current of
     Just x -> liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
-    Nothing -> liftPrintln ("No writer found " <> show prevWriter <> " : " <> show current)
+    Nothing -> liftLiftIO $ debugMessage $ pack ("No writer found " <> show prevWriter <> " : " <> show current)
 
   State.put current
   return ()

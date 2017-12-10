@@ -89,12 +89,12 @@ handleRemoteMessage server aCount aMessage@(CreateTopic aTopic) = do
   availableWriter <- liftIO $ atomically $ findAvailableWriter server
   case availableWriter of
     Just a -> liftIO $ atomically $ sendRemote server a (aMessage, currentTime)
-    Nothing -> say $ printf $
+    Nothing -> liftIO $ debugMessage $ pack  $
                       "No writer found. Dropping this message " <> show aMessage <> "\n"
 
 handleRemoteMessage server aCount aMessage@(ServiceAvailable serviceProfile pid) = do
   liftIO $ Logger.debugMessage  $ pack ("TestWriter : Received message " <> show aMessage <> "\n")
-  say $ printf ("TestWriter : Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("TestWriter : Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
       myPid <- getMyPid server
@@ -103,7 +103,7 @@ handleRemoteMessage server aCount aMessage@(ServiceAvailable serviceProfile pid)
   return ()
 
 handleRemoteMessage server aCount aMessage@(QueryMessage (messageId, processId, message)) =
-  say $ printf ("Query Message handler : Received message " <> show message <> "\n")
+  liftIO $ debugMessage $ pack  ("Query Message handler : Received message " <> show message <> "\n")
 
 handleRemoteMessage serverL aCount aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
@@ -112,22 +112,22 @@ handleRemoteMessage serverL aCount aMessage@(MessageKeyStore (messageId, process
   void $ liftIO $ atomically $ updateMessageKey serverL processId messageId
   _ <- liftIO $ atomically $
             sendRemote serverL processId (QueryMessage (messageId, myPid, Nothing), currentTime)
-  say $ printf "Message key store message processed..\n"
+  liftIO $ debugMessage $ pack  "Message key store message processed..\n"
   return()
 
 
 
 
 handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) = do
-  say $ printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   p <- liftIO $ atomically $ addService serverL serviceProfileL pid
-  say $ printf "Added service " <> show p <> show serviceProfileL <> "\n"
+  liftIO $ debugMessage $ pack ("Added service " <> show p <> show serviceProfileL <> "\n")
   case serviceProfileL of
     Writer -> 
       case aCount of
         Just count -> 
           forM_ [1..count] $ \currentCount -> do
-            say $ printf "Test Writer -> Writing message " <> show currentCount <> "\n"
+            liftIO $ debugMessage $ pack ("Test Writer -> Writing message " <> show currentCount <> "\n")
             getNextMessage >>= flip runMessageWriter serverL
         Nothing -> return ()
     _ -> return ()
@@ -140,7 +140,7 @@ handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) 
       case nextId of
         Just nId -> do
           let topic = Topic $ pack "TestTopic"
-          say $ printf "Writing message \n"
+          liftIO $ debugMessage $ pack  "Writing message \n"
           return $
             WriteMessage
               (Publisher topic)
@@ -149,7 +149,7 @@ handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) 
         Nothing -> throw $ UUIDGenException "No next id."
 
 handleRemoteMessage _ _ unhandledMessage =
-  say $ printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()

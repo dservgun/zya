@@ -15,25 +15,24 @@ where
 
 
 import Conduit
-import Control.Exception
-
-import Control.Monad.Catch as Catch
+import Control.Concurrent.Async as Async(async)
 import Control.Concurrent.STM.Lifted
 import Control.Distributed.Process as Process
-import Control.Concurrent.Async as Async(async)
-
+import Control.Exception
 import Control.Lens
 import Control.Monad (forever, void)
+import Control.Monad.Catch as Catch
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
-import Data.Text as Text (Text, unpack)
+import Data.Text as Text (Text, unpack, pack)
 import Data.Time
+import Data.Zya.Core.Internal.WebserviceProtocolHandler
 import Data.Zya.Core.Service
+import Data.Zya.Utils.Logger
 import Network.WebSockets.Connection as WS (sendTextData, receiveData)
 import Text.Printf
 import Yesod.Core
 import Yesod.WebSockets
-import Data.Zya.Core.Internal.WebserviceProtocolHandler
 
 
 newtype App = App Server
@@ -65,23 +64,23 @@ startWebServer :: ServerReaderT ()
 startWebServer = do
   serverConfiguration <- ask
 
-  lift $ say $ printf "Starting webservice \n"
+  lift $ liftIO $ debugMessage $ pack  "Starting webservice \n"
   _ <- liftIO $ putStrLn "Starting webservice\n"
   _ <- liftIO $ do
     let serverL = serverConfiguration^.server
     let webserverPortL = serverConfiguration^.webserverPort
     Async.async $ warp webserverPortL  $ App serverL
-  lift $ say $ printf "Webserver started\n"
+  lift $ liftIO $ debugMessage $ pack  "Webserver started\n"
 
 
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage serverL _ _ _ aMessage@(CreateTopic _)  = do
-  say $  printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   return ()
 
 
 handleRemoteMessage serverL _ connectionString _ aMessage@(ServiceAvailable serviceProfileL pid) = do
-  say $  printf ("WebServer : Received Service Available message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("WebServer : Received Service Available message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
       myPid <- getMyPid serverL
@@ -90,7 +89,7 @@ handleRemoteMessage serverL _ connectionString _ aMessage@(ServiceAvailable serv
   return ()
 
 handleRemoteMessage serverL _ _ _ aMessage@(GreetingsFrom serviceProfileL pid) = do
-  say $  printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   _ <- liftIO $ atomically $ addService serverL serviceProfileL pid
   return ()
 
@@ -98,40 +97,40 @@ handleRemoteMessage serverL _ _ _ aMessage@(GreetingsFrom serviceProfileL pid) =
 -- perhaps we can cache the message.
 handleRemoteMessage serverL _ _ messageCount
   aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = 
-    say $ printf "Not handling this message. Not a writer.\n"
+    liftIO $ debugMessage $ pack  "Not handling this message. Not a writer.\n"
 
 handleRemoteMessage serverL _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
   currentTime <- liftIO getCurrentTime
   liftIO $ atomically $ updateMessageKey serverL processId messageId
   _ <- liftIO $ sendWelcomeMessages (processId, messageId, serverL)
-  say $ printf "Message key store message processed..\n"
+  liftIO $ debugMessage $ pack  "Message key store message processed..\n"
   return()
 
 handleRemoteMessage serverL dbType connectionString messageCount
   aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
   selfPid <- getSelfPid
-  say $  printf ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
   return ()
 
 
 handleRemoteMessage _ dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
-  say $ printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   return ()
 
 
 handleRemoteMessage _ dbType connectionString _ aMessage@(TerminateProcess message) = do
-  say $ printf ("Terminating self " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
 
 handleRemoteMessage _ dbType connectionString unhandledMessage _ =
-  say $  printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification serverL notificationMessage@(ProcessMonitorNotification _ pid _) = do
-  say $  printf ("Monitor notification " <> show notificationMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess serverL pid
   terminate
 eventLoop :: ServerReaderT ()
@@ -154,15 +153,15 @@ eventLoop = do
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]) `Process.catchExit`
               (\pId (TerminateProcess aText) -> do
-                  say $ printf ("Terminating process " <> show aText <> " " <> show sName <> "\n")
+                  liftIO $ debugMessage $ pack  ("Terminating process " <> show aText <> " " <> show sName <> "\n")
                   return ())
 
 webService :: ServerReaderT ()
 webService = do
   initializeProcess
-  Catch.catch startWebServer (\a@(SomeException e) -> lift $ say $ printf $ "" <> show a <>"\n")
+  Catch.catch startWebServer (\a@(SomeException e) -> lift $ liftIO $ debugMessage $ pack  $ "" <> show a <>"\n")
 
-  lift $ say $ printf "Calling event loop \n"
+  lift $ liftIO $ debugMessage $ pack  "Calling event loop \n"
   eventLoop
 
   return()

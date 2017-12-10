@@ -115,7 +115,6 @@ import Data.Zya.Core.Internal.LocalMessage
 import Data.Zya.Core.Internal.ServerTypes as ServerTypes
 
 
-
 -- TODO: Need to deal with this.
 type WebServerEndPoint = Int
 
@@ -228,7 +227,7 @@ proxyProcess aServer
 
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
---  say $ printf "Handling whereIsReply : "  <> (show serviceProfile) <> " " <> (show a) <> "\n"
+  --liftIO $ debugMessage $ pack ("Handling whereIsReply : "  <> (show serviceProfile) <> " " <> (show a) <> "\n")
   mSpid <-
     liftIO $ do
     currentTime <- getCurrentTime
@@ -236,7 +235,7 @@ handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
       mySpId <- readTVar $ myProcessId aServer
       sendRemote aServer pid (ServiceAvailable aServiceProfile mySpId, currentTime)
       return mySpId
-  say $ printf
+  liftIO $ debugMessage $ pack 
         ("Sending info about self " <> " " <> show mSpid <> ":" <> show pid <> show aServiceProfile
             <> "\n")
 handleWhereIsReply _ _ (WhereIsReply _ Nothing) = return ()

@@ -5,29 +5,25 @@ module Data.Zya.Core.Subscription where
 import System.Environment(getArgs)
 
 import Control.Concurrent.STM
+import Control.Distributed.Process
+import Control.Distributed.Process.Backend.SimpleLocalnet
+import Control.Distributed.Process.Closure
+import Control.Distributed.Process.Node as Node hiding (newLocalNode)
+import Control.Exception.Safe
 import Control.Lens
 import Control.Monad
-import Control.Monad.Trans
 import Control.Monad.Reader
-import Control.Exception.Safe
-
-import Control.Distributed.Process
-import Control.Distributed.Process.Closure
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Node as Node hiding (newLocalNode)
-
-
+import Control.Monad.Trans
 import Data.Monoid((<>))
 import Data.Text(pack, Text)
-import Data.Zya.Core.Service
-
-import Text.Printf
-import Data.Zya.Core.TopicAllocator
-import Data.Zya.Core.Writer
-import Data.Zya.Core.TestWriter
-import Data.Zya.Core.QueryService
-import Data.Zya.Core.WebServerService(webService)
 import Data.Zya.Core.ComputeNodeService(computeService)
+import Data.Zya.Core.QueryService
+import Data.Zya.Core.Service
+import Data.Zya.Core.TestWriter
+import Data.Zya.Core.TopicAllocator
+import Data.Zya.Core.WebServerService(webService)
+import Data.Zya.Core.Writer
+import Data.Zya.Utils.Logger
 
 newtype UnsupportedServiceException = UnsupportedServiceException {_unServiceType :: Maybe ServiceProfile} deriving(Show)
 instance Exception UnsupportedServiceException
@@ -35,11 +31,11 @@ instance Exception UnsupportedServiceException
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage _ aMessage = do
   selfPid <- getSelfPid
-  say $ printf ("Received message " <> show selfPid <> " " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show selfPid <> " " <> show aMessage <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification _ notificationMessage =
-  say $ printf ("Monitor notification " <> show notificationMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Monitor notification " <> show notificationMessage <> "\n")
 
 
 
@@ -51,9 +47,9 @@ terminator = do
   serverConfiguration <- ask
   remoteProcessesL <- liftIO $ atomically $ remoteProcesses (serverConfiguration^.server)
   lift $ do 
-    say $ printf "Terminator " <> show (serverConfiguration ^. serviceProfile)
+    liftIO $ debugMessage $ pack  ("Terminator " <> show (serverConfiguration ^. serviceProfile)
       <> show (serverConfiguration^.serviceName)
-      <> "\n"
+      <> "\n")
     forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
     pid <- getSelfPid -- the state is not update in the terminator, at least for now.
     exit pid $ TerminateProcess "Shutting down self"
@@ -66,7 +62,7 @@ subscription backendL (sP, params, dbTypeL, dbConnection, count, portNumber) = d
   n <- newServer myPid
   let readerParams = makeServerConfiguration n backendL sP params dbTypeL dbConnection count portNumber
 
-  say $ printf $ "Starting subscrpition " <> show sP <> " " <> show params <> "\n"
+  liftIO $ debugMessage $ pack  $ "Starting subscrpition " <> show sP <> " " <> show params <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
     Reader -> Control.Exception.Safe.throw $ UnsupportedServiceException $ Just Reader

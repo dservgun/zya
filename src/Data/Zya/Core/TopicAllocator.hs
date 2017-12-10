@@ -32,12 +32,13 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Text.Printf
 import Data.Zya.Core.ServiceTypes
+import Data.Zya.Utils.Logger
 
 
 
 handleRemoteMessage :: Server -> PMessage -> Process ()
 handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
-  say $ printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   -- Check for writers and then send a message to the writer.
   availableWriter <- 
     liftIO $ do 
@@ -47,12 +48,12 @@ handleRemoteMessage server aMessage@(CreateTopic aTopic) = do
         Just a ->  atomically $ sendRemote server a (aMessage, currentTime)
         Nothing -> return ()
       return availableWriter
-  say $ printf ("Sent message to writer " <> show availableWriter <> "\n")
+  liftIO $ debugMessage $ pack  ("Sent message to writer " <> show availableWriter <> "\n")
   return ()
 
 
 handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
-  say $ printf ("Received message " <> show aMessage <> "\n") 
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n") 
   liftIO $ do 
       currentTime <- liftIO getCurrentTime
       atomically $ do 
@@ -62,17 +63,17 @@ handleRemoteMessage server aMessage@(ServiceAvailable serviceProfile pid) = do
   return ()
 
 handleRemoteMessage server aMessage@(GreetingsFrom serviceProfile pid) = do
-  say $ printf ("Received message " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   _ <- liftIO $ atomically $ addService server serviceProfile pid
   return ()
 
 
 handleRemoteMessage server aMessage@(TerminateProcess message) = do 
-  say $ printf ("Terminating self " <> show aMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
 handleRemoteMessage server unhandledMessage = 
-  say $ printf ("Received unhandled message  " <> show unhandledMessage <> "\n")
+  liftIO $ debugMessage $ pack  ("Received unhandled message  " <> show unhandledMessage <> "\n")
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do
