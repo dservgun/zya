@@ -70,7 +70,7 @@ library
     Data.Zya.Core.Internal.MessageDistribution 
     Data.Zya.Utils.Logger
     Data.Zya.Parsers.ServiceDescription
-    Data.Zya.Ethereum.WebSockets.Client
+    Data.Zya.Ethereum.Sockets.Client
 
 
   -- Modules included in this library but not exported.
