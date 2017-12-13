@@ -23,6 +23,10 @@ import System.Log.Formatter
 import Data.Monoid
 import Control.Applicative
 import Data.Aeson
+import Data.Zya.Ethereum.Internal.Types.RPCRequest
+import Data.Zya.Ethereum.Internal.Types.RPCResponse
+
+import Text.Printf 
 
 
 initializeSysLog :: IO () 
@@ -59,6 +63,7 @@ sendClientVersionPayload =
     params :: [String]
     params = []
 
+sendClientVersionPayload2 = createRPCRequestWithDefaults "clientVersion" 12
 
 sendMessage :: Value -> FilePath -> IO Text 
 sendMessage aValue aFilePath = do 
@@ -70,8 +75,8 @@ sendMessage aValue aFilePath = do
   System.IO.putStrLn(Data.Text.unpack $ decodeUtf8 msg)
   return $ decodeUtf8 msg
 
-sendClientVersionRequest :: FilePath -> IO Text 
-sendClientVersionRequest aFilePath = sendMessage sendClientVersionPayload aFilePath
+--sendClientVersionRequest :: FilePath -> IO Text 
+--sendClientVersionRequest aFilePath = sendMessage sendClientVersionPayload aFilePath
 
 domainSocket :: FilePath -> IO (Socket) 
 domainSocket filePath = do 

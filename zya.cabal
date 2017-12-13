@@ -71,6 +71,8 @@ library
     Data.Zya.Utils.Logger
     Data.Zya.Parsers.ServiceDescription
     Data.Zya.Ethereum.Sockets.Client
+    Data.Zya.Ethereum.Internal.Types.RPCRequest
+    Data.Zya.Ethereum.Internal.Types.RPCResponse
 
 
   -- Modules included in this library but not exported.
