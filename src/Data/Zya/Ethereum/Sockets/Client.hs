@@ -46,24 +46,37 @@ infoMessage = infoM rootLoggerName
 debugMessage :: String -> IO ()
 debugMessage = debugM rootLoggerName
 
+----- Eth client JSON Rpc methods --- 
+clientVersion anId = 
+    createRPCRequestWithDefaults "clientVersion" anId []
+net_peerCount anId = 
+    createRPCRequest defaultNetMethodParameters "peerCount" anId []
+net_listening anId = 
+    createRPCRequest defaultNetMethodParameters "listening" anId []
+sha3 aParam anId = 
+  createRPCRequestWithDefaults "sha3" anId [aParam]
+net_version anId = 
+  createRPCRequest 
+    defaultNetMethodParameters 
+    "version" anId []
+eth_protocolVersion anId = 
+  createRPCRequest
+    defaultEthMethodParameters 
+    "protocolVersion" anId []
+
+eth_syncing anId = 
+  createRPCRequest
+    defaultEthMethodParameters
+    "syncing" anId
+-- Fix this
+eth_coinbase anId = 
+  createRPCRequest
+    defaultEthMethodParameters
+    "coinbase" anId    
 
 
 
--- '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":67}'
-sendClientVersionPayload :: Value
-sendClientVersionPayload = 
-  object["jsonrpc" .= rpcVersion , "method" .= clientVersion, "id" .= idValue, "params" .= params]
-  where
-    idValue :: Int 
-    idValue = 67
-    clientVersion :: String 
-    clientVersion = "web3_clientVersion"
-    rpcVersion :: String
-    rpcVersion = "2.0"
-    params :: [String]
-    params = []
 
-sendClientVersionPayload2 = createRPCRequestWithDefaults "clientVersion" 12
 
 sendMessage :: Value -> FilePath -> IO Text 
 sendMessage aValue aFilePath = do 
