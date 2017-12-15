@@ -46,39 +46,11 @@ infoMessage = infoM rootLoggerName
 debugMessage :: String -> IO ()
 debugMessage = debugM rootLoggerName
 
------ Eth client JSON Rpc methods --- 
-clientVersion anId = 
-    createRPCRequestWithDefaults "clientVersion" anId []
-net_peerCount anId = 
-    createRPCRequest defaultNetMethodParameters "peerCount" anId []
-net_listening anId = 
-    createRPCRequest defaultNetMethodParameters "listening" anId []
-sha3 aParam anId = 
-  createRPCRequestWithDefaults "sha3" anId [aParam]
-net_version anId = 
-  createRPCRequest 
-    defaultNetMethodParameters 
-    "version" anId []
-eth_protocolVersion anId = 
-  createRPCRequest
-    defaultEthMethodParameters 
-    "protocolVersion" anId []
-
-eth_syncing anId = 
-  createRPCRequest
-    defaultEthMethodParameters
-    "syncing" anId
--- Fix this
-eth_coinbase anId = 
-  createRPCRequest
-    defaultEthMethodParameters
-    "coinbase" anId    
 
 
 
 
-
-sendMessage :: Value -> FilePath -> IO Text 
+sendMessage :: Value -> FilePath -> IO (Maybe Value)
 sendMessage aValue aFilePath = do 
   sock <- domainSocket aFilePath 
   System.IO.putStrLn(T.unpack $ decodeUtf8 $ L.toStrict $ encode $ aValue)
@@ -86,7 +58,7 @@ sendMessage aValue aFilePath = do
   msg <- Network.Socket.ByteString.recv sock 4096
   System.IO.putStrLn(show msg)
   System.IO.putStrLn(Data.Text.unpack $ decodeUtf8 msg)
-  return $ decodeUtf8 msg
+  return $ decode . encode . decodeUtf8 $ msg
 
 --sendClientVersionRequest :: FilePath -> IO Text 
 --sendClientVersionRequest aFilePath = sendMessage sendClientVersionPayload aFilePath
