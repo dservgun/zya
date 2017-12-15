@@ -60,9 +60,6 @@ sendMessage aValue aFilePath = do
   System.IO.putStrLn(Data.Text.unpack $ decodeUtf8 msg)
   return $ decode . encode . decodeUtf8 $ msg
 
---sendClientVersionRequest :: FilePath -> IO Text 
---sendClientVersionRequest aFilePath = sendMessage sendClientVersionPayload aFilePath
-
 domainSocket :: FilePath -> IO (Socket) 
 domainSocket filePath = do 
   sock <- socket AF_UNIX Stream 0 
