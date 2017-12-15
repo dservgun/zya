@@ -5,18 +5,18 @@ import Data.Aeson
 import Text.Printf
 import Data.Monoid
 import Data.Text
-data RPCRequest = RPCRequest {
-  rpcVersion :: String
-  , method :: String
-  , id :: Int 
-  , params :: Maybe [String]
-}
+
+newtype Request = Request {_unRequest :: Int} deriving(Show)
+
 
 type Param = Value -- Need to confirm this
 type Method = String 
 
 methodPrefix :: String 
 methodPrefix = "web3"
+
+
+newtype Address = Address {_unAddress :: String} 
 
 
 data DefaultParameters = DefaultParameters {
@@ -79,7 +79,15 @@ eth_compilers anId =
       "get_compilers"
       anId
 
-data BlockQuantity = Earliest | Latest | Pending | BlockId Integer deriving (Show)
+data BlockQuantity = Earliest | Latest | Pending | BlockId Integer
+
+instance Show BlockQuantity where 
+  show a = 
+    case a of
+      Earliest -> "earliest" 
+      Latest -> "latest"
+      Pending -> "pending" 
+      BlockId anId -> printf "%d" anId
 
 -- Retrieve all the details.
 eth_getBlockByNumber :: Int -> BlockQuantity -> Bool -> Value 
@@ -97,3 +105,40 @@ eth_getBlockByNumber anId blockQuantity details =
       where
         blockId :: Integer -> Text
         blockId anId = pack (Text.Printf.printf "0x%x" anId)
+
+
+
+
+eth_mining :: Int -> Value
+eth_mining anId = 
+  createRPCRequest defaultEthMethodParameters "mining" anId []
+
+eth_hashrate :: Int -> Value
+eth_hashrate anId = 
+  createRPCRequest defaultEthMethodParameters "hashrate" anId []
+
+eth_gasPrice :: Int -> Value
+eth_gasPrice anId = 
+  createRPCRequest defaultEthMethodParameters "gasPrice" anId []
+
+eth_accounts :: Int -> Value 
+eth_accounts anId = 
+  createRPCRequest defaultEthMethodParameters "accounts" anId []
+
+eth_blockNumber :: Int -> Value
+eth_blockNumber anId = 
+  createRPCRequest defaultEthMethodParameters "blockNumbers" anId []
+
+eth_getBalance :: Int -> Address -> BlockQuantity -> Value
+eth_getBalance anId (Address anAddress) defaultQuantity = 
+  createRPCRequest 
+    defaultEthMethodParameters
+    "getBalance"
+    anId
+    [String . pack . convertToAddress $ anAddress
+    , String . pack . show $ defaultQuantity]
+
+
+
+convertToAddress :: String -> String
+convertToAddress anAddress = printf "0x%s" anAddress
