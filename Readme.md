@@ -54,3 +54,19 @@ When we see postgresql errors, it is most likely on ubuntu due to missing librar
   sudo apt-get install c2hs cpphs hscolour hugs
   sudo apt-get install postgresql-server-dev-all
 ```
+
+#### Heap profile analysis
+Tool to print heap analysis is [hp2pretty](https://hackage.haskell.org/package/hp2pretty) (not hp2ps). The output 
+is in svg and you need inkscape or some of the popular tools for viewing svg files.
+
+
+#### Use stack
+Install stack and run the following
+* stack setup
+* stack build
+* stack-run <executable_name> 
+
+##### Install stack-run
+``` stack install stack-run ```
+
+The onboarding may be a bit more smoother.

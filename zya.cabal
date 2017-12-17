@@ -209,7 +209,7 @@ executable zya_reference
     , yesod-websockets
     , web3
 
-  ghc-options : -Wall -O2 -threaded "-with-rtsopts=-h"
+  ghc-options : -Wall -O2 -threaded "-with-rtsopts=-N -g1"
   default-language:   Haskell2010
   hs-source-dirs : src
 test-suite Tasty
