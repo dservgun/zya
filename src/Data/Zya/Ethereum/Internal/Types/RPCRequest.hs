@@ -25,6 +25,18 @@ data DefaultParameters = DefaultParameters {
   , defaultMethodPrefix :: String
 } deriving (Show) 
 
+type Quantity = Integer
+
+data BlockQuantity = Earliest | Latest | Pending | BlockId Integer
+
+instance Show BlockQuantity where 
+  show a = 
+    case a of
+      Earliest -> "earliest" 
+      Latest -> "latest"
+      Pending -> "pending" 
+      BlockId anId -> printf "%d" anId
+
 defaultParameters = DefaultParameters "2.0" "web3"
 defaultNetMethodParameters = DefaultParameters "2.0" "net"
 defaultEthMethodParameters = DefaultParameters "2.0" "eth"
@@ -80,15 +92,6 @@ eth_compilers anId =
       "get_compilers"
       anId
 
-data BlockQuantity = Earliest | Latest | Pending | BlockId Integer
-
-instance Show BlockQuantity where 
-  show a = 
-    case a of
-      Earliest -> "earliest" 
-      Latest -> "latest"
-      Pending -> "pending" 
-      BlockId anId -> printf "%d" anId
 
 -- Retrieve all the details.
 eth_getBlockByNumber :: Int -> BlockQuantity -> Bool -> Value 
@@ -209,8 +212,24 @@ eth_sign anId (Address anAddress) (Hash sha3Hash) =
     [String . pack . convertToAddress $ anAddress 
     , String . pack $ sha3Hash ]
 
+type Gas = Integer 
+type GasPrice = Integer 
 
-eth_sendTransaction = undefined
+eth_sendTransaction :: Address -> Address -> Gas -> GasPrice -> Quantity -> Data -> Quantity
+eth_sendTransaction (Address from) (Address to) gas gasPrice quantity data _ = 
+  createRPCRequest 
+    defaultEthMethodParameters
+    "sendTransaction"
+    anId 
+    [
+      convertToAddress from
+      , convertToAddress to 
+      , convertIntToHex gas
+      , convertIntToHex gasPrice
+      , convertIntToHex quantity 
+      , convertByteStringToHex data
+    ] 
+
 eth_sendRawTransaction = undefined 
 eth_call = undefined 
 eth_estimateGas = undefined 
@@ -226,6 +245,32 @@ eth_compileSolidity = undefined
 eth_compileLLL = undefined 
 eth_compileSerpent = undefined 
 eth_newFilter = undefined
+eth_newBlockFilter = undefined
+eth_newPendingTransactionFilter = undefined
+eth_uninstallFilter = undefined
+eth_getFilterChanges = undefined 
+eth_getFilterLogs = undefined
+eth_getLogs = undefined
+eth_getWork = undefined 
+eth_submitWork = undefined
+eth_submitHashRate = undefined
+db_putString = undefined
+db_getString = undefined 
+db_putHex = undefined 
+db_getHex =  undefined 
+shh_version = undefined 
+shh_post = undefined 
+shh_newIdentity = undefined
+shh_hasIdentity = undefined 
+shh_newGroup = undefined
+shh_addToGroup = undefined 
+shh_newFilter = undefined 
+shh_uninstallFilter = undefined 
+shh_getFilterChanges = undefined 
+shh_getMessages = undefined
+
+
+convertByteStringToHex :: [Byte] -> String
 
 convertIntToHex :: Int -> String
 convertIntToHex anId = printf "0x%x" anId
