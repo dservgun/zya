@@ -212,23 +212,24 @@ eth_sign anId (Address anAddress) (Hash sha3Hash) =
     [String . pack . convertToAddress $ anAddress 
     , String . pack $ sha3Hash ]
 
-type Gas = Integer 
-type GasPrice = Integer 
+type Gas = Int
+type GasPrice = Int
 
-eth_sendTransaction :: Address -> Address -> Gas -> GasPrice -> Quantity -> Data -> Quantity
-eth_sendTransaction (Address from) (Address to) gas gasPrice quantity data _ = 
+eth_sendTransaction :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> Address -> Int -> Value
+eth_sendTransaction anId (Address from) (Address to) gas gasPrice quantity (Address dataString) aNonce = 
   createRPCRequest 
     defaultEthMethodParameters
     "sendTransaction"
-    anId 
-    [
-      convertToAddress from
-      , convertToAddress to 
-      , convertIntToHex gas
-      , convertIntToHex gasPrice
-      , convertIntToHex quantity 
-      , convertByteStringToHex data
-    ] 
+    anId $
+      (String . pack) <$> 
+        [
+          convertToAddress from
+          , convertToAddress to 
+          , convertIntToHex gas
+          , convertIntToHex gasPrice
+          , convertIntToHex quantity 
+          , convertToAddress dataString
+        ] 
 
 eth_sendRawTransaction = undefined 
 eth_call = undefined 
@@ -270,7 +271,6 @@ shh_getFilterChanges = undefined
 shh_getMessages = undefined
 
 
-convertByteStringToHex :: [Byte] -> String
 
 convertIntToHex :: Int -> String
 convertIntToHex anId = printf "0x%x" anId
