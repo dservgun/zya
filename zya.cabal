@@ -73,6 +73,8 @@ library
     Data.Zya.Ethereum.Sockets.Client
     Data.Zya.Ethereum.Internal.Types.RPCRequest
     Data.Zya.Ethereum.Internal.Types.RPCResponse
+    Data.Zya.Kafka.Client 
+    Data.Zya.Kafka.Util
 
 
   -- Modules included in this library but not exported.
