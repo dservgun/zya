@@ -2,9 +2,9 @@ module Data.Zya.Kafka.Util where
 
 import Data.Word
 import Data.Bits
+import qualified Data.ByteString.Lazy.Char8 as L8
 
-
-int16ToWord8Array :: Word16 -> [Word8] 
+int16ToWord8Array :: Int -> [Word8] 
 int16ToWord8Array aNumber = 
   [
     fromIntegral (aNumber `shiftR` 8)
@@ -36,3 +36,8 @@ int64ToWordArray aNumber =
 
   ]
 
+
+
+wordArrayToInt32 :: [Word8] -> Int 
+wordArrayToInt32 anArray = Prelude.foldl accum 0 anArray
+  where accum a o = (a `shiftL` 8) .|. (fromIntegral o)

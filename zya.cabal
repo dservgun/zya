@@ -71,6 +71,8 @@ library
     Data.Zya.Utils.Logger
     Data.Zya.Parsers.ServiceDescription
     Data.Zya.Ethereum.WebSockets.Client
+    Data.Zya.Kafka.Client 
+    Data.Zya.Kafka.Util
 
 
   -- Modules included in this library but not exported.
