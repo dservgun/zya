@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Data.Zya.Ethereum.Internal.Types.RPCRequest where
 
 import Data.Aeson
 import Text.Printf
 import Data.Monoid
 import Data.Text
+import Text.ParserCombinators.Parsec 
+import Control.Monad.IO.Class(liftIO)
 
 newtype Request = Request {_unRequest :: Int} deriving(Show)
 newtype StoragePosition = StoragePosition {_unSP :: Int} deriving(Show)
@@ -28,6 +31,29 @@ data DefaultParameters = DefaultParameters {
 type Quantity = Integer
 
 data BlockQuantity = Earliest | Latest | Pending | BlockId Integer
+
+{--|
+  The parameters are specific a type of request. Use this
+  typeclass to capture the parameters. 
+
+--}
+class EthParameter a m where 
+  toEthParam :: (Functor m) => a -> Bool -> m Value
+
+instance EthParameter BlockQuantity [] where 
+  toEthParam a details = 
+    case a of 
+      Earliest -> 
+        [String "earliest", Bool details]
+      Latest -> 
+        [String "latest", Bool details]
+      Pending -> 
+        [String "pending" , Bool details]
+      BlockId anInteger ->  [String (blockId anInteger), Bool details]
+      where
+        blockId :: Integer -> Text
+        blockId anId = pack (Text.Printf.printf "0x%x" anId)
+
 
 instance Show BlockQuantity where 
   show a = 
@@ -93,24 +119,12 @@ eth_compilers anId =
       anId
 
 
+
 -- Retrieve all the details.
 eth_getBlockByNumber :: Int -> BlockQuantity -> Bool -> Value 
 eth_getBlockByNumber anId blockQuantity details = 
-  case blockQuantity of
-    Earliest -> 
-      createRPCRequest defaultEthMethodParameters "getBlockByNumber" anId [String "earliest", Bool details]
-    Latest -> 
-      createRPCRequest defaultEthMethodParameters "getBlockByNumber" anId [String "latest", Bool details]
-    Pending -> 
-      createRPCRequest defaultEthMethodParameters "gethBlockByNumber" anId [String "pending" , Bool details]
-    BlockId anInteger -> 
-      createRPCRequest defaultEthMethodParameters "getBlockByNumber" anId $ 
-          [String (blockId anInteger), Bool details]
-      where
-        blockId :: Integer -> Text
-        blockId anId = pack (Text.Printf.printf "0x%x" anId)
-
-
+  createRPCRequest defaultEthMethodParameters "getBlockByNumber" anId
+    $ toEthParam blockQuantity details
 
 
 eth_mining :: Int -> Value
@@ -215,27 +229,80 @@ eth_sign anId (Address anAddress) (Hash sha3Hash) =
 type Gas = Int
 type GasPrice = Int
 
+
 eth_sendTransaction :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> Address -> Int -> Value
 eth_sendTransaction anId (Address from) (Address to) gas gasPrice quantity (Address dataString) aNonce = 
   createRPCRequest 
     defaultEthMethodParameters
     "sendTransaction"
     anId $
-      (String . pack) <$> 
         [
-          convertToAddress from
-          , convertToAddress to 
-          , convertIntToHex gas
-          , convertIntToHex gasPrice
-          , convertIntToHex quantity 
-          , convertToAddress dataString
+          object[ "from" .= (String . pack $ convertToAddress from)]
+          , object[ "to" .= (String . pack . convertToAddress $ to)] 
+          , object[ "gas" .= (String .pack . convertIntToHex $ gas)]
+          , object[ "gasPrice" .= (String .pack . convertIntToHex $ gasPrice)]
+          , object[ "value" .= (String . pack . convertIntToHex $ quantity)]
+          , object[ "data" .= (String . pack . convertToAddress $ dataString)]
         ] 
 
-eth_sendRawTransaction = undefined 
-eth_call = undefined 
-eth_estimateGas = undefined 
-eth_getBlockByHash = undefined
-eth_getTransactionByHash = undefined
+type EthData = Text 
+
+eth_sendRawTransaction :: Int -> EthData -> Value 
+eth_sendRawTransaction anId aData = 
+  createRPCRequest 
+    defaultEthMethodParameters
+    "sendRawTransaction"
+    anId $[String aData]
+
+eth_call :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> EthData -> Value
+eth_call anId (Address from) (Address to) gas gasPrice quantity encodedData = 
+  createRPCRequest 
+    defaultEthMethodParameters 
+    "call"
+    anId $ 
+        [
+          object[ "from" .= (String . pack . convertToAddress $ from)]
+          , object["to" .= (String . pack . convertToAddress $ to)]
+          , object["gas" .= (String . pack . convertIntToHex $ gas)]
+          , object["gasPrice" .= (String . pack . convertIntToHex $ gasPrice)]
+          , object["value" .= (String . pack . convertIntToHex $ quantity)]
+          , object["data" .= (String encodedData)]
+        ]
+eth_estimateGas :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> EthData -> Value 
+eth_estimateGas anId (Address from) (Address to) gas gasPrice quantity encodedData = 
+  createRPCRequest 
+    defaultEthMethodParameters 
+    "estimateGas"
+    anId $ 
+        [
+          object[ "from" .= (String . pack . convertToAddress $ from)]
+          , object["to" .= (String . pack . convertToAddress $ to)]
+          , object["gas" .= (String . pack . convertIntToHex $ gas)]
+          , object["gasPrice" .= (String . pack . convertIntToHex $ gasPrice)]
+          , object["value" .= (String . pack . convertIntToHex $ quantity)]
+          , object["data" .= (String encodedData)]
+        ]
+
+eth_getBlockByHash :: Int -> EthData -> Value 
+eth_getBlockByHash anId ethData = 
+  createRPCRequest
+    defaultEthMethodParameters
+    "getBlockByHash"
+    anId $ 
+      [
+        String ethData
+        , Bool True
+      ]
+eth_getTransactionByHash :: Int -> EthData -> Value 
+eth_getTransactionByHash anId ethData = 
+  createRPCRequest
+    defaultEthMethodParameters
+    "getTransactionByHash"
+    anId $ 
+      [
+        String ethData
+      ]
+
 eth_getTransactionByBlockHashAndIndex = undefined 
 eth_getTransactionByBlockNumberAndIndex = undefined 
 eth_getTransactionReceipt = undefined
@@ -275,4 +342,28 @@ shh_getMessages = undefined
 convertIntToHex :: Int -> String
 convertIntToHex anId = printf "0x%x" anId
 convertToAddress :: String -> String
-convertToAddress anAddress = printf "0x%s" anAddress
+convertToAddress anAddress = anAddress
+
+maxAddress :: Integer
+maxAddress = 0xffffffffffffffffffffffffffffffffffffffff
+-- Valid address is 20 bytes
+validAddressC :: Integer -> Either String Integer
+validAddressC anAddress =  
+  if anAddress < maxAddress then
+    Right anAddress
+  else
+    Left "Invalid address"
+
+
+-- Read an integer from a string
+
+integerParser :: GenParser Char st Integer
+integerParser = do 
+  digits <- many digit
+  let val = (read digits :: Integer) 
+  return val
+
+
+parseInteger :: String -> Either ParseError Integer
+parseInteger = parse integerParser "Integer parsing failed"
+
