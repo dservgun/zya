@@ -67,7 +67,6 @@ sendMessage aMessage server = do
   currentTime <- liftIO getCurrentTime
   let sticky = stickyProcess prevWriter current
   when sticky $ liftLiftIO $ infoMessage $ pack ("Sticky process.." <> show prevWriter <> " : " <> show current)
-  -- make this into fmap.
   case current of
     Just x -> liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
     Nothing -> liftLiftIO $ debugMessage $ pack ("No writer found " <> show prevWriter <> " : " <> show current)

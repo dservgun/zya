@@ -60,8 +60,9 @@ handleRemoteMessage server dbType connectionString _ aMessage@(ServiceAvailable 
   return ()
 
 handleRemoteMessage server dbType connectionString _ aMessage@(GreetingsFrom serviceProfile pid) = do
-  liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
-  liftIO $ publishLocalSnapshot server pid
+  liftIO $ do 
+    debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
+    publishLocalSnapshot server pid
 
   return ()
 
@@ -132,9 +133,8 @@ eventLoop = do
           matchAny $ \ _ -> return ()])
       `Process.catchExit`
       (\ pId (TerminateProcess aText) ->
-         do say $
-              printf
-                ("Terminating process " <> show aText <> " " <> show sName <> "\n")
+         do 
+            liftIO $ errorMessage $ pack ("Terminating process " <> show aText <> " " <> show sName <> "\n")
             return ())
 
 queryService :: ServerReaderT ()
