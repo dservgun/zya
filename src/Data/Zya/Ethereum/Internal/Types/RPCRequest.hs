@@ -19,7 +19,7 @@ methodPrefix :: String
 methodPrefix = "web3"
 
 
-newtype Address = Address {_unAddress :: String} 
+newtype Address = Address {_unAddress :: String} deriving(Show, Eq)
 newtype Hash = Hash {_unHash :: String}
 
 
