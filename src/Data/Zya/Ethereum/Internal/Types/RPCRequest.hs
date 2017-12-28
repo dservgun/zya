@@ -8,6 +8,7 @@ import Data.Monoid
 import Data.Text
 import Text.ParserCombinators.Parsec 
 import Control.Monad.IO.Class(liftIO)
+import Data.Zya.Ethereum.Internal.Types.Common
 
 newtype Request = Request {_unRequest :: Int} deriving(Show)
 newtype StoragePosition = StoragePosition {_unSP :: Int} deriving(Show)
@@ -28,40 +29,12 @@ data DefaultParameters = DefaultParameters {
   , defaultMethodPrefix :: String
 } deriving (Show) 
 
-type Quantity = Integer
-
-data BlockQuantity = Earliest | Latest | Pending | BlockId Integer
 
 {--|
   The parameters are specific a type of request. Use this
   typeclass to capture the parameters. 
 
 --}
-class EthParameter a m where 
-  toEthParam :: (Functor m) => a -> Bool -> m Value
-
-instance EthParameter BlockQuantity [] where 
-  toEthParam a details = 
-    case a of 
-      Earliest -> 
-        [String "earliest", Bool details]
-      Latest -> 
-        [String "latest", Bool details]
-      Pending -> 
-        [String "pending" , Bool details]
-      BlockId anInteger ->  [String (blockId anInteger), Bool details]
-      where
-        blockId :: Integer -> Text
-        blockId anId = pack (Text.Printf.printf "0x%x" anId)
-
-
-instance Show BlockQuantity where 
-  show a = 
-    case a of
-      Earliest -> "earliest" 
-      Latest -> "latest"
-      Pending -> "pending" 
-      BlockId anId -> printf "%d" anId
 
 defaultParameters = DefaultParameters "2.0" "web3"
 defaultNetMethodParameters = DefaultParameters "2.0" "net"
@@ -145,7 +118,7 @@ eth_accounts anId =
 
 eth_blockNumber :: Int -> Value
 eth_blockNumber anId = 
-  createRPCRequest defaultEthMethodParameters "blockNumbers" anId []
+  createRPCRequest defaultEthMethodParameters "blockNumber" anId []
 
 eth_getBalance :: Int -> Address -> BlockQuantity -> Value
 eth_getBalance anId (Address anAddress) defaultQuantity = 
