@@ -23,6 +23,7 @@ import System.Log.Formatter
 import Data.Monoid
 import Control.Applicative
 import Data.Aeson
+import Data.Zya.Ethereum.Internal.Types.Common
 import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Ethereum.Internal.Types.RPCResponse
 
@@ -48,6 +49,18 @@ debugMessage = debugM rootLoggerName
 
 
 
+defaultBufferSize :: Int 
+defaultBufferSize = 10 * 1024
+
+-- Should probably be a generic handle. 
+-- should recursively read the message till the buffer is completely
+-- read and have an upper cap on the number of bytes we allow 
+-- as response. Or i should probably be using conduit.
+
+sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
+sendMessageWithSockets aSocket aRequest = do 
+  msg <- Network.Socket.ByteString.recv aSocket defaultBufferSize
+  return . decode . fromStrict $ msg
 
 
 sendMessage :: Value -> FilePath -> IO (Maybe Value)
@@ -82,7 +95,7 @@ entryPoint hostName portNumber = do
 
 
 type Account = Text 
-type Transaction = Text
+
 getTransactionsByAccount :: FilePath -> Account -> Integer -> Integer -> IO [Transaction]
 getTransactionsByAccount aFilePath account start end = do 
   domSocket <- domainSocket aFilePath
@@ -134,6 +147,22 @@ function getTransactionsByAccount(myaccount, startBlockNumber, endBlockNumber) {
 
 -}
 
+type RequestId = Int
+type BlockIdAsInt = Integer
 
+-- Get the block by a specific hash block. 
+-- these are internal functions, need to be moved around.
+getBlockByHash :: Socket -> RequestId -> BlockIdAsInt -> IO (Maybe (Result BlockByHash))
+getBlockByHash aSocket aRequestId aBlockId = do
+  let details = True -- This gets all the transaction details for a block. 
+  -- how large can a block get?
+  let request = eth_getBlockByNumber aRequestId (BlockId aBlockId) details
+  result <- sendMessageWithSockets aSocket request
+  return $ fmap fromJSON result
 
+getTransactions :: BlockByHash -> [Transaction]
+getTransactions aBlockByHash = transactions aBlockByHash
+
+filterTransactions :: Integer -> [Transaction] -> [Transaction]
+filterTransactions address transactions = Prelude.filter(\a -> from a == address || to a == address) transactions
 
