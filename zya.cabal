@@ -269,3 +269,25 @@ test-suite Tasty
   ghc-options : -Wall
   default-language:   Haskell2010
   main-is : Tasty.hs
+
+
+
+executable loyakk_client
+  main-is : EtherClient.hs
+  build-depends : 
+    base
+    , aeson
+    , async
+    , monad-control
+    , monad-logger
+    , mtl
+    , network
+    , text
+    , websockets
+    , hslogger
+    , zya
+    , bytestring
+  ghc-options : -Wall
+  default-language:   Haskell2010
+  hs-source-dirs : ethClient
+  other-modules :  
