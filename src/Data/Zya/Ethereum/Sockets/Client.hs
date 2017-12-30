@@ -2,35 +2,35 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Zya.Ethereum.Sockets.Client where
 
+
+import Control.Applicative
 import Control.Concurrent(forkIO)
+import Control.Exception(bracket)
 import Control.Monad(forever, unless)
-import Control.Monad.Trans(liftIO)
 import Control.Monad.Reader
 import Control.Monad.State
-import Control.Exception(bracket)
-import Network.Socket
-import Network.Socket.ByteString
-import Network.BSD 
-import System.IO
+import Control.Monad.Trans(liftIO)
+import Data.Aeson
 import Data.ByteString hiding (hPutStrLn, hGetLine)
 import Data.ByteString.Lazy as L hiding(hGetContents)
-import Data.Text
-import Data.Text.Lazy (toStrict)
-import Data.Text.Encoding
-import qualified Data.Text as T
-import qualified Data.Text.IO as T 
-import System.Log.Logger
-import System.Log.Handler.Syslog
-import System.Log.Handler.Simple
-import System.Log.Handler (setFormatter)
-import System.Log.Formatter
 import Data.Monoid
-import Control.Applicative
-import Data.Aeson
+import Data.Text
+import Data.Text.Encoding
+import Data.Text.Lazy (toStrict)
 import Data.Zya.Ethereum.Internal.Types.Common
 import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Ethereum.Internal.Types.RPCResponse
-
+import Network.BSD 
+import Network.Socket
+import Network.Socket.ByteString
+import qualified Data.Text as T
+import qualified Data.Text.IO as T 
+import System.IO
+import System.Log.Formatter
+import System.Log.Handler (setFormatter)
+import System.Log.Handler.Simple
+import System.Log.Handler.Syslog
+import System.Log.Logger
 import Text.Printf 
 
 
@@ -54,7 +54,7 @@ debugMessage = debugM rootLoggerName
 
 
 defaultBufferSize :: Int 
-defaultBufferSize = 10 * 1024
+defaultBufferSize = 10 * 1024 * 1024
 
 -- Should probably be a generic handle. 
 -- should recursively read the message till the buffer is completely
@@ -65,8 +65,6 @@ sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
 sendMessageWithSockets sock request = do 
   _ <- Network.Socket.ByteString.sendAll sock (L.toStrict $ encode $ request)
   msg <- Network.Socket.ByteString.recv sock defaultBufferSize
-  System.IO.putStrLn "After send message with sockets"
-  System.IO.putStrLn $ (show msg)
   return . decode . fromStrict $ msg
 
 
@@ -159,19 +157,25 @@ type BlockIdAsInt = Integer
 
 -- Get the block by a specific hash block. 
 -- these are internal functions, need to be moved around.
-getBlockByHash :: Socket -> RequestId -> BlockIdAsInt -> IO (Maybe (Result BlockByHash))
+getBlockByHash :: Socket -> RequestId -> BlockQuantity -> IO (Result BlockByHash)
 getBlockByHash aSocket aRequestId aBlockId = do
   let details = True -- This gets all the transaction details for a block. 
   -- how large can a block get?
-  let request = eth_getBlockByNumber aRequestId (BlockId aBlockId) details
-  result <- sendMessageWithSockets aSocket request
-  return $ fmap fromJSON result
 
-getTransactions :: BlockByHash -> [Transaction]
-getTransactions aBlockByHash = transactions aBlockByHash
+  let request = eth_getBlockByNumber aRequestId aBlockId details
+  result <- sendMessageWithSockets aSocket request
+  System.IO.putStrLn $ "block by hash "  <> (show request) <> " " <> (show result)
+  return $ joinResponse $ fmap fromJSON result
+
+getTransactions :: (Result BlockByHash) -> [Transaction]
+getTransactions aBlockByHash = 
+    case aBlockByHash of 
+      Success a -> transactions a
+      Error s -> []
 
 filterTransactions :: Integer -> [Transaction] -> [Transaction]
-filterTransactions address transactions = Prelude.filter(\a -> from a == address || to a == address) transactions
+filterTransactions address transactions = transactions
+      --Prelude.filter(\a -> from a == address || to a == address) transactions
 
 
 --- Design
@@ -182,12 +186,15 @@ filterTransactions address transactions = Prelude.filter(\a -> from a == address
 data SessionConfig = SessionConfig {
   startRequestId :: Integer
   , sessionSocket :: Socket
-}
+  , accountAddress :: Integer
+  , startBlock :: Integer
+  , endBlock :: Integer
+} deriving(Show)
 
 data SessionState = SessionState {
   nextRequestId :: Int
-  , currentBlock :: Maybe Integer
-}
+  , curBlock :: Maybe Integer
+} deriving(Show)
 
 newtype EthereumSessionApp a = EthereumSessionApp {
   runA :: ReaderT SessionConfig (StateT SessionState IO) a
@@ -199,11 +206,16 @@ newtype SessionRequest = SessionRequest {_unReq :: Text}
 newtype SessionResponse = SessionResponse {_unRes :: Text}
 
 
+joinResponse :: Maybe(Result a) -> Result a
+joinResponse (Just a) = a 
+joinResponse Nothing = Error "No response.."
+
 -- 1. Send a sync request.
 -- 2. If the response is a success, 
 -- 3. Send a request to query all transactions for the block.
 -- 4. If the transactions match the address, add them to the result, 
 -- 5. If not, decrement the block and repeat, until there are no blocks to process.
+
 
 gethSession :: EthereumSessionApp [(SessionRequest, SessionResponse)]
 gethSession = do 
@@ -211,28 +223,49 @@ gethSession = do
   sessionState <- get
   let socket = sessionSocket cfg
   let nReq = nextRequestId sessionState 
-  let request = eth_syncing nReq []
-  syncResponse <- liftIO $ do 
-    sendMessageWithSockets socket request >>= \m -> return $ eth_syncResponse <$> m
-  liftIO $ System.IO.putStrLn ("Sync response " <> (show syncResponse))
-
-  put sessionState {nextRequestId = nReq + 1} 
+  s2 <- get
+  liftIO $ System.IO.putStrLn $ " Current state " <> (show s2)
+  block <- getBlockByHashT
+  liftIO $ System.IO.putStrLn $ "Transaction " <> show block
   return [(SessionRequest "test",SessionResponse "test")]
 
 
-finalInterface :: Socket -> IO([(SessionRequest, SessionResponse)], SessionState)
-finalInterface socket = do 
+getBlockByHashT :: EthereumSessionApp [Transaction]
+getBlockByHashT = do 
+  sessionState <- get 
+  cfg <- ask
+  let socket = sessionSocket cfg 
+  let accountAddr = accountAddress cfg
+  let start = startBlock cfg
+  let end = endBlock cfg
+  let requestId = nextRequestId sessionState 
+  let currentBlockId = curBlock sessionState
+  liftIO $ System.IO.putStrLn $ " Request id " <> (show requestId) <>  " State " <> (show sessionState)
+  result <- mapM (\x -> do 
+    prev <- get
+    modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
+    liftIO $ getBlockByHash socket requestId (BlockId x)
+    ) [start .. end] -- ignoring this
+  let transactionList = Prelude.map (\x -> filterTransactions accountAddr $ getTransactions x) result
+  return $ (Prelude.concat transactionList)
+
+finalInterface :: Socket -> String -> (Integer, Integer) -> IO([(SessionRequest, SessionResponse)], SessionState)
+finalInterface socket accountAddress (start, end) = do 
   let 
-    config = SessionConfig 1 socket
+    config = SessionConfig 1 socket (read accountAddress) start end
     state = SessionState 0 Nothing
   runStateT (runReaderT (runA gethSession) config) state
 
 
-finalInterfaceWithBracket :: FilePath -> IO([(SessionRequest, SessionResponse)], SessionState)
-finalInterfaceWithBracket aFilePath = do 
+finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([(SessionRequest, SessionResponse)], SessionState)
+finalInterfaceWithBracket aFilePath accountAddress (start, end) = do 
   socket <- domainSocket aFilePath 
-  bracket (domainSocket aFilePath) (close) $ \socket -> finalInterface socket
+  bracket (domainSocket aFilePath) (close) $ \socket -> finalInterface socket accountAddress (start, end)
 
 
 -- Dont commit this, or who cares, really?
-testMethod = finalInterfaceWithBracket "/home/dinkarganti/local_test/geth_test.ipc"
+testMethod (start, end) = 
+  finalInterfaceWithBracket 
+    "/home/dinkarganti/local_test/geth_test.ipc" 
+    "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20"
+    (start, end)
