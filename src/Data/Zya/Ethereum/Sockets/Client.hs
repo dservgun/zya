@@ -317,6 +317,6 @@ testMethod (start, numberOfBlocks) = do
 
 
 testFilePath = "/home/dinkarganti/local_test/geth_test.ipc" 
-queryTransactionTestMethod = 
+queryTransactionTestMethod txId = 
   mapM(queryTransactionWithBracket testFilePath "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20")
-      ["0xd7c7673a9597099b71773f05b589b4d341c42e1f3b40a8ab360fd9460237492d"]
+      [Text.pack txId]
