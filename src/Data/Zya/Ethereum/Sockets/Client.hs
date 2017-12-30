@@ -199,6 +199,12 @@ newtype SessionRequest = SessionRequest {_unReq :: Text}
 newtype SessionResponse = SessionResponse {_unRes :: Text}
 
 
+-- 1. Send a sync request.
+-- 2. If the response is a success, 
+-- 3. Send a request to query all transactions for the block.
+-- 4. If the transactions match the address, add them to the result, 
+-- 5. If not, decrement the block and repeat, until there are no blocks to process.
+
 gethSession :: EthereumSessionApp [(SessionRequest, SessionResponse)]
 gethSession = do 
   cfg <- ask

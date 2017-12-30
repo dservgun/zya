@@ -50,31 +50,33 @@ Tested-With: GHC==8.0.1
 library
   -- Modules exported by the library.
   exposed-modules:
-    Data.Zya.Core.Subscription
+    Data.Zya.Core.ComputeNodeService
+    Data.Zya.Core.Internal.LocalMessage
+    Data.Zya.Core.Internal.MessageDistribution
+    Data.Zya.Core.Internal.ServerTypes
+    Data.Zya.Core.Internal.WebserviceProtocolHandler
+    Data.Zya.Core.LocalMessageHandlingStrategy
+    Data.Zya.Core.QueryService
     Data.Zya.Core.Service
     Data.Zya.Core.ServiceTypes
-    Data.Zya.Core.TopicAllocator
-    Data.Zya.Core.Writer
-    Data.Zya.Core.QueryService
-    Data.Zya.Core.WebServerService
+    Data.Zya.Core.Subscription
     Data.Zya.Core.TestWriter
-    Data.Zya.Core.ComputeNodeService
-    Data.Zya.Core.LocalMessageHandlingStrategy
-    Data.Zya.Persistence.Persistence
+    Data.Zya.Core.TopicAllocator
+    Data.Zya.Core.WebServerService
+    Data.Zya.Core.Writer
+    Data.Zya.Ethereum.Internal.Types.Common
+    Data.Zya.Ethereum.Internal.Types.RPCRequest
+    Data.Zya.Ethereum.Internal.Types.RPCResponse
+    Data.Zya.Ethereum.Internal.Types.Transaction
+    Data.Zya.Ethereum.Sockets.Client
+    Data.Zya.Kafka.Client 
+    Data.Zya.Kafka.Util
+    Data.Zya.Parsers.ServiceDescription
     Data.Zya.Persistence.Internal.FileSystem
     Data.Zya.Persistence.Internal.Postgres
     Data.Zya.Persistence.Internal.Sqlite
-    Data.Zya.Core.Internal.ServerTypes
-    Data.Zya.Core.Internal.WebserviceProtocolHandler
-    Data.Zya.Core.Internal.LocalMessage 
-    Data.Zya.Core.Internal.MessageDistribution 
-    Data.Zya.Utils.Logger
-    Data.Zya.Parsers.ServiceDescription
-    Data.Zya.Ethereum.Sockets.Client
-    Data.Zya.Ethereum.Internal.Types.RPCRequest
-    Data.Zya.Ethereum.Internal.Types.RPCResponse
-    Data.Zya.Kafka.Client 
-    Data.Zya.Kafka.Util
+    Data.Zya.Persistence.Persistence
+    Data.Zya.Utils.Logger  
 
 
   -- Modules included in this library but not exported.
@@ -159,7 +161,8 @@ executable zya_client_reference
   ghc-options : -Wall
   default-language:   Haskell2010
   hs-source-dirs : hsclient
-
+  other-modules : 
+    Data.Zya.Client.SimpleClient  
 
 executable zya_reference
   main-is : Main.hs
@@ -216,6 +219,26 @@ executable zya_reference
   ghc-options : -Wall -O2 -threaded "-with-rtsopts=-N -g1"
   default-language:   Haskell2010
   hs-source-dirs : src
+  other-modules: 
+        Data.Zya.Core.ComputeNodeService
+        Data.Zya.Core.Internal.LocalMessage
+        Data.Zya.Core.Internal.MessageDistribution
+        Data.Zya.Core.Internal.ServerTypes
+        Data.Zya.Core.Internal.WebserviceProtocolHandler
+        Data.Zya.Core.LocalMessageHandlingStrategy
+        Data.Zya.Core.QueryService
+        Data.Zya.Core.Service
+        Data.Zya.Core.ServiceTypes
+        Data.Zya.Core.Subscription
+        Data.Zya.Core.TestWriter
+        Data.Zya.Core.TopicAllocator
+        Data.Zya.Core.WebServerService
+        Data.Zya.Core.Writer
+        Data.Zya.Persistence.Internal.Postgres
+        Data.Zya.Persistence.Internal.Sqlite
+        Data.Zya.Persistence.Persistence
+        Data.Zya.Utils.Logger
+
 test-suite Tasty
   type:   exitcode-stdio-1.0
   build-depends:
