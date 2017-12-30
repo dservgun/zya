@@ -1,9 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Data.Zya.Ethereum.Sockets.Client where
 
 import Control.Concurrent(forkIO)
 import Control.Monad(forever, unless)
 import Control.Monad.Trans(liftIO)
+import Control.Monad.Reader
+import Control.Monad.State
+import Control.Exception(bracket)
 import Network.Socket
 import Network.Socket.ByteString
 import Network.BSD 
@@ -58,8 +62,11 @@ defaultBufferSize = 10 * 1024
 -- as response. Or i should probably be using conduit.
 
 sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
-sendMessageWithSockets aSocket aRequest = do 
-  msg <- Network.Socket.ByteString.recv aSocket defaultBufferSize
+sendMessageWithSockets sock request = do 
+  _ <- Network.Socket.ByteString.sendAll sock (L.toStrict $ encode $ request)
+  msg <- Network.Socket.ByteString.recv sock defaultBufferSize
+  System.IO.putStrLn "After send message with sockets"
+  System.IO.putStrLn $ (show msg)
   return . decode . fromStrict $ msg
 
 
@@ -166,3 +173,60 @@ getTransactions aBlockByHash = transactions aBlockByHash
 filterTransactions :: Integer -> [Transaction] -> [Transaction]
 filterTransactions address transactions = Prelude.filter(\a -> from a == address || to a == address) transactions
 
+
+--- Design
+--- The application session contains a read only socket
+--- the last request is the previous state
+--- The tell writes to a list of transactions. 
+
+data SessionConfig = SessionConfig {
+  startRequestId :: Integer
+  , sessionSocket :: Socket
+}
+
+data SessionState = SessionState {
+  nextRequestId :: Int
+  , currentBlock :: Maybe Integer
+}
+
+newtype EthereumSessionApp a = EthereumSessionApp {
+  runA :: ReaderT SessionConfig (StateT SessionState IO) a
+} deriving(Functor, Applicative, Monad, MonadIO, MonadReader SessionConfig, MonadState SessionState)
+
+data SessionStatus = EthSuccess | EthFailure deriving (Show)
+
+newtype SessionRequest = SessionRequest {_unReq :: Text}
+newtype SessionResponse = SessionResponse {_unRes :: Text}
+
+
+gethSession :: EthereumSessionApp [(SessionRequest, SessionResponse)]
+gethSession = do 
+  cfg <- ask
+  sessionState <- get
+  let socket = sessionSocket cfg
+  let nReq = nextRequestId sessionState 
+  let request = eth_syncing nReq []
+  syncResponse <- liftIO $ do 
+    sendMessageWithSockets socket request >>= \m -> return $ eth_syncResponse <$> m
+  liftIO $ System.IO.putStrLn ("Sync response " <> (show syncResponse))
+
+  put sessionState {nextRequestId = nReq + 1} 
+  return [(SessionRequest "test",SessionResponse "test")]
+
+
+finalInterface :: Socket -> IO([(SessionRequest, SessionResponse)], SessionState)
+finalInterface socket = do 
+  let 
+    config = SessionConfig 1 socket
+    state = SessionState 0 Nothing
+  runStateT (runReaderT (runA gethSession) config) state
+
+
+finalInterfaceWithBracket :: FilePath -> IO([(SessionRequest, SessionResponse)], SessionState)
+finalInterfaceWithBracket aFilePath = do 
+  socket <- domainSocket aFilePath 
+  bracket (domainSocket aFilePath) (close) $ \socket -> finalInterface socket
+
+
+-- Dont commit this, or who cares, really?
+testMethod = finalInterfaceWithBracket "/home/dinkarganti/local_test/geth_test.ipc"
