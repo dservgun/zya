@@ -4,6 +4,7 @@ module Data.Zya.Ethereum.Internal.Types.Transaction where
 import Data.Aeson
 import GHC.Generics
 import Data.HashMap.Strict as HM
+import Data.Text as Text
 data Transaction = 
   Transaction {
     -- | Hash of the transaction
@@ -18,7 +19,7 @@ data Transaction =
     -- | Transaction index position in the block. Null when pending.
     , transactionIndex :: Integer
     -- | address of the sender 
-    , from :: Integer
+    , from :: Integer -- TODO revisit.
     -- | address of the receiver
     , to :: Integer
     -- | Value transferred in wei
@@ -46,9 +47,15 @@ instance FromJSON Transaction where
                   nonce <- v .: "nonce"
                   blockHash <- v .: "blockHash" 
                   blockNumber <- v .: "blockNumber" 
-                  transactionIndex <- v .: "transactionIndex"
-                  fr <- v .: "from"
-                  toA <- v .: "to"
+                  transactionIndex <- v .: "transactionIndex"                  
+                  frJ <- v .: "from"
+                  fr <- case frJ of 
+                    Null -> return ("0x00000"  :: String)
+                    String s -> return (Text.unpack s)
+                  toAJ <- v .: "to"
+                  toA <- case toAJ of 
+                    Null -> return ("0x00000"  :: String)
+                    String s -> return (Text.unpack s)                    
                   value <- v .: "value"
                   gasPrice <- v .: "gasPrice"
                   gas <- v .: "gas" 
@@ -58,18 +65,33 @@ instance FromJSON Transaction where
                   return $ Transaction (read hash) (read nonce) (read blockHash) 
                         (read blockNumber)
                         (read transactionIndex)
-                        (read fr) (read toA)
+                        (read fr) 
+                        (read toA)
                         (read value) (read gasPrice)
                         (read gas) (read input)
                         False Nothing -- need to fix this.
+            _ -> return $ Transaction 0 0 0 
+                            0 0 
+                            0  -- from can be null, because the contract perhaps got created.
+                            0 
+                            0 
+                            0 
+                            0 
+                            0 False Nothing
         Nothing -> do 
                 hash <- vOuter .: "hash"
                 nonce <- vOuter .: "nonce"
                 blockHash <- vOuter .: "blockHash" 
                 blockNumber <- vOuter .: "blockNumber" 
                 transactionIndex <- vOuter .: "transactionIndex"
-                fr <- vOuter .: "from"
-                toA <- vOuter .: "to"
+                frJ <- vOuter .: "from"
+                fr <- case frJ of 
+                  Null -> return ("0x00000"  :: String)
+                  String s -> return (Text.unpack s)
+                toAJ <- vOuter .: "to"
+                toA <- case toAJ of 
+                  Null -> return ("0x00000"  :: String)
+                  String s -> return (Text.unpack s)                    
                 value <- vOuter .: "value"
                 gasPrice <- vOuter .: "gasPrice"
                 gas <- vOuter .: "gas" 

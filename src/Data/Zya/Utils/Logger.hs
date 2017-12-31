@@ -20,10 +20,13 @@ import System.Log.Logger
 
 setup :: Priority-> IO ()
 setup priority = do 
-  l <- openlog "Data.Zya.Utils.Logger" [PID] USER priority
-  updateGlobalLogger rootLoggerName (addHandler l)
   updateGlobalLogger rootLoggerName (setLevel priority)
   return ()
+
+
+addSysLogHandler priority = do
+  l <- openlog "Data.Zya.Utils.Logger" [PID] USER priority
+  updateGlobalLogger rootLoggerName (addHandler l)
 
 addFileHandler fileName priority = do
   h <- fileHandler fileName priority >>= \lh -> return $

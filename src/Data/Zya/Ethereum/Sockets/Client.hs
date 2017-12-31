@@ -5,7 +5,7 @@ module Data.Zya.Ethereum.Sockets.Client where
 
 import Control.Applicative
 import Control.Concurrent(forkIO)
-import Control.Exception(bracket)
+import Control.Exception(bracket, handle, SomeException(..))
 import Control.Monad(forever, unless)
 import Control.Monad.Reader
 import Control.Monad.State
@@ -31,7 +31,7 @@ import System.Log.Handler (setFormatter)
 import System.Log.Handler.Simple
 import System.Log.Handler.Syslog
 import System.Log.Logger
-import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage)
+import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage)
 
 import Text.Printf 
 
@@ -64,18 +64,21 @@ defaultBufferSize = 100 * 1024 * 1024
 -- as response. Or i should probably be using conduit.
 
 sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
-sendMessageWithSockets sock request = do 
-  _ <- Network.Socket.ByteString.sendAll sock (L.toStrict $ encode $ request)
+sendMessageWithSockets sock request = do
+  let requestBS = L.toStrict . encode $ request 
+  debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
+  _ <- Network.Socket.ByteString.send sock requestBS
   msg <- Network.Socket.ByteString.recv sock defaultBufferSize
---  System.IO.putStrLn $ "Received " <> (show $ Data.ByteString.length msg)
+  debugMessage $ T.pack $ "Received " <> (show $ Data.ByteString.length msg)
   return . decode . fromStrict $ msg
 
 
 sendMessage :: Value -> FilePath -> IO (Maybe Value)
 sendMessage aValue aFilePath = do 
+  let packS = Text.pack
   sock <- domainSocket aFilePath 
   System.IO.putStrLn(T.unpack $ decodeUtf8 $ L.toStrict $ encode $ aValue)
-  _ <- Network.Socket.ByteString.sendAll sock (L.toStrict $ encode $ aValue)
+  handle (\e@(SomeException e1) -> errorMessage . packS $ (show e) <> " : Error") $ Network.Socket.ByteString.sendAll sock (L.toStrict $ encode $ aValue)
   msg <- Network.Socket.ByteString.recv sock 4096
   System.IO.putStrLn(show msg)
   System.IO.putStrLn(Text.unpack $ decodeUtf8 msg)
@@ -169,13 +172,14 @@ getBlockByHash aSocket aRequestId aBlockId = do
 
   let request = eth_getBlockByNumber aRequestId aBlockId details
   result <- sendMessageWithSockets aSocket request
+  debugMessage $ T.pack $ "Get block by hash " <> " " <> (show request)
   return $ joinResponse $ fmap fromJSON result
 
 getTransactionByHash :: Socket -> RequestId -> EthData -> IO (Result Transaction)
 getTransactionByHash aSocket aRequestId aTransactionHash = do  
   let request = eth_getTransactionByHash aRequestId aTransactionHash 
   result <- sendMessageWithSockets aSocket request 
-  debugMessage $ T.pack $ show result
+  debugMessage $ T.pack $  " Transaction returned " <> show result
   return $ joinResponse $ fmap fromJSON result
 getTransactions :: (Result BlockByHash) -> [Transaction]
 getTransactions aBlockByHash = 
@@ -184,7 +188,8 @@ getTransactions aBlockByHash =
       Error s -> []
 
 filterTransactions :: Integer -> [Transaction] -> [Transaction]
-filterTransactions address transactions = Prelude.filter(\a -> from a == address || to a == address) transactions
+filterTransactions address transactions = 
+  Prelude.filter(\a -> from a == address || to a == address) transactions
 
 
 --- Design
@@ -211,8 +216,8 @@ newtype EthereumSessionApp a = EthereumSessionApp {
 
 data SessionStatus = EthSuccess | EthFailure deriving (Show)
 
-newtype SessionRequest = SessionRequest {_unReq :: Text}
-newtype SessionResponse = SessionResponse {_unRes :: Text}
+newtype SessionRequest = SessionRequest {_unReq :: Text} deriving (Show)
+newtype SessionResponse = SessionResponse {_unRes :: Text} deriving(Show)
 
 
 joinResponse :: Maybe(Result a) -> Result a
@@ -249,15 +254,18 @@ getAllFilteredTransactionsForAddress = do
   let end = endBlock cfg
   let requestId = nextRequestId sessionState 
   let currentBlockId = curBlock sessionState
-  -- liftIO $ System.IO.putStrLn $ " Request id " <> (show requestId) <>  " State " <> (show sessionState)
+  liftIO $ debugMessage $ T.pack $ " Request id " 
+                <> (show requestId) <>  " State " <> (show sessionState) <> " " <> (show start)
+                <>  " " <> (show end)
   result <- mapM (\x -> do 
     prev <- get
     modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
     s <- get
     let reqId = nextRequestId s
-    --liftIO $ System.IO.putStrLn $ "Request id " <> (show reqId)
+    liftIO $ debugMessage $ T.pack $ "Request id " <> (show reqId) <>  " " <> (show start) <> " - " <> (show end)
     liftIO $ getBlockByHash socket reqId (BlockId x)
     ) [start .. end]
+  liftIO $ debugMessage $ T.pack $ show (result)
   let transactionList = Prelude.map (\x -> filterTransactions accountAddr $ getTransactions x) result
   return $ (Prelude.concat transactionList)
 
@@ -284,24 +292,27 @@ queryTransaction socket accountAddress transactionHash = do
     state = SessionState 0 Nothing 
   runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
 
+
+closeHandle h = do 
+  debugMessage $ Text.pack $ "Closing handle " <> show h
 finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([(SessionRequest, SessionResponse)], SessionState)
 finalInterfaceWithBracket aFilePath accountAddress (start, end) = do 
-  socket <- domainSocket aFilePath 
-  bracket (domainSocket aFilePath) (\h -> infoMessage (Text.pack $ "Closed socket " <> (show h)) >> close h ) $ \socket -> do 
+  bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
           result <- finalInterface socket accountAddress (start, end)
+          debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " ----> " <> (show end) <>  " " <> (show result)
           return result
 
 
 queryTransactionWithBracket :: FilePath -> String -> EthData -> IO(Result Transaction, SessionState)
 queryTransactionWithBracket aFilePath accountAddress transactionHash = do 
-  socket <- domainSocket aFilePath 
-  bracket (domainSocket aFilePath) (\h -> infoMessage (Text.pack $ "Closed socket " <> (show h)) >> close h ) $ \socket -> do 
-          debugMessage $ Text.pack $ "Processing block range " <> (show transactionHash)
+  bracket (domainSocket aFilePath) (\h -> closeHandle h ) $ \socket -> do 
+          debugMessage $ Text.pack $ "Processing transaction " <> (show transactionHash)
           result <- queryTransaction socket accountAddress transactionHash
           return result
 
 defaultBlockSize = 100
+
 chunkBlocks (start, numberOfBlocks) = Prelude.takeWhile (\x -> x <= (start + numberOfBlocks))  $ Prelude.iterate (+defaultBlockSize) start
 
 
