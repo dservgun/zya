@@ -2,7 +2,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Zya.Ethereum.Internal.Types.Common (
-  Transaction(from, to)
+  Transaction(to, from)
+  , OutputFormat(..)
   , BlockQuantity
   , BlockByHash(..)
   , BlockQuantity(..)
@@ -10,10 +11,12 @@ module Data.Zya.Ethereum.Internal.Types.Common (
   ) where
 import Data.Aeson
 import GHC.Generics
-import Data.Zya.Ethereum.Internal.Types.Transaction 
 import Data.Text
 import Text.Printf
 import Test.QuickCheck
+import Data.Zya.Ethereum.Internal.Types.Transaction
+
+
 type Quantity = Integer
 
 data BlockQuantity = Earliest | Latest | Pending | BlockId Integer

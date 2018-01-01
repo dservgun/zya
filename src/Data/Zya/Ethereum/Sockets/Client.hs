@@ -231,7 +231,7 @@ joinResponse Nothing = Error "No response.."
 -- 5. If not, decrement the block and repeat, until there are no blocks to process.
 
 
-gethSession :: EthereumSessionApp [(SessionRequest, SessionResponse)]
+gethSession :: EthereumSessionApp [Transaction]
 gethSession = do 
   cfg <- ask
   sessionState <- get
@@ -241,7 +241,7 @@ gethSession = do
 --  liftIO $ System.IO.putStrLn $ " Current state " <> (show s2)
   block <- getAllFilteredTransactionsForAddress
   liftIO $ infoMessage $ Text.pack $ "Transaction " <> show (Prelude.length block) <> " " <> (show block)
-  return [(SessionRequest "test",SessionResponse "test")]
+  return block
 
 
 getAllFilteredTransactionsForAddress :: EthereumSessionApp [Transaction]
@@ -265,7 +265,7 @@ getAllFilteredTransactionsForAddress = do
     liftIO $ debugMessage $ T.pack $ "Request id " <> (show reqId) <>  " " <> (show start) <> " - " <> (show end)
     liftIO $ getBlockByHash socket reqId (BlockId x)
     ) [start .. end]
-  liftIO $ debugMessage $ T.pack $ show (result)
+  liftIO $ debugMessage $ T.pack $ "Blocks returned " <> (show (Prelude.length result))
   let transactionList = Prelude.map (\x -> filterTransactions accountAddr $ getTransactions x) result
   return $ (Prelude.concat transactionList)
 
@@ -278,7 +278,7 @@ queryTransactionByHash transactionHash = do
   liftIO $ getTransactionByHash socket requestId transactionHash 
 
 
-finalInterface :: Socket -> String -> (Integer, Integer) -> IO([(SessionRequest, SessionResponse)], SessionState)
+finalInterface :: Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
 finalInterface socket accountAddress (start, numberOfBlocks) = do 
   let 
     config = SessionConfig 1 socket (read accountAddress) start (start + numberOfBlocks)
@@ -295,7 +295,7 @@ queryTransaction socket accountAddress transactionHash = do
 
 closeHandle h = do 
   debugMessage $ Text.pack $ "Closing handle " <> show h
-finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([(SessionRequest, SessionResponse)], SessionState)
+finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
 finalInterfaceWithBracket aFilePath accountAddress (start, end) = do 
   bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
@@ -316,16 +316,20 @@ defaultBlockSize = 100
 chunkBlocks (start, numberOfBlocks) = Prelude.takeWhile (\x -> x <= (start + numberOfBlocks))  $ Prelude.iterate (+defaultBlockSize) start
 
 
+printTransactions :: [Transaction] -> OutputFormat -> [Text]
+printTransactions transactionList (a@(CSV ",")) = Prelude.map (\t -> transactionOutput a) transactionList
+
 testMethod (start, numberOfBlocks) = do
   let unfoldList = chunkBlocks(start, numberOfBlocks)
   let pack1 = Text.pack 
   debugMessage . pack1 . show $ unfoldList
-  mapM (\x -> 
-      finalInterfaceWithBracket 
-        "/home/dinkarganti/local_test/geth_test.ipc" 
-        "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20"
-        (x, defaultBlockSize)) unfoldList
-
+  transactions <- 
+      mapM (\x -> 
+        finalInterfaceWithBracket 
+          "/home/dinkarganti/local_test/geth_test.ipc" 
+          "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20"
+          (x, defaultBlockSize)) unfoldList
+  return (Prelude.concat $ fst transactions)
 
 testFilePath = "/home/dinkarganti/local_test/geth_test.ipc" 
 queryTransactionTestMethod txId = 

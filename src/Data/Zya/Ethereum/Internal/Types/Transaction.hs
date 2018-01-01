@@ -1,10 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
-module Data.Zya.Ethereum.Internal.Types.Transaction where
+module Data.Zya.Ethereum.Internal.Types.Transaction 
+  (
+    Transaction(..)
+    , transactionOutput
+    , OutputFormat(..)
+  )
+where
 import Data.Aeson
+import Data.Monoid
 import GHC.Generics
 import Data.HashMap.Strict as HM
 import Data.Text as Text
+
+data OutputFormat = CSV Text | JSON deriving (Show)
+
 data Transaction = 
   Transaction {
     -- | Hash of the transaction
@@ -43,32 +53,32 @@ instance FromJSON Transaction where
         Just v1 -> do
           case v1 of 
             Object v -> do  
-                  hash <- v .: "hash"
-                  nonce <- v .: "nonce"
-                  blockHash <- v .: "blockHash" 
-                  blockNumber <- v .: "blockNumber" 
-                  transactionIndex <- v .: "transactionIndex"                  
+                  hashS <- v .: "hash"
+                  nonceS <- v .: "nonce"
+                  blockHashS <- v .: "blockHash" 
+                  blockNumberS <- v .: "blockNumber" 
+                  transactionIndexS <- v .: "transactionIndex"                  
                   frJ <- v .: "from"
-                  fr <- case frJ of 
-                    Null -> return ("0x00000"  :: String)
+                  frS <- case frJ of 
                     String s -> return (Text.unpack s)
+                    _ -> return ("0x00000"  :: String)
                   toAJ <- v .: "to"
                   toA <- case toAJ of 
-                    Null -> return ("0x00000"  :: String)
                     String s -> return (Text.unpack s)                    
-                  value <- v .: "value"
-                  gasPrice <- v .: "gasPrice"
-                  gas <- v .: "gas" 
-                  input <- return "0x00" -- v .: "input"
+                    _ -> return ("0x00000"  :: String)
+                  valueS <- v .: "value"
+                  gasPriceS <- v .: "gasPrice"
+                  gasS <- v .: "gas" 
+                  inputS <- return "0x00" -- v .: "input"
             --      replayProtected <- v .: "replayProtected"
             --      chainId <- v .: "chainId"
-                  return $ Transaction (read hash) (read nonce) (read blockHash) 
-                        (read blockNumber)
-                        (read transactionIndex)
-                        (read fr) 
+                  return $ Transaction (read hashS) (read nonceS) (read blockHashS) 
+                        (read blockNumberS)
+                        (read transactionIndexS)
+                        (read frS) 
                         (read toA)
-                        (read value) (read gasPrice)
-                        (read gas) (read input)
+                        (read valueS) (read gasPriceS)
+                        (read gasS) (read inputS)
                         False Nothing -- need to fix this.
             _ -> return $ Transaction 0 0 0 
                             0 0 
@@ -79,31 +89,40 @@ instance FromJSON Transaction where
                             0 
                             0 False Nothing
         Nothing -> do 
-                hash <- vOuter .: "hash"
-                nonce <- vOuter .: "nonce"
-                blockHash <- vOuter .: "blockHash" 
-                blockNumber <- vOuter .: "blockNumber" 
-                transactionIndex <- vOuter .: "transactionIndex"
+                hashS <- vOuter .: "hash"
+                nonceS <- vOuter .: "nonce"
+                blockHashS <- vOuter .: "blockHash" 
+                blockNumberS <- vOuter .: "blockNumber" 
+                transactionIndexS <- vOuter .: "transactionIndex"
                 frJ <- vOuter .: "from"
-                fr <- case frJ of 
-                  Null -> return ("0x00000"  :: String)
+                frS <- case frJ of 
                   String s -> return (Text.unpack s)
+                  _ -> return ("0x00000"  :: String)
+
                 toAJ <- vOuter .: "to"
                 toA <- case toAJ of 
-                  Null -> return ("0x00000"  :: String)
                   String s -> return (Text.unpack s)                    
-                value <- vOuter .: "value"
-                gasPrice <- vOuter .: "gasPrice"
-                gas <- vOuter .: "gas" 
-                input <- return "0x00" -- v .: "input"
+                  _ -> return ("0x00000"  :: String)
+
+                valueS <- vOuter .: "value"
+                gasPriceS <- vOuter .: "gasPrice"
+                gasS <- vOuter .: "gas" 
+                inputS <- return "0x00" -- v .: "input"
           --      replayProtected <- v .: "replayProtected"
           --      chainId <- v .: "chainId"
-                return $ Transaction (read hash) (read nonce) (read blockHash) 
-                      (read blockNumber)
-                      (read transactionIndex)
-                      (read fr) (read toA)
-                      (read value) (read gasPrice)
-                      (read gas) (read input)
+                return $ Transaction (read hashS) (read nonceS) (read blockHashS) 
+                      (read blockNumberS)
+                      (read transactionIndexS)
+                      (read frS) (read toA)
+                      (read valueS) (read gasPriceS)
+                      (read gasS) (read inputS)
                       False Nothing -- need to fix this.
 
 instance ToJSON Transaction
+
+transactionOutput :: Transaction -> OutputFormat -> Text
+transactionOutput = 
+  \t format -> Text.pack $ 
+      (show . hash $ t) <> "," <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) <> "," 
+      <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," <> (show $ value t)
+      <> "," <> (show $ gasPrice t) <> "," <> (show $ gas t) <> "\n"
