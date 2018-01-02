@@ -4,6 +4,7 @@
 module Data.Zya.Ethereum.Internal.Types.Common (
   Transaction(to, from)
   , OutputFormat(..)
+  , transactionOutput
   , BlockQuantity
   , BlockByHash(..)
   , BlockQuantity(..)

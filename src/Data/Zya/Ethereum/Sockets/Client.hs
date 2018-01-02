@@ -317,7 +317,9 @@ chunkBlocks (start, numberOfBlocks) = Prelude.takeWhile (\x -> x <= (start + num
 
 
 printTransactions :: [Transaction] -> OutputFormat -> [Text]
-printTransactions transactionList (a@(CSV ",")) = Prelude.map (\t -> transactionOutput a) transactionList
+printTransactions transactionList (a@(CSV ",")) = Prelude.map (\t -> transactionOutput t a) transactionList
+
+
 
 testMethod (start, numberOfBlocks) = do
   let unfoldList = chunkBlocks(start, numberOfBlocks)
@@ -329,9 +331,29 @@ testMethod (start, numberOfBlocks) = do
           "/home/dinkarganti/local_test/geth_test.ipc" 
           "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20"
           (x, defaultBlockSize)) unfoldList
-  return (Prelude.concat $ fst transactions)
+  return (Prelude.concat $ fst <$> transactions)
 
 testFilePath = "/home/dinkarganti/local_test/geth_test.ipc" 
+
+
 queryTransactionTestMethod txId = 
   mapM(queryTransactionWithBracket testFilePath "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20")
       [Text.pack txId]
+
+
+blockBrowserIO ipcPath accountAddress (start, range, defaultBlocks) = do 
+  let unfoldList = chunkBlocks(start, range)
+  let pack1 = Text.pack 
+  debugMessage . pack1 . show $ unfoldList
+  transactions <- 
+      mapM (\x -> 
+        finalInterfaceWithBracket 
+          ipcPath
+          accountAddress
+          (x, defaultBlocks)) unfoldList
+  debugMessage $ pack1 $ show $ Prelude.concat $ fst <$> transactions
+  return ()
+
+
+queryTransactionIO filePath addressId txId = 
+  mapM (queryTransactionWithBracket filePath addressId) [txId] >> return ()
