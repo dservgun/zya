@@ -11,7 +11,7 @@ import Control.Monad.IO.Class(liftIO)
 import Data.Zya.Ethereum.Internal.Types.Common
 
 newtype Request = Request {_unRequest :: Int} deriving(Show)
-newtype StoragePosition = StoragePosition {_unSP :: Int} deriving(Show)
+newtype StoragePosition = StoragePosition {_unSP :: Integer} deriving(Show)
 
 type Param = Value -- Need to confirm this
 type Method = String 
@@ -159,7 +159,7 @@ eth_getBlockTransactionCountByHash anId (Hash aHash) defaultQuantity =
       String . pack $ aHash
     ]
 
-eth_getBlockTransactionCountByNumber :: Int -> Int -> BlockQuantity -> Value 
+eth_getBlockTransactionCountByNumber :: Int -> Integer -> BlockQuantity -> Value 
 eth_getBlockTransactionCountByNumber anId transactionId defaultQuantity = 
   createRPCRequest defaultEthMethodParameters
     "getBlockTransactionCountByNumber" 
@@ -174,7 +174,7 @@ eth_getUncleCountByBlockHash anId (Hash aHash) =
     anId 
     [String . pack $ aHash]
 
-eth_getUncleCountByBlockNumber :: Int -> Int -> Value 
+eth_getUncleCountByBlockNumber :: Int -> Integer -> Value 
 eth_getUncleCountByBlockNumber (anId) (aNumber) = 
   createRPCRequest
     defaultEthMethodParameters
@@ -199,23 +199,25 @@ eth_sign anId (Address anAddress) (Hash sha3Hash) =
     [String . pack . convertToAddress $ anAddress 
     , String . pack $ sha3Hash ]
 
-type Gas = Int
-type GasPrice = Int
+type Gas = Integer
+type GasPrice = Integer
+type TransactionValue = Integer
+type NonceValue = Integer
 
-
-eth_sendTransaction :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> Address -> Int -> Value
+eth_sendTransaction :: Int -> Address -> Address -> Gas -> GasPrice -> TransactionValue -> Address -> NonceValue -> Value
 eth_sendTransaction anId (Address from) (Address to) gas gasPrice quantity (Address dataString) aNonce = 
   createRPCRequest 
     defaultEthMethodParameters
     "sendTransaction"
     anId $
         [
-          object[ "from" .= (String . pack $ convertToAddress from)]
-          , object[ "to" .= (String . pack . convertToAddress $ to)] 
-          , object[ "gas" .= (String .pack . convertIntToHex $ gas)]
-          , object[ "gasPrice" .= (String .pack . convertIntToHex $ gasPrice)]
-          , object[ "value" .= (String . pack . convertIntToHex $ quantity)]
-          , object[ "data" .= (String . pack . convertToAddress $ dataString)]
+          object[ "from" .= (String . pack $ convertToAddress from)
+          ,  "to" .= (String . pack . convertToAddress $ to)
+          , "gas" .= (String .pack . convertIntToHex $ gas)
+          , "gasPrice" .= (String .pack . convertIntToHex $ gasPrice)
+          , "value" .= (String . pack . convertIntToHex $ quantity)
+          , "data" .= (String . pack . convertToAddress $ dataString)
+          ]
         ] 
 
 type EthData = Text 
@@ -227,7 +229,7 @@ eth_sendRawTransaction anId aData =
     "sendRawTransaction"
     anId $[String aData]
 
-eth_call :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> EthData -> Value
+eth_call :: Int -> Address -> Address -> Gas -> GasPrice -> Integer -> EthData -> Value
 eth_call anId (Address from) (Address to) gas gasPrice quantity encodedData = 
   createRPCRequest 
     defaultEthMethodParameters 
@@ -241,7 +243,7 @@ eth_call anId (Address from) (Address to) gas gasPrice quantity encodedData =
           , object["value" .= (String . pack . convertIntToHex $ quantity)]
           , object["data" .= (String encodedData)]
         ]
-eth_estimateGas :: Int -> Address -> Address -> Gas -> GasPrice -> Int -> EthData -> Value 
+eth_estimateGas :: Int -> Address -> Address -> Gas -> GasPrice -> Integer -> EthData -> Value 
 eth_estimateGas anId (Address from) (Address to) gas gasPrice quantity encodedData = 
   createRPCRequest 
     defaultEthMethodParameters 
@@ -312,7 +314,7 @@ shh_getMessages = undefined
 
 
 
-convertIntToHex :: Int -> String
+convertIntToHex :: Integer -> String
 convertIntToHex anId = printf "0x%x" anId
 convertToAddress :: String -> String
 convertToAddress anAddress = anAddress

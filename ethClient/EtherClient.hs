@@ -6,6 +6,7 @@ import Data.Text as Text
 import System.Environment(getArgs)
 import Options.Applicative
 import Data.Semigroup((<>))
+import Data.Zya.Ethereum.Internal.Types.RPCRequest
 --main :: IO[([(SessionRequest, SessionResponse)], SessionState)]
 -- TODO: Get parseopts.
 
@@ -13,6 +14,17 @@ import Data.Semigroup((<>))
 data EtherClientCommand = 
   TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}
     | BlockBrowser {ipcPath :: FilePath, address :: String, blockId :: Integer, numberOfBlocks :: Integer, defaultBlockChunks :: Integer}
+    | SendTransaction {commandType :: String
+                        , ipcPath :: FilePath
+                        , address :: String
+                        , fromAddress :: String
+                        , toAddress :: String
+                        , gas :: Integer
+                        , gasPrice :: Integer
+                        , value :: Integer 
+                        , txData :: Integer 
+                        , nonce :: Integer
+                      }
   deriving(Show)  
 
 
@@ -25,6 +37,7 @@ blockIdParser =
         <> metavar "BLOCK ID"
         <> help "Block id to start scanning from")
 
+
 numberOfBlocksParser :: Parser Integer 
 numberOfBlocksParser = 
   read <$> 
@@ -32,6 +45,7 @@ numberOfBlocksParser =
       (long "range"
         <> metavar "NUMBEROFBLOCKS" 
         <> help "The number of blocks we want to scan over.")
+
 
 defaultBlockChunksParser :: Parser Integer 
 defaultBlockChunksParser = 
@@ -50,12 +64,12 @@ ipcPathParser =
      <> metavar "IPCPATH"
      <> help "The ipc path for the eth node") 
 
-addressParser :: Parser String 
-addressParser = 
+addressParser :: String -> Parser String 
+addressParser metaVarName= 
   strOption
     (
       long "address" 
-      <> metavar "ADDRESS"
+      <> metavar metaVarName
       <> help ("The hash for the address")
     )
 
@@ -67,18 +81,54 @@ transactionIdParser =
         <>  metavar "Transaction hash" 
         <> help "Hash for the transaction")
 
+gasParser :: Parser Integer 
+gasParser = 
+  read <$> strOption 
+            (long "gas" <> metavar "Amount of gas used" <> help "Amount of gas for a transaction")
+
+gasPriceParser :: Parser Integer 
+gasPriceParser = 
+  read <$> strOption
+            (long "gasPrice" <> metavar "Gas price" <> help "Gas price for the transaction")
+
+valueParser :: Parser Integer 
+valueParser = read<$> strOption (long "value" <> metavar "Transaction value" <> help "Transaction value in wei")
+
+commandTypeParser :: Parser String
+commandTypeParser = strOption (long "commandType" <> metavar "commandType" <> help "Command type")
+
+-- TODO: Fix these.
+
+txDataParser :: Parser Integer 
+txDataParser = pure 0xffffff
+
+nonceDataParser :: Parser Integer 
+nonceDataParser = pure 0xfffff
+
 transactionCommandParser :: Parser EtherClientCommand 
 transactionCommandParser = 
   TransactionQuery 
-  <$> ipcPathParser <*> addressParser <*> transactionIdParser
+  <$> ipcPathParser <*> (addressParser "Account address") <*> transactionIdParser
 
 blockBrowserCommandParser :: Parser EtherClientCommand 
 blockBrowserCommandParser =  
   BlockBrowser
-  <$> ipcPathParser <*> addressParser <*> blockIdParser <*> numberOfBlocksParser <*> defaultBlockChunksParser
+  <$> ipcPathParser <*> (addressParser "Account address") <*> blockIdParser <*> numberOfBlocksParser <*> defaultBlockChunksParser
 
+sendTransactionParser = 
+  SendTransaction 
+    <$> commandTypeParser 
+    <*> ipcPathParser 
+    <*> addressParser "AccountAddress"
+    <*> addressParser "FromAddress"
+    <*> addressParser "ToAddress"
+    <*> gasParser 
+    <*> gasPriceParser
+    <*> valueParser
+    <*> txDataParser
+    <*> nonceDataParser
 commandParser :: Parser EtherClientCommand 
-commandParser = blockBrowserCommandParser <|> transactionCommandParser
+commandParser = blockBrowserCommandParser <|> transactionCommandParser <|> sendTransactionParser 
 
 main :: IO () 
 main = 
@@ -104,6 +154,12 @@ etherClientCommandHandler (BlockBrowser ipcPath address blockId numberOfBlocks d
   addFileHandler "info.log" INFO 
   blockBrowserIO ipcPath address (blockId, numberOfBlocks, defaultBlocks)
 
+etherClientCommandHandler (SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce) = do 
+  setup DEBUG 
+  addFileHandler "debug.log" DEBUG 
+  addFileHandler "info.log" INFO 
+  sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)
+
 transactionQuery = do 
   setup DEBUG
   [txId] <- getArgs
@@ -111,10 +167,3 @@ transactionQuery = do
   addFileHandler "info.log" INFO
   queryTransactionTestMethod txId >>= \x -> infoMessage $ Text.pack $ show x
 
-
-blockBrowser = do 
-  setup DEBUG
-  [blockId, range] <- getArgs
-  addFileHandler "debug.log" DEBUG
-  addFileHandler "info.log" INFO
-  testMethod (read blockId, read range)
