@@ -21,8 +21,9 @@ import Data.Text.Lazy (toStrict)
 import Data.Zya.Ethereum.Internal.Types.Common
 import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Ethereum.Internal.Types.RPCResponse
-import Network.BSD 
-import Network.Socket
+import Data.Zya.Utils.IPC
+import Data.Zya.Utils.JsonRPC
+import Network.Socket(Socket)
 import Network.Socket.ByteString
 import qualified Data.Text as T
 import qualified Data.Text.IO as T 
@@ -56,22 +57,10 @@ debugMessage = debugM rootLoggerName
 -}
 
 
-defaultBufferSize :: Int 
-defaultBufferSize = 100 * 1024 * 1024
-
 -- Should probably be a generic handle. 
 -- should recursively read the message till the buffer is completely
 -- read and have an upper cap on the number of bytes we allow 
 -- as response. Or i should probably be using conduit.
-
-sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
-sendMessageWithSockets sock request = do
-  let requestBS = L.toStrict . encode $ request 
-  debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
-  _ <- Network.Socket.ByteString.send sock requestBS
-  msg <- Network.Socket.ByteString.recv sock defaultBufferSize
-  debugMessage $ T.pack $ "Received " <> (show $ Data.ByteString.length msg)
-  return . decode . fromStrict $ msg
 
 
 sendMessage :: Value -> FilePath -> IO (Maybe Value)
@@ -84,27 +73,6 @@ sendMessage aValue aFilePath = do
   System.IO.putStrLn(show msg)
   System.IO.putStrLn(Text.unpack $ decodeUtf8 msg)
   return $ decode . fromStrict $ msg
-
-domainSocket :: FilePath -> IO (Socket) 
-domainSocket filePath = do 
-  sock <- socket AF_UNIX Stream 0 
-  setSocketOption sock KeepAlive 0
-  connect sock (SockAddrUnix filePath)
-  return sock
-
-entryPoint :: HostName -> ServiceName -> IO (Handle, Socket)
-entryPoint hostName portNumber = do 
-    addrInfos <- getAddrInfo Nothing (Just hostName) (Just portNumber)
-    -- Empty list will throw an exception, we dont need 
-    -- to check for a safe head in this case.
-    let serverAddr = Prelude.head addrInfos
-    sock <- socket(addrFamily serverAddr) Stream defaultProtocol 
-    setSocketOption sock KeepAlive 1
-    connect sock (addrAddress serverAddr)
-    h <- socketToHandle sock ReadWriteMode
-    hSetBuffering h (BlockBuffering Nothing)
-    infoMessage (Text.pack $ "Connected to " <> (show hostName) <> ":" <> (show portNumber))
-    return (h, sock)
 
 
 type Account = Text 

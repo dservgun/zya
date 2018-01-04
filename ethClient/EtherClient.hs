@@ -6,10 +6,9 @@ import Data.Text as Text
 import System.Environment(getArgs)
 import Options.Applicative
 import Data.Semigroup((<>))
-import Data.Zya.Ethereum.Internal.Types.RPCRequest
---main :: IO[([(SessionRequest, SessionResponse)], SessionState)]
--- TODO: Get parseopts.
 
+import Data.Zya.Utils.JsonRPC
+import Data.Zya.Ethereum.Internal.Types.RPCRequest
 
 data EtherClientCommand = 
   TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}

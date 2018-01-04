@@ -76,8 +76,9 @@ library
     Data.Zya.Persistence.Internal.Postgres
     Data.Zya.Persistence.Internal.Sqlite
     Data.Zya.Persistence.Persistence
-    Data.Zya.Utils.Logger  
-
+    Data.Zya.Utils.Logger
+    Data.Zya.Utils.IPC
+    Data.Zya.Utils.JsonRPC
 
   -- Modules included in this library but not exported.
   other-modules:
@@ -275,7 +276,7 @@ test-suite Tasty
 
 
 
-executable loyakk_client
+executable zya_ethereum_client
   main-is : EtherClient.hs
   build-depends : 
     base
