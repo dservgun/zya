@@ -15,6 +15,7 @@ import Data.ByteString hiding (hPutStrLn, hGetLine)
 import Data.ByteString.Lazy as L hiding(hGetContents)
 import Data.Monoid
 import Data.Text as Text
+import Data.Text.IO as TextIO
 import Data.Text.Encoding
 import Data.Text.Lazy (toStrict)
 import Data.Zya.Ethereum.Internal.Types.Common
@@ -297,7 +298,7 @@ queryTransactionWithBracket aFilePath accountAddress transactionHash = do
 
 
 queryTransactionIO filePath addressId txId = 
-  mapM (queryTransactionWithBracket filePath addressId) [txId] >> return ()
+  mapM (queryTransactionWithBracket filePath addressId) txId >> return ()
 
 
 
@@ -309,14 +310,13 @@ finalInterface socket accountAddress (start, numberOfBlocks) = do
   runStateT (runReaderT (runA gethSession) config) state
 
 
-finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
-finalInterfaceWithBracket aFilePath accountAddress (start, end) = do 
+finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> (Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)) -> IO([Transaction], SessionState)
+finalInterfaceWithBracket aFilePath accountAddress (start, end) finalInterface = do 
   bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
           result <- finalInterface socket accountAddress (start, end)
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " ----> " <> (show end) <>  " " <> (show result)
           return result
-
 
 
 
@@ -328,10 +328,7 @@ printTransactions :: [Transaction] -> OutputFormat -> [Text]
 printTransactions transactionList (a@(CSV ",")) = Prelude.map (\t -> transactionOutput t a) transactionList
 
 
-
-
-
-blockBrowserIO ipcPath accountAddress (start, range, defaultBlocks) = do 
+blockBrowserIO ipcPath outputFile accountAddress (start, range, defaultBlocks) = do 
   let unfoldList = chunkBlocks(start, range, defaultBlocks)
   let pack1 = Text.pack 
   debugMessage . pack1 . show $ unfoldList
@@ -340,7 +337,10 @@ blockBrowserIO ipcPath accountAddress (start, range, defaultBlocks) = do
         finalInterfaceWithBracket 
           ipcPath
           accountAddress
-          (x, defaultBlocks)) unfoldList
+          (x, defaultBlocks) finalInterface) unfoldList
+  bracket(openFile outputFile WriteMode)(hClose) (\h -> do
+        TextIO.hPutStrLn h "Hash, Currency, target-address, sender-address, value, gasPrice, gas"
+        TextIO.hPutStrLn h $ Text.unlines $ printTransactions (Prelude.concat $ fst <$> transactions) (CSV ","))
   debugMessage $ pack1 $ show $ Prelude.concat $ fst <$> transactions
   return ()
 
@@ -400,7 +400,7 @@ testMethod (start, numberOfBlocks, defaultBlockSize) = do
         finalInterfaceWithBracket 
           "/home/dinkarganti/local_test/geth_test.ipc" 
           "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20"
-          (x, defaultBlockSize)) unfoldList
+          (x, defaultBlockSize) finalInterface) unfoldList
   return (Prelude.concat $ fst <$> transactions)
 
 testFilePath = "/home/dinkarganti/local_test/geth_test.ipc" 

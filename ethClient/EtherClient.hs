@@ -13,7 +13,7 @@ import Data.Zya.Ethereum.Internal.Types.RPCRequest
 
 data EtherClientCommand = 
   TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}
-    | BlockBrowser {ipcPath :: FilePath, address :: String, blockId :: Integer, numberOfBlocks :: Integer, defaultBlockChunks :: Integer}
+    | BlockBrowser {ipcPath :: FilePath, outputPath :: FilePath, address :: String, blockId :: Integer, numberOfBlocks :: Integer, defaultBlockChunks :: Integer}
     | SendTransaction {commandType :: String
                         , ipcPath :: FilePath
                         , address :: String
@@ -57,6 +57,10 @@ defaultBlockChunksParser =
       <> help "The number of blocks to query at any given time usually a number between 1 to 100"
     )
 
+outputFileParser :: Parser FilePath 
+outputFileParser = 
+  strOption 
+    (long "outputFile" <> metavar "OutputFile" <> help "The output file")
 ipcPathParser :: Parser FilePath
 ipcPathParser = 
   strOption
@@ -113,7 +117,7 @@ transactionCommandParser =
 blockBrowserCommandParser :: Parser EtherClientCommand 
 blockBrowserCommandParser =  
   BlockBrowser
-  <$> ipcPathParser <*> (addressParser "Account address") <*> blockIdParser <*> numberOfBlocksParser <*> defaultBlockChunksParser
+  <$> ipcPathParser <*> outputFileParser <*> (addressParser "Account address") <*> blockIdParser <*> numberOfBlocksParser <*> defaultBlockChunksParser
 
 sendTransactionParser = 
   SendTransaction 
@@ -141,29 +145,17 @@ main =
                 <> header "EthClient - to communicate on ipc"
                 )
 
+
 etherClientCommandHandler :: EtherClientCommand -> IO ()
-etherClientCommandHandler (TransactionQuery ipcPath address transactionId) = do
+etherClientCommandHandler aCommand = do
   setup DEBUG 
   addFileHandler "debug.log" DEBUG
   addFileHandler "info.log" INFO 
-  queryTransactionIO ipcPath address transactionId >> return ()
-
-etherClientCommandHandler (BlockBrowser ipcPath address blockId numberOfBlocks defaultBlocks) = do 
-  setup DEBUG
-  addFileHandler "debug.log" DEBUG
-  addFileHandler "info.log" INFO 
-  blockBrowserIO ipcPath address (blockId, numberOfBlocks, defaultBlocks)
-
-etherClientCommandHandler (SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce) = do 
-  setup DEBUG 
-  addFileHandler "debug.log" DEBUG 
-  addFileHandler "info.log" INFO 
-  sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)
-
-transactionQuery = do 
-  setup DEBUG
-  [txId] <- getArgs
-  addFileHandler "debug.log" DEBUG
-  addFileHandler "info.log" INFO
-  queryTransactionTestMethod txId >>= \x -> infoMessage $ Text.pack $ show x
+  case aCommand of 
+    TransactionQuery ipcPath address transactionId -> do
+      queryTransactionIO ipcPath address [transactionId] >> return ()
+    BlockBrowser ipcPath outputFile address blockId numberOfBlocks defaultBlocks -> 
+      blockBrowserIO ipcPath outputFile address (blockId, numberOfBlocks, defaultBlocks)
+    SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce ->
+      sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)    
 

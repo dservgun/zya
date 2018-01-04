@@ -120,9 +120,11 @@ instance FromJSON Transaction where
 
 instance ToJSON Transaction
 
+currency = "ETH"
+
 transactionOutput :: Transaction -> OutputFormat -> Text
 transactionOutput = 
   \t format -> Text.pack $ 
-      (show . hash $ t) <> "," <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) <> "," 
-      <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," <> (show $ value t)
+      (show . hash $ t) <> "," <> currency <> "," <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
+      <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) <> "," <> (show $ value t)
       <> "," <> (show $ gasPrice t) <> "," <> (show $ gas t) <> "\n"
