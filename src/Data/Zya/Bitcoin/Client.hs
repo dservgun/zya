@@ -1,32 +1,40 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Zya.Bitcoin.Client where
 
-import Data.Aeson
-import Data.Monoid
-import Data.Map as Map
-import Data.Scientific
-import Data.Text
-import Data.Zya.Utils.IPC
-import Data.Zya.Utils.JsonRPC
-import Network.Socket
-import System.IO
-import Control.Exception
 
+import Control.Exception
 import Control.Exception as E
 import Control.Lens hiding ((.=))
-import Network.HTTP.Client hiding(responseBody)
-import Network.Wreq
+import Data.Aeson
+import Data.Aeson.Lens(key, nth)
 import Data.ByteString
 import Data.ByteString.Lazy
+import Data.Map as Map
+import Data.Monoid
+import Data.Scientific
 import Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
+import Data.Zya.Bitcoin.Transaction
+import Data.Zya.Utils.IPC
+import Data.Zya.Utils.JsonRPC
+import Network.HTTP.Client hiding(responseBody)
+import Network.Socket
+import Network.Wreq
+import System.IO
 
 version :: String
 version = "1.0"
-newtype RequestId = RequestId {id :: Text} deriving(Show)
-newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show)
 
 
+
+getTransactionDetail :: RequestId -> Text -> Value
+getTransactionDetail (RequestId anId) aTransaction = 
+  object [
+    "jsonrpc" .= version
+    , "id" .= anId 
+    , "method" .= ("gettransaction" :: Text)
+    , "params" .= [String aTransaction]
+  ]
 getAccountAddress :: RequestId -> AccountAddress -> Value
 getAccountAddress (RequestId anId) (AccountAddress aString) = 
   let 
@@ -62,13 +70,14 @@ type Resp = Response (Map String Value)
 newtype UserName = UserName {_uName :: String} deriving(Show) 
 newtype Password = Password {_uPassword :: String} deriving(Show)
 
-getJSORRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
+getJSONRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
   let endPoint = "http://" <> userName <> ":" <> password <> "@" <> hostName <> ":" <> serviceName
   let u = toStrict $ encode $ T.pack $ userName 
   let p = toStrict $ encode $ T.pack $ password
   let opts = defaults
-  r <- asJSON =<< postWith opts endPoint aRequest :: IO Resp
-  return $ r ^. responseBody
+  r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
+  let respBody = r ^? responseBody . key "result"
+  return respBody
 
 
 
@@ -84,11 +93,11 @@ addresses = AccountAddress
             , "1C6nxuqAmytbXR162nC3Xw2TMsYkQJNw9C"]
 
 -- Load all addresses in the client
-loadAddresses :: (String, String) -> UserName -> Password -> [AccountAddress] -> IO [Map String Value]
+loadAddresses :: (String, String) -> UserName -> Password -> [AccountAddress] -> IO [Maybe Value]
 loadAddresses defaults userName password addresses =  
   mapM
       (\addr -> 
-        getJSORRpcResponse 
+        getJSONRpcResponse 
           (fst someDefaults) 
           (snd someDefaults) 
           userName
@@ -96,24 +105,51 @@ loadAddresses defaults userName password addresses =
           $ getAccountAddress (RequestId "test") addr) addresses
 
 
-
-testDefaults = 
+transactionSummaries :: IO (Maybe (Result [TransactionSummary]))
+transactionSummaries = 
   let 
     userName = UserName "loyakk_user1"
     password = Password "loyakk_password1"
   in
-  handle (\a@(SomeException e) ->  (System.IO.putStrLn $ "Exception ***" <> show a) >> return (Map.empty)) $ do 
+  handle (\a@(SomeException e) -> return $ Just $ Data.Aeson.Error (show a)) $ do 
     _ <- 
       loadAddresses someDefaults 
         (UserName "loyakk_user1")
         (Password "loyakk_password1") 
         addresses
-    getJSORRpcResponse 
-      (fst someDefaults) 
-      (snd someDefaults) 
-      userName
-      password
-      $ getListReceivedByAddress (RequestId "1") 6 True True
+    -- transaction summaries.
+    resp <- 
+        getJSONRpcResponse 
+          (fst someDefaults) 
+          (snd someDefaults) 
+          userName
+          password
+          $ getListReceivedByAddress (RequestId "1") 6 True True
+    transactionSummaries <- return $ fromJSON <$> resp
+    return $ transactionSummaries
+
+transactionDetails :: UserName -> Password -> Text -> IO (Maybe(Result Transaction)) 
+transactionDetails userName password anId = do 
+  resp <- getJSONRpcResponse 
+            (fst someDefaults)
+            (snd someDefaults)
+            userName 
+            password 
+            $ getTransactionDetail (RequestId "1") (anId)
+  
+  return $ fromJSON <$> resp
+transactionIds' = (fmap . fmap . fmap) (Prelude.map _transactions) transactionSummaries
+
+transactionIds = (fmap . fmap . fmap) (Prelude.concat) transactionIds'
 
 
+transactionDetailsWithDefaults = transactionDetails (UserName "loyakk_user1") (Password "loyakk_password1")
 
+f2 = do 
+  x <- transactionIds
+  case x of 
+    Just y -> do      
+      case y of 
+        Success aList -> do
+          System.IO.putStrLn $ (show $ Prelude.take 5 aList)
+          mapM transactionDetailsWithDefaults $ aList

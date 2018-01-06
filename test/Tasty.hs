@@ -14,6 +14,10 @@ import Data.Zya.Core.ComputeNodeService
 import Data.Zya.Persistence.Persistence(DBType, persist)
 import Test.Tasty
 import Test.Tasty.HUnit as HU
+import Test.Tasty.SmallCheck as SC 
+import Test.Tasty.QuickCheck as QC
+import Data.Zya.Bitcoin.TransactionTest
+
 
 testBackend :: IO Backend
 testBackend = simpleBackend "localhost" "5000"
@@ -60,12 +64,14 @@ createTopicTestCase =  do
   threadDelay (fromIntegral $ (10 ^ 6 * 30))
 
 
-allTests :: TestTree
-allTests = testGroup "Yet another zookeeper tests" [
+hunitTest = 
   testGroup "HUnit tests" [
     testCase "createTopic allocator, shutdown and no exceptions.\n" createTopicTestCase
     ]
-  ]
+
+
+allTests :: TestTree
+allTests = testGroup "Yet another zookeeper tests" [jsonProperties]
 
 
 
