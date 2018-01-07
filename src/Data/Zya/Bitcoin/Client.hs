@@ -4,6 +4,7 @@ module Data.Zya.Bitcoin.Client where
 
 import Control.Exception
 import Control.Exception as E
+import Control.Monad
 import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Aeson.Lens(key, nth)
@@ -13,8 +14,9 @@ import Data.Map as Map
 import Data.Monoid
 import Data.Scientific
 import Data.Text as T
+import Data.Text.IO as TextIO
 import Data.Text.Encoding (decodeUtf8)
-import Data.Zya.Bitcoin.Transaction
+import Data.Zya.Bitcoin.Transaction as Transaction
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
 import Network.HTTP.Client hiding(responseBody)
@@ -32,8 +34,8 @@ getTransactionDetail (RequestId anId) aTransaction =
   object [
     "jsonrpc" .= version
     , "id" .= anId 
-    , "method" .= ("gettransaction" :: Text)
-    , "params" .= [String aTransaction]
+    , "method" .= ("getrawtransaction" :: Text)
+    , "params" .= [String aTransaction, Number 1]
   ]
 getAccountAddress :: RequestId -> AccountAddress -> Value
 getAccountAddress (RequestId anId) (AccountAddress aString) = 
@@ -125,7 +127,7 @@ transactionSummaries =
           userName
           password
           $ getListReceivedByAddress (RequestId "1") 6 True True
-    transactionSummaries <- return $ fromJSON <$> resp
+    let transactionSummaries = fromJSON <$> resp
     return $ transactionSummaries
 
 transactionDetails :: UserName -> Password -> Text -> IO (Maybe(Result Transaction)) 
@@ -136,20 +138,51 @@ transactionDetails userName password anId = do
             userName 
             password 
             $ getTransactionDetail (RequestId "1") (anId)
-  
+  System.IO.putStrLn $ show resp
   return $ fromJSON <$> resp
-transactionIds' = (fmap . fmap . fmap) (Prelude.map _transactions) transactionSummaries
 
-transactionIds = (fmap . fmap . fmap) (Prelude.concat) transactionIds'
+-- scary types.
+transactionIds' = (fmap . fmap . fmap) (Prelude.map (\x -> (_account x, _address x, _transactions x))) transactionSummaries
+
+transactionIds = transactionIds'
 
 
-transactionDetailsWithDefaults = transactionDetails (UserName "loyakk_user1") (Password "loyakk_password1")
+transactionDetailsWithDefaults = 
+    transactionDetails (UserName "loyakk_user1") (Password "loyakk_password1")
 
+formatCSV :: (AccountAddress, Transaction.Address, Transaction) -> String
+formatCSV (AccountAddress account, Transaction.Address address, 
+          Transaction amount conf blockH blockT txid _ time timeR _ _ _
+          ) = 
+      (show account) <> ", " 
+      <> (show address) <> "," 
+      <> (show amount) <> ","
+      <> (show conf) <> ","
+      <> (show blockH) <> ","
+      <> (show blockT) <> "," 
+      <> (show txid) <> "," 
+      <> (show time) <> ","
+      <> (show timeR)
+format :: (AccountAddress, Transaction.Address, [Maybe (Result Transaction)]) -> [Text]
+format (account, address, transactions) = 
+  Prelude.map(\l -> case l of 
+                      Just (Success x) -> T.pack $ formatCSV(account, address, x)) transactions
+
+-- All transaction details with account information
 f2 = do 
   x <- transactionIds
   case x of 
     Just y -> do      
       case y of 
-        Success aList -> do
-          System.IO.putStrLn $ (show $ Prelude.take 5 aList)
-          mapM transactionDetailsWithDefaults $ aList
+        Success aList -> do 
+          z1 <- mapM (\a@(x, addr, y) -> do 
+                z <- mapM transactionDetailsWithDefaults y 
+                return $ format (x, addr, z)) aList
+          return $ Prelude.concat z1
+
+
+writeToFile aFile = do 
+  bracket (openFile aFile WriteMode) (hClose) $ \h -> do 
+    TextIO.hPutStrLn h "Account, Address, Amount, Confirmation, Block Hash, Block Time, Transaction Id, Time, Time Received"
+    f <- f2
+    TextIO.hPutStrLn h (T.unlines f)
