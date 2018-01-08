@@ -16,7 +16,9 @@ import Data.Scientific
 import Data.Text as T
 import Data.Text.IO as TextIO
 import Data.Text.Encoding (decodeUtf8)
+import Data.Zya.Bitcoin.Common as BCommon
 import Data.Zya.Bitcoin.Transaction as Transaction
+import Data.Zya.Bitcoin.RawTransaction as RawTransaction
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
 import Network.HTTP.Client hiding(responseBody)
@@ -130,7 +132,7 @@ transactionSummaries =
     let transactionSummaries = fromJSON <$> resp
     return $ transactionSummaries
 
-transactionDetails :: UserName -> Password -> Text -> IO (Maybe(Result Transaction)) 
+transactionDetails :: UserName -> Password -> Text -> IO (Maybe(Result RawTransaction)) 
 transactionDetails userName password anId = do 
   resp <- getJSONRpcResponse 
             (fst someDefaults)
@@ -150,8 +152,8 @@ transactionIds = transactionIds'
 transactionDetailsWithDefaults = 
     transactionDetails (UserName "loyakk_user1") (Password "loyakk_password1")
 
-formatCSV :: (AccountAddress, Transaction.Address, Transaction) -> String
-formatCSV (AccountAddress account, Transaction.Address address, 
+formatCSV :: (AccountAddress, BCommon.Address, Transaction) -> String
+formatCSV (AccountAddress account, BCommon.Address address, 
           Transaction amount conf blockH blockT txid _ time timeR _ _ _
           ) = 
       (show account) <> ", " 
@@ -163,10 +165,11 @@ formatCSV (AccountAddress account, Transaction.Address address,
       <> (show txid) <> "," 
       <> (show time) <> ","
       <> (show timeR)
-format :: (AccountAddress, Transaction.Address, [Maybe (Result Transaction)]) -> [Text]
+
+format :: (AccountAddress, BCommon.Address, [Maybe (Result RawTransaction)]) -> [Text]
 format (account, address, transactions) = 
   Prelude.map(\l -> case l of 
-                      Just (Success x) -> T.pack $ formatCSV(account, address, x)) transactions
+                      Just (Success x) -> T.pack $ show(account, address, x)) transactions
 
 -- All transaction details with account information
 f2 = do 

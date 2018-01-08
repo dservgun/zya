@@ -4,6 +4,8 @@ import Control.Comonad
 import Data.Monoid
 import Prelude
 import Test.QuickCheck
+import Data.Foldable
+
 data BinaryTree a = Node a (BinaryTree a) (BinaryTree a) 
           | Leaf a 
           deriving (Show)

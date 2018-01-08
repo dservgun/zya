@@ -10,6 +10,7 @@ import Data.Aeson.Types
 import Data.Scientific
 import Data.Text
 import Data.Char as C (toLower)
+import Data.Zya.Bitcoin.Common
 {-- | 
 {
   "amount": 0.00000000,
@@ -28,10 +29,6 @@ import Data.Char as C (toLower)
   "hex" : 
 --}
 
-
-newtype RequestId = RequestId {id :: Text} deriving(Show, Eq)
-newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq)
-newtype Address = Address {_unaddress :: Text} deriving (Show, Eq)
 
 data Transaction = Transaction{
   __amount :: Scientific
@@ -92,16 +89,6 @@ data TransactionSummary = TransactionSummary {
 } deriving(Show, Generic, Eq)
 
 
-parseString :: Value -> Parser Text
-parseString = withText "string" $ return
-
-instance FromJSON Address where 
-  parseJSON a = do 
-    v <- parseString a
-    return (Address v)
-
-instance ToJSON Address where
-  toJSON (Address add) = String add
 
 instance FromJSON AccountAddress where
   parseJSON a = do 
