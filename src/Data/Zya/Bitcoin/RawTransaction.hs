@@ -3,14 +3,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Data.Zya.Bitcoin.RawTransaction where
-import Data.Text
-import Data.Scientific
-import GHC.Generics
-import Data.Zya.Bitcoin.Common
 import Data.Aeson
+import Data.Map as Map
+import Data.Scientific
+import Data.Text as Text
+import Data.Zya.Bitcoin.Common
+import GHC.Generics
+
 {-- | Raw transactions return greater detail about a given transaction and 
       can be queried without having to load the address or the account in
-      the wallet.
+      the wallet. 
 --}
 
 
@@ -29,6 +31,7 @@ data RawTransaction = RawTransaction {
   , __time :: Integer
   , __blockTime :: Integer
 } deriving(Show, Generic)
+
 
 
 
@@ -67,3 +70,23 @@ instance ToJSON RawTransaction where
       , "time" .= time
       , "blocktime" .= blockTime
     ]
+
+
+-- Need to understand how to fold this stuff.
+groupFormatCSV (AccountAddress acc) (Address addr) (RawTransaction t h v size vsize lT vin vout _ _ confirmations time blockTime) = 
+  --Prelude.map formatCSV (\a -> Map.union footer a) valueOuts
+  Prelude.map (\x -> formatCSVWithM x) valueOuts
+  where
+    valueOuts = fmap (\a -> Map.union envelope a) 
+                  $ Prelude.map prepareCSV vout
+    footer :: Map Int Text
+    footer = Map.fromList $ 
+      Prelude.zipWith (,) [100..]  -- Some large number, need to review this.
+        $ Text.pack <$> [show confirmations, show time, show blockTime]
+    header :: Map Int Text 
+    header = Map.fromList[(-2, acc ), (-1, addr)]
+    envelope = Map.union header footer
+
+
+rawTransactionAsCSV :: AccountAddress -> Address -> RawTransaction -> Text 
+rawTransactionAsCSV account address = \a -> Text.unlines $ groupFormatCSV account address a

@@ -74,14 +74,22 @@ type Resp = Response (Map String Value)
 newtype UserName = UserName {_uName :: String} deriving(Show) 
 newtype Password = Password {_uPassword :: String} deriving(Show)
 
-getJSONRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
-  let endPoint = "http://" <> userName <> ":" <> password <> "@" <> hostName <> ":" <> serviceName
-  let u = toStrict $ encode $ T.pack $ userName 
-  let p = toStrict $ encode $ T.pack $ password
-  let opts = defaults
+
+doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
-  return respBody
+  if respBody ==  Nothing then 
+    return $ Just $ (String $ T.pack $ "Failed to return response : " <> (show aRequest))
+  else 
+    return respBody
+
+
+getJSONRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
+  let endPoint = "http://" <> userName <> ":" <> password <> "@" <> hostName <> ":" <> serviceName
+  let opts = defaults  
+  handle
+      (\e@(SomeException s) -> return $ Just $ String $ T.pack $ show e) 
+      $ doPost opts endPoint aRequest
 
 
 
@@ -140,7 +148,7 @@ transactionDetails userName password anId = do
             userName 
             password 
             $ getTransactionDetail (RequestId "1") (anId)
-  System.IO.putStrLn $ show resp
+  --System.IO.putStrLn $ show resp
   return $ fromJSON <$> resp
 
 -- scary types.
@@ -152,28 +160,26 @@ transactionIds = transactionIds'
 transactionDetailsWithDefaults = 
     transactionDetails (UserName "loyakk_user1") (Password "loyakk_password1")
 
-formatCSV :: (AccountAddress, BCommon.Address, Transaction) -> String
-formatCSV (AccountAddress account, BCommon.Address address, 
-          Transaction amount conf blockH blockT txid _ time timeR _ _ _
-          ) = 
-      (show account) <> ", " 
-      <> (show address) <> "," 
-      <> (show amount) <> ","
-      <> (show conf) <> ","
-      <> (show blockH) <> ","
-      <> (show blockT) <> "," 
-      <> (show txid) <> "," 
-      <> (show time) <> ","
-      <> (show timeR)
+
+
 
 format :: (AccountAddress, BCommon.Address, [Maybe (Result RawTransaction)]) -> [Text]
 format (account, address, transactions) = 
   Prelude.map(\l -> case l of 
-                      Just (Success x) -> T.pack $ show(account, address, x)) transactions
+                      Just (Success aTransaction) -> 
+                        formatCSV account 
+                        <> ","
+                        <> formatCSV address
+                        <> ","
+                        <> rawTransactionAsCSV account address aTransaction
+                      _ -> 
+                          T.pack $ "Error in transaction for " <> (show account)
+                              <> " " <> (show address) <> ":" <> (show l)
+              ) transactions
 
 -- All transaction details with account information
 f2 = do 
-  x <- transactionIds
+  x <- (fmap . fmap . fmap) (Prelude.take 3) transactionIds
   case x of 
     Just y -> do      
       case y of 
@@ -182,6 +188,7 @@ f2 = do
                 z <- mapM transactionDetailsWithDefaults y 
                 return $ format (x, addr, z)) aList
           return $ Prelude.concat z1
+    _ -> return $ []
 
 
 writeToFile aFile = do 
@@ -189,3 +196,5 @@ writeToFile aFile = do
     TextIO.hPutStrLn h "Account, Address, Amount, Confirmation, Block Hash, Block Time, Transaction Id, Time, Time Received"
     f <- f2
     TextIO.hPutStrLn h (T.unlines f)
+
+

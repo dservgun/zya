@@ -4,11 +4,13 @@
 
 module Data.Zya.Bitcoin.Common where
 
-import Data.Text
-import Data.Scientific
 import Data.Aeson
 import Data.Aeson.Types
+import Data.Map as Map
+import Data.Scientific
+import Data.Text as Text
 import GHC.Generics
+
 newtype RequestId = RequestId {id :: Text} deriving(Show, Eq)
 newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq)
 newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic)
@@ -46,7 +48,6 @@ instance ToJSON ScriptPubKey where
         , "type" .= t 
         , "addresses" .= addresses
       ]    
-
 
 instance FromJSON ScriptPubKey where 
   parseJSON = withObject "script pub key" $ \o -> do 
@@ -96,7 +97,7 @@ instance FromJSON ValueOut where
   parseJSON = withObject "valueout" $ \o -> do 
     __value <- o .: "value"
     __n <- o .: "n"
-    __scriptPubKey <- o .: "ScriptPubKey"
+    __scriptPubKey <- o .: "scriptPubKey"
     return ValueOut{..}
 
 instance ToJSON ValueOut where 
@@ -104,7 +105,7 @@ instance ToJSON ValueOut where
       object [
         "value" .= v
         , "n" .= n 
-        , "ScriptPubKey" .= s 
+        , "scriptPubKey" .= s 
       ]
 
 
@@ -125,3 +126,40 @@ instance FromJSON ValueIn where
     __scriptSig <- o .: "scriptSig"
     __sequence <- o .: "sequence"
     return ValueIn{..}    
+
+
+class CSVFormatter a where 
+  -- | A formatter returning the ordering and the text to go with 
+  -- | it. 
+  prepareCSV :: a -> Map Int Text
+
+formatCSVWithM aRow = 
+    Text.intercalate "," orderedList
+    where
+      orderedList = snd <$> toAscList aRow
+
+formatCSV :: (CSVFormatter a) => a -> Text
+formatCSV aRow = 
+    Text.intercalate "," orderedList
+    where
+      orderedList = snd <$> toAscList (prepareCSV aRow)
+
+instance CSVFormatter AccountAddress where 
+  prepareCSV (AccountAddress anAddress) = Map.fromList[(1, anAddress)]
+
+instance CSVFormatter Address where
+  prepareCSV (Address anAddress) = Map.fromList[(1, anAddress)]
+
+instance CSVFormatter ValueOut where 
+  prepareCSV (ValueOut v n sP) = 
+    Map.fromList $ 
+        Prelude.zipWith (,) 
+          [1..]
+          [Text.pack $ show v, mergeScriptAddresses sP]
+
+
+
+mergeScriptAddresses :: ScriptPubKey -> Text 
+mergeScriptAddresses (ScriptPubKey _ _ _ _ addresses) = 
+  Text.intercalate "," $ _unaddress <$> addresses
+

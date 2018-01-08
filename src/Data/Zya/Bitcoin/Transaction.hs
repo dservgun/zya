@@ -3,14 +3,17 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Data.Zya.Bitcoin.Transaction where
-import GHC.Generics
-import Data.Monoid((<>))
+
 import Data.Aeson
 import Data.Aeson.Types
-import Data.Scientific
-import Data.Text
 import Data.Char as C (toLower)
-import Data.Zya.Bitcoin.Common
+import Data.Map as Map
+import Data.Monoid((<>))
+import Data.Scientific
+import Data.Text as Text
+import Data.Zya.Bitcoin.Common as BCommon
+import GHC.Generics
+
 {-- | 
 {
   "amount": 0.00000000,
@@ -130,3 +133,21 @@ instance ToJSON TransactionSummary where
 
 nullAddress :: String
 nullAddress = "0000000000000000"
+
+
+instance CSVFormatter Transaction where 
+  prepareCSV (Transaction amount conf blockH blockT txId _ time timeR _ _ _) = 
+    Map.fromList 
+      $ Prelude.zipWith (,) [1 ..] fieldValueList
+    where 
+      fieldValueList = 
+        (Text.pack) <$> 
+                [
+                show amount 
+                , show conf
+                , show blockH
+                , show blockT
+                , show txId
+                , show time
+                , show timeR]
+
