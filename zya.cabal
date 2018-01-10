@@ -55,6 +55,7 @@ library
     Data.Zya.Core.Internal.MessageDistribution
     Data.Zya.Core.Internal.ServerTypes
     Data.Zya.Core.Internal.WebserviceProtocolHandler
+    Data.Zya.Core.Internal.CSVFormatter
     Data.Zya.Core.LocalMessageHandlingStrategy
     Data.Zya.Core.QueryService
     Data.Zya.Core.Service

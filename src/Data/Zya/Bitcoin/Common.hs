@@ -11,8 +11,8 @@ import Data.Scientific
 import Data.Text as Text
 import GHC.Generics
 
-newtype RequestId = RequestId {id :: Text} deriving(Show, Eq)
-newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq)
+newtype RequestId = RequestId {id :: Text} deriving(Show, Eq, Generic)
+newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq, Generic)
 newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic)
 
 parseString :: Value -> Parser Text
@@ -35,7 +35,7 @@ data ScriptPubKey = ScriptPubKey {
   , __reqSigs :: Integer
   , __type :: KeyType
   , __keyAddresses :: [Address]
-} deriving(Show)
+} deriving(Show, Generic)
 
 
 instance ToJSON ScriptPubKey where 

@@ -1,10 +1,22 @@
-{-# LANGUAGE InstanceSigs #-}
-module BinaryTrees where 
-import Control.Comonad
-import Data.Monoid
-import Prelude
-import Test.QuickCheck
-import Data.Foldable
+
+data Bit = O | I
+
+class Serialize a where 
+  put :: a -> [Bit]
+  get :: [Bit] -> a
+
+
+class GSerialize f where 
+  gput :: f a -> [Bit]
+
+instance GSerialize U1 where 
+  gput U1 = []
+
+instance (GSerialize a, GSerialize b) => GSerialize( a :*: b) where 
+  gput (a :*: b) = gput a ++ gput b
+
+
+
 
 data BinaryTree a = Node a (BinaryTree a) (BinaryTree a) 
           | Leaf a 
@@ -89,5 +101,7 @@ fructify (B a b) = B (fructify a) (fructify b)
 
 appBind :: (Monad f, Applicative f) => f (a -> b) -> f a -> f b
 appBind f1 container = f1 >>= \f -> f <$> container
+
+
 
 

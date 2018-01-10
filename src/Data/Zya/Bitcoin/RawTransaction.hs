@@ -81,11 +81,9 @@ groupFormatCSV (AccountAddress acc) (Address addr) (RawTransaction t h v size vs
                   $ Prelude.map prepareCSV vout
     footer :: Map Int Text
     footer = Map.fromList $ 
-      Prelude.zipWith (,) [100..]  -- Some large number, need to review this.
-        $ Text.pack <$> [show confirmations, show time, show blockTime]
-    header :: Map Int Text 
-    header = Map.fromList[(-2, acc ), (-1, addr)]
-    envelope = Map.union header footer
+      Prelude.zipWith (,) [-5, -4, -3, -2, -1]
+        $ Text.pack <$> [show acc, show addr, show confirmations, show time, show blockTime]
+    envelope = footer
 
 
 rawTransactionAsCSV :: AccountAddress -> Address -> RawTransaction -> Text 

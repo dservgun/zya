@@ -137,8 +137,15 @@ transactionSummaries =
           userName
           password
           $ getListReceivedByAddress (RequestId "1") 6 True True
-    let transactionSummaries = fromJSON <$> resp
-    return $ transactionSummaries
+    let transactionSummaries = 
+                      (fmap . fmap)
+                      (Prelude.filter(\x -> notEmptyAccountAddress x))
+                      (fromJSON <$> resp)
+    return transactionSummaries
+
+
+notEmptyAccountAddress :: TransactionSummary -> Bool
+notEmptyAccountAddress summary = _account summary /= (AccountAddress "")
 
 transactionDetails :: UserName -> Password -> Text -> IO (Maybe(Result RawTransaction)) 
 transactionDetails userName password anId = do 
@@ -167,11 +174,7 @@ format :: (AccountAddress, BCommon.Address, [Maybe (Result RawTransaction)]) -> 
 format (account, address, transactions) = 
   Prelude.map(\l -> case l of 
                       Just (Success aTransaction) -> 
-                        formatCSV account 
-                        <> ","
-                        <> formatCSV address
-                        <> ","
-                        <> rawTransactionAsCSV account address aTransaction
+                        rawTransactionAsCSV account address aTransaction
                       _ -> 
                           T.pack $ "Error in transaction for " <> (show account)
                               <> " " <> (show address) <> ":" <> (show l)
@@ -179,7 +182,7 @@ format (account, address, transactions) =
 
 -- All transaction details with account information
 f2 = do 
-  x <- (fmap . fmap . fmap) (Prelude.take 3) transactionIds
+  x <- transactionIds
   case x of 
     Just y -> do      
       case y of 
@@ -193,7 +196,7 @@ f2 = do
 
 writeToFile aFile = do 
   bracket (openFile aFile WriteMode) (hClose) $ \h -> do 
-    TextIO.hPutStrLn h "Account, Address, Amount, Confirmation, Block Hash, Block Time, Transaction Id, Time, Time Received"
+    TextIO.hPutStrLn h "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
     f <- f2
     TextIO.hPutStrLn h (T.unlines f)
 
