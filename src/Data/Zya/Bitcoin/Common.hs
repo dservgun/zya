@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Data.Zya.Bitcoin.Common where
 
@@ -14,6 +15,9 @@ import GHC.Generics
 newtype RequestId = RequestId {id :: Text} deriving(Show, Eq, Generic)
 newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq, Generic)
 newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic)
+newtype UserName = UserName {_uName :: String} deriving(Show) 
+newtype Password = Password {_uPassword :: String} deriving(Show)
+
 
 parseString :: Value -> Parser Text
 parseString = withText "string" $ return
@@ -162,4 +166,5 @@ instance CSVFormatter ValueOut where
 mergeScriptAddresses :: ScriptPubKey -> Text 
 mergeScriptAddresses (ScriptPubKey _ _ _ _ addresses) = 
   Text.intercalate "," $ _unaddress <$> addresses
+
 

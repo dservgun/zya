@@ -250,6 +250,8 @@ executable zya_reference
         Data.Zya.Persistence.Internal.Sqlite
         Data.Zya.Persistence.Persistence
         Data.Zya.Utils.Logger
+        Data.Zya.Bitcoin.Client 
+        Data.Zya.Bitcoin.Transaction
 
 test-suite Tasty
   type:   exitcode-stdio-1.0

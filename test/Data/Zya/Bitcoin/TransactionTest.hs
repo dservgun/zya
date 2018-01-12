@@ -48,7 +48,7 @@ prop1 (aTransaction@(Transaction{..})) =
 prop2 (transSummary@(TransactionSummary{..})) =
     Data.Aeson.Success transSummary == (fromJSON . toJSON $ transSummary)
 
-jsonProperties = testGroup "(checked by QuickCheck)"
+jsonProperties = testGroup "QuickCheck tests"
   [ QC.testProperty "Transaction = toJSON fromJSON " prop1
   , QC.testProperty "TransactionSummary  = toJSON fromJSON" prop2
   ]

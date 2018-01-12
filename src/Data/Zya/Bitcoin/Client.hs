@@ -17,8 +17,10 @@ import Data.Text as T
 import Data.Text.IO as TextIO
 import Data.Text.Encoding (decodeUtf8)
 import Data.Zya.Bitcoin.Common as BCommon
+import Data.Zya.Bitcoin.BitcoinSession as BSession(Application, SessionStatus, SessionConfig(..))
 import Data.Zya.Bitcoin.Transaction as Transaction
 import Data.Zya.Bitcoin.RawTransaction as RawTransaction
+import Data.Zya.Bitcoin.JsonRpc
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
 import Network.HTTP.Client hiding(responseBody)
@@ -26,53 +28,9 @@ import Network.Socket
 import Network.Wreq
 import System.IO
 
-version :: String
-version = "1.0"
-
-
-
-getTransactionDetail :: RequestId -> Text -> Value
-getTransactionDetail (RequestId anId) aTransaction = 
-  object [
-    "jsonrpc" .= version
-    , "id" .= anId 
-    , "method" .= ("getrawtransaction" :: Text)
-    , "params" .= [String aTransaction, Number 1]
-  ]
-getAccountAddress :: RequestId -> AccountAddress -> Value
-getAccountAddress (RequestId anId) (AccountAddress aString) = 
-  let 
-    params = object ["account" .= String aString] :: Value
-  in 
-  object 
-  [
-    "jsonrpc" .= version
-    , "id" .= anId 
-    , "method" .= ("getaccountaddress" :: Text)
-    , "params" .= params
-  ]
-
-
-getListReceivedByAddress :: RequestId -> Integer -> Bool -> Bool -> Value 
-getListReceivedByAddress (RequestId anId) transactionCount includeEmpty includeWatchOnly = 
-  let tranFrac = scientific transactionCount 0 in
-  object[
-    "jsonrpc" .= version
-    , "id" .= anId
-    , "method" .= ("listreceivedbyaddress" :: String)
-    , "params" .= ([Number tranFrac, Bool includeEmpty, Bool includeWatchOnly] :: [Value])
-  ]
-
-
-{-
-  curl --user user --data-binary '{"jsonrpc": "1.0", "id":"curltest", "method": "getinfo", "params": [] }' 
-    -H 'content-type: text/plain;' http://127.0.0.1:8332/
--}
 
 
 type Resp = Response (Map String Value)
-newtype UserName = UserName {_uName :: String} deriving(Show) 
-newtype Password = Password {_uPassword :: String} deriving(Show)
 
 
 doPost opts endPoint aRequest = do
@@ -154,12 +112,15 @@ transactionDetails userName password anId = do
             (snd someDefaults)
             userName 
             password 
-            $ getTransactionDetail (RequestId "1") (anId)
+            $ getRawTransaction (RequestId "1") (anId)
   --System.IO.putStrLn $ show resp
   return $ fromJSON <$> resp
 
 -- scary types.
-transactionIds' = (fmap . fmap . fmap) (Prelude.map (\x -> (_account x, _address x, _transactions x))) transactionSummaries
+transactionIds' = 
+    (fmap . fmap . fmap) 
+      (Prelude.map (\x -> (_account x, _address x, _transactions x))) 
+      transactionSummaries
 
 transactionIds = transactionIds'
 
@@ -199,5 +160,6 @@ writeToFile aFile = do
     TextIO.hPutStrLn h "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
     f <- f2
     TextIO.hPutStrLn h (T.unlines f)
+
 
 

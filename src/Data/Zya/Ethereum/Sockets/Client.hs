@@ -208,8 +208,8 @@ gethSession = do
   sessionState <- get
   let socket = sessionSocket cfg
   let nReq = nextRequestId sessionState 
+  --TODO : Cleanup
   s2 <- get
---  liftIO $ System.IO.putStrLn $ " Current state " <> (show s2)
   block <- getAllFilteredTransactionsForAddress
   liftIO $ infoMessage $ Text.pack $ "Transaction " <> show (Prelude.length block) <> " " <> (show block)
   return block

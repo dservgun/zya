@@ -55,3 +55,4 @@ instance CSVFormatter Int where
 
 instance CSVFormatter Integer where 
   output anInteger = Set.fromList[Value . pack . show $ anInteger]
+
