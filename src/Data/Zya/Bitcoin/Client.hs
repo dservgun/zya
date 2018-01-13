@@ -20,9 +20,9 @@ import Data.Zya.Bitcoin.Common as BCommon
 import Data.Zya.Bitcoin.BitcoinSession as BSession(Application, SessionStatus, SessionConfig(..))
 import Data.Zya.Bitcoin.Transaction as Transaction
 import Data.Zya.Bitcoin.RawTransaction as RawTransaction
-import Data.Zya.Bitcoin.JsonRpc
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
+import Data.Zya.Bitcoin.JsonRPC
 import Network.HTTP.Client hiding(responseBody)
 import Network.Socket
 import Network.Wreq
@@ -45,9 +45,10 @@ doPost opts endPoint aRequest = do
 getJSONRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
   let endPoint = "http://" <> userName <> ":" <> password <> "@" <> hostName <> ":" <> serviceName
   let opts = defaults  
+  System.IO.putStrLn $ show aRequest
   handle
       (\e@(SomeException s) -> return $ Just $ String $ T.pack $ show e) 
-      $ doPost opts endPoint aRequest
+      $ return Nothing -- doPost opts endPoint aRequest
 
 
 
@@ -96,8 +97,8 @@ transactionSummaries =
           password
           $ getListReceivedByAddress (RequestId "1") 6 True True
     let transactionSummaries = 
-                      (fmap . fmap)
-                      (Prelude.filter(\x -> notEmptyAccountAddress x))
+                      --(fmap . fmap)
+                      --(Prelude.filter(\x -> notEmptyAccountAddress x))
                       (fromJSON <$> resp)
     return transactionSummaries
 

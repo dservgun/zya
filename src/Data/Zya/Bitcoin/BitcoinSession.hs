@@ -37,6 +37,7 @@ import Network.Wreq
 -- that we would like to know about.
 data GeneralSessionParameters = GeneralSessionParameters {
   transactionCount :: Integer
+  , resultSize :: Int
 } deriving(Show)
 data HostEndPoint = HostEndPoint {
   hostName :: HostName
@@ -52,7 +53,7 @@ createDefaultConfig =
       -- someDefaults = ("127.0.0.1", "8332")
       -- userName = UserName "loyakk_user1"
       -- password = Password "loyakk_password1"
-      sessParams = GeneralSessionParameters 1
+      sessParams = GeneralSessionParameters 6 10
       hostEndPoint = HostEndPoint "127.0.0.1" "8332" (UserName "loyakk_user1") (Password "loyakk_password1")
     in 
       SessionConfig 1 hostEndPoint sessParams "abc"
@@ -75,7 +76,7 @@ data SessionState = SessionState {
 
 createDefaultState = 
     SessionState 
-      (RequestId "1") 
+      (RequestId 1) 
 
 
 instance Show SessionState where 
@@ -90,10 +91,27 @@ type SessionStatus a = Either String a
 newtype SessionRequest = SessionRequest {_unReq :: Text} deriving (Show)
 newtype SessionResponse = SessionResponse {_unRes :: Text} deriving(Show)
 
--- Workflow 
--- for each account
--- get address for the account
--- get 
+{-- | Workflow for each account
+  Retrieve
+   * The address for the account.
+   * All associated transaction summaries for the address.
+   * Collect all the transaction details for each summary.
+--}
+processAccount :: AccountAddress -> Application [Result RawTransaction]
+processAccount address = do 
+  (SessionConfig sReqId hostEndPoint generalSessionParameters outputFile) <- ask
+  let fullyFormedEndPoint = endPoint hostEndPoint
+  let opts = defaults
+  let resultRows = resultSize generalSessionParameters
+  (SessionState nReqId) <- State.get
+  let req = getAccountAddress address nReqId
+  response <- liftIO $ doPost opts fullyFormedEndPoint req
+  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
+  transactionSummaries <- processListByAddress address
+  let transactionIds = Prelude.take resultRows $ Prelude.map (\x -> _transactions x) $ Prelude.concat transactionSummaries
+  liftIO $ putStrLn $ "transaction ids " <> (show $ Prelude.length transactionIds)
+  r <- mapM transactionDetails $ Prelude.concat transactionIds
+  return r
 
 
 getRawTransaction :: Text -> RequestId -> Value 
@@ -136,7 +154,7 @@ getAccountAddress (AccountAddress aString) (RequestId anId) =
 type NextRequest = RequestId -> Value
 
 incrementRequestId :: RequestId -> RequestId 
-incrementRequestId (RequestId anId) = RequestId $ anId <> (Text.pack $ show 1) -- Some counter.
+incrementRequestId input = input + 1
 
 
 
@@ -144,66 +162,44 @@ incrementRequestId (RequestId anId) = RequestId $ anId <> (Text.pack $ show 1) -
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
-  putStrLn $ (show respBody)
+  putStrLn $ show aRequest
   if respBody ==  Nothing then 
     return $ Just $ (String $ Text.pack $ "Failed to return response : " <> (show aRequest))
   else 
     return respBody
 
 
-transactionDetails :: Text -> Application (Maybe (Result RawTransaction))
+transactionDetails :: Text -> Application (Result RawTransaction)
 transactionDetails anId = do 
   (SessionConfig _ hostEndPoint genParams outputFile) <- ask
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hostEndPoint
   let request = getRawTransaction anId nReqId
   resp <- liftIO $ doPost defaults fullyFormedEndPoint request
-  --System.IO.putStrLn $ show resp
-  return $ fromJSON <$> resp
+  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
+  --liftIO $ putStrLn $ show resp
+  return $ 
+    case resp of 
+      Just x -> fromJSON x 
+      Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
 
 
-processListByAddress ::  AccountAddress -> Application (Maybe (Result TransactionSummary))
+processListByAddress ::  AccountAddress -> Application (Result [TransactionSummary])
 processListByAddress accountAddress = do
   (SessionConfig _ hostEndPoint genParams outputFile) <- ask
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hostEndPoint
   let request = getListReceivedByAddress accountAddress (transactionCount genParams) includeEmpty includeWatchOnly nReqId
   response <- liftIO $ doPost defaults fullyFormedEndPoint request
-  return $ fromJSON <$> response
+  liftIO $ putStrLn $ Prelude.take 1024 $ show response
+  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
+  case response of 
+    Just x -> return $ fromJSON x
+    Nothing -> return $ Error "No transactions found"
   where
     includeEmpty = True
     includeWatchOnly = True
 
-
-getTexts :: Result(Maybe [Text]) -> [Text]
-getTexts aResultSet = 
-  case aResultSet of 
-      Success y -> 
-        case y of 
-            Just z -> z
-            _ -> []
-      _ -> []
-
-processAccount :: AccountAddress -> Application [Maybe (Result RawTransaction)]
-processAccount address = do 
-  (SessionConfig sReqId hostEndPoint generalSessionParameters outputFile) <- ask
-  let fullyFormedEndPoint = endPoint hostEndPoint
-  let opts = defaults
-  (SessionState nReqId) <- State.get
-  let req = getAccountAddress address nReqId
-  response <- liftIO $ doPost opts fullyFormedEndPoint req
-  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
-  transactionSummaries <- processListByAddress address
-  let transactionIds = mapM (\x -> fmap _transactions x) transactionSummaries
-  mapM transactionDetails $ getTexts transactionIds
-
-
---generalLedgerForAddress :: Address -> IO (SessionStatus AccountAddress, SessionState)
-generalLedgerForAddress anAddress = do 
-  let 
-    config = createDefaultConfig
-    state = createDefaultState
-  runStateT(runReaderT (runA (processAccount anAddress)) config) state
 
 
 
@@ -215,8 +211,14 @@ addresses = AccountAddress
             , "1DZzpDWEacmFVsw8KTRB6uqVxf7nAYdzmW"
             , "1C6nxuqAmytbXR162nC3Xw2TMsYkQJNw9C"]
 
-f1 = generalLedgerForAddress $ AccountAddress "16R9ffu5BPcKHoy3dvZLQeghqHgHecEVWF"
+f1 addressList = do
+  mapM processAccount addressList
 
+f2 addressList = do 
+  let 
+    config = createDefaultConfig
+    state = createDefaultState
+  runStateT (runReaderT (runA $ f1 addressList) config) state
 {-unwrapSendTransactionIO :: Socket -> String -> TransactionRequest -> IO(Maybe Value, SessionState) 
 unwrapSendTransactionIO socket accountAddress transactionRequest = do 
   let 

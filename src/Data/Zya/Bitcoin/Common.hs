@@ -12,12 +12,15 @@ import Data.Scientific
 import Data.Text as Text
 import GHC.Generics
 
-newtype RequestId = RequestId {id :: Text} deriving(Show, Eq, Generic)
+newtype RequestId = RequestId {id :: Integer} deriving(Show, Eq, Generic)
 newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq, Generic)
 newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic)
 newtype UserName = UserName {_uName :: String} deriving(Show) 
 newtype Password = Password {_uPassword :: String} deriving(Show)
 
+instance Num RequestId where 
+  RequestId a + RequestId b = RequestId (a + b)
+  fromInteger = RequestId 
 
 parseString :: Value -> Parser Text
 parseString = withText "string" $ return
