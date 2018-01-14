@@ -100,3 +100,9 @@ groupFormatCSV (AccountAddress acc) (Address addr) (RawTransaction t h v size vs
 
 rawTransactionAsCSV :: AccountAddress -> Address -> RawTransaction -> Text 
 rawTransactionAsCSV account address = \a -> Text.unlines $ groupFormatCSV account address a
+
+rawTransactionAsCSVR :: AccountAddress -> Address -> Result RawTransaction -> Text
+rawTransactionAsCSVR account address = \a -> 
+  case a of 
+    Success x -> rawTransactionAsCSV account address x 
+    Error y -> Text.pack y

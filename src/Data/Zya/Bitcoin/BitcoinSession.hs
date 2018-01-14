@@ -20,6 +20,7 @@ import Data.Aeson.Lens(key, nth)
 import Data.Monoid
 import Data.Scientific
 import Data.Text as Text
+import Data.Text.IO as TextIO
 import Data.Zya.Bitcoin.Common 
 import Data.Zya.Bitcoin.Common as BCommon
 import Data.Zya.Bitcoin.JsonRPC hiding (getListReceivedByAddress, getAccountAddress, getRawTransaction)
@@ -30,8 +31,9 @@ import Network.HTTP.Client hiding(responseBody)
 import Network.Socket
 import Network.Wreq as Wreq
 import System.Log.Logger
+import System.IO
 import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage, addFileHandler)
-
+import Data.Zya.Bitcoin.Config
 
 --import Network.Wreq.Internal.Types as WreqTypes
 
@@ -58,14 +60,16 @@ data HostEndPoint = HostEndPoint {
   , password :: Password 
 } deriving(Show)
 
+createConfig :: String -> String -> String -> SessionConfig 
+createConfig userName password port = 
+    let 
+      sessParams = GeneralSessionParameters 1000 $ ResultSet 10
+      hostEndPoint = HostEndPoint "127.0.0.1" port (UserName userName) (Password password)
+    in 
+      SessionConfig 1 hostEndPoint sessParams "gl.csv" "accounts.txt"
 
 createDefaultConfig :: SessionConfig 
-createDefaultConfig = 
-    let 
-      sessParams = GeneralSessionParameters 6 AllRows
-      hostEndPoint = HostEndPoint "127.0.0.1" "8332" (UserName "loyakk_user1") (Password "loyakk_password1")
-    in 
-      SessionConfig 1 hostEndPoint sessParams "abc"
+createDefaultConfig = createConfig "loyakk_user1" "loyakk_password1" "8332"
 
 endPoint :: HostEndPoint -> String 
 endPoint (HostEndPoint hostName serviceName (UserName userName) (Password password)) = 
@@ -77,6 +81,7 @@ data SessionConfig = SessionConfig {
   , hostEndPoint :: HostEndPoint
   , sessionParameters :: GeneralSessionParameters
   , outputFile :: FilePath
+  , inputFile :: FilePath
 } deriving(Show)
 
 data SessionState = SessionState {
@@ -107,9 +112,9 @@ newtype SessionResponse = SessionResponse {_unRes :: Text} deriving(Show)
    * All associated transaction summaries for the address.
    * Collect all the transaction details for each summary.
 --}
-processAccount :: AccountAddress -> Application [Result RawTransaction]
+processAccount :: AccountAddress -> Application [(AccountAddress, Address, Result RawTransaction)]
 processAccount address = do 
-  (SessionConfig sReqId hostEndPoint generalSessionParameters outputFile) <- ask
+  (SessionConfig sReqId hostEndPoint generalSessionParameters outputFile _) <- ask
   let fullyFormedEndPoint = endPoint hostEndPoint
   let opts = defaults
   let resultRows = resultSize generalSessionParameters
@@ -119,14 +124,21 @@ processAccount address = do
   debugMessage' $ Text.pack $ show response 
   State.modify (\s -> s {nextRequestId = 1 + nReqId})
   transactionSummaries <- processListByAddress address
-  let transactionIds = truncateResultSet resultRows $ Prelude.map (\x -> _transactions x) $ Prelude.concat transactionSummaries
-  liftIO $ putStrLn $ "transaction ids " <> (show $ Prelude.length transactionIds)
+  let transactionIds = truncateResultSet resultRows $ 
+                            Prelude.map (\x -> _transactions x) $ 
+                              Prelude.filter(\x -> _account x == address) $ 
+                                Prelude.concat transactionSummaries
+  debugMessage' $ Text.pack $ "transaction ids " <> (show $ Prelude.length transactionIds)
   r <- mapM transactionDetails $ truncateResultSet resultRows $ Prelude.concat transactionIds
-  return r
+  let r2 = Prelude.map (\(x,y) -> (address, Address x, y))r 
+  return r2
 
 truncateResultSet :: ResultSetSize ->  [a] -> [a]
 truncateResultSet (ResultSet n) a = Prelude.take n a 
 truncateResultSet AllRows a = a 
+
+notEmptyAccountAddress :: TransactionSummary -> Bool
+notEmptyAccountAddress summary = _account summary /= (AccountAddress "")
 
 
 getRawTransaction :: Text -> RequestId -> Value 
@@ -175,7 +187,7 @@ type NextRequest = RequestId -> Value
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
-  putStrLn $ show aRequest
+  debugMessage $ Text.pack $ show aRequest
   if respBody ==  Nothing then 
     return $ Just $ (String $ Text.pack $ "Failed to return response : " <> (show aRequest))
   else 
@@ -187,9 +199,9 @@ errorMessage' = liftIO . errorMessage
 debugMessage' :: Text -> Application () 
 debugMessage' = liftIO . debugMessage
 
-transactionDetails :: Text -> Application (Result RawTransaction)
+transactionDetails :: Text -> Application (Text, Result RawTransaction)
 transactionDetails anId = do 
-  (SessionConfig _ hostEndPoint genParams outputFile) <- ask
+  (SessionConfig _ hostEndPoint genParams outputFile _) <- ask
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hostEndPoint
   let request = getRawTransaction anId nReqId
@@ -198,20 +210,19 @@ transactionDetails anId = do
       doPost defaults fullyFormedEndPoint request
   errorMessage' $ Text.pack $ show resp
   State.modify (\s -> s {nextRequestId = 1 + nReqId})
-  return $ 
-    case resp of 
-      Just x -> fromJSON x 
-      Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
-
+  let r = case resp of 
+            Just x -> fromJSON x
+            Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
+  return (anId, r)
 
 processListByAddress :: AccountAddress -> Application (Result [TransactionSummary])
 processListByAddress accountAddress = do
-  (SessionConfig _ hEndPoint gP' oFile) <- ask
+  (SessionConfig _ hEndPoint gP' oFile _) <- ask
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hEndPoint
   let request = getListReceivedByAddress accountAddress (transactionCount gP') includeEmpty includeWatchOnly nReqId
   response <- liftIO $ doPost defaults fullyFormedEndPoint request
-  debugMessage' $ Text.take 1024 $ Text.pack $ show response
+  debugMessage' $ Text.pack $ show response
   State.modify (\s -> s {nextRequestId = 1 + nReqId})
   case response of 
     Just x -> return $ fromJSON x
@@ -232,8 +243,8 @@ addresses = AccountAddress
             , "1C6nxuqAmytbXR162nC3Xw2TMsYkQJNw9C"]
 
 
-generalLedgerApplication :: Traversable t => t AccountAddress -> IO (t [Result RawTransaction], SessionState)
-generalLedgerApplication addressList = do 
+generalLedgerApplication' :: Traversable t => t AccountAddress -> IO (t [(AccountAddress, Address, Result RawTransaction)], SessionState)
+generalLedgerApplication' addressList = do 
   setup DEBUG
   addFileHandler "btc.debug.log" DEBUG
   addFileHandler "btc.info.log" INFO
@@ -243,3 +254,31 @@ generalLedgerApplication addressList = do
   runStateT (runReaderT (runA $ traverse processAccount addressList) config) initialState
 
 
+--writeToFile :: [[Text]] -> FilePath -> IO () 
+writeToFile messages aFile = 
+  bracket (openFile aFile AppendMode) (hClose) $ \h -> do 
+    TextIO.hPutStrLn h "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
+    TextIO.hPutStrLn h (Text.unlines messages)
+
+readInputAccounts :: FilePath -> IO [AccountAddress]
+readInputAccounts aFile = do
+  bracket (openFile aFile ReadMode) (\_ -> return()) $ \h -> do 
+    contents <- System.IO.hGetContents h 
+    return $ AccountAddress . Text.pack <$> (Prelude.lines contents)
+
+--generalLedgerApplication :: Traversable t => t AccountAddress -> IO [()]
+generalLedgerApplication inputFileConfig = do 
+  config <- defaultFileLocation >>= readConfig 
+  setup DEBUG
+  addFileHandler "btc.debug.log" DEBUG
+  addFileHandler "btc.info.log" INFO 
+  user <- btcUserName config
+  passwordL <- btcPassword config
+  port <- btcRpcPort config
+  let 
+    config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
+    initialState = createDefaultState
+  addressList <- readInputAccounts (inputFileConfig)
+  transactionIds <- fst <$> (runStateT (runReaderT (runA $ traverse processAccount addressList) config1) initialState)
+  messages <- return $ mapM (\y -> Prelude.map (\(x1, y1, z1) -> rawTransactionAsCSVR x1 y1 z1) y) transactionIds
+  mapM (\m -> writeToFile m (outputFile config1)) $ Prelude.take 3 messages

@@ -295,7 +295,6 @@ test-suite Tasty
   main-is : Tasty.hs
 
 
-
 executable zya_ethereum_client
   main-is : EtherClient.hs
   build-depends : 

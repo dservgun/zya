@@ -1,8 +1,10 @@
 module Main where 
 import Data.Zya.Bitcoin.BitcoinSession
+import Data.Text
+import Data.Traversable
+import System.Environment(getArgs)
 
 
-main :: IO () 
 main = do
-  generalLedgerApplication addresses 
-  return ()
+  [fileName] <- getArgs
+  generalLedgerApplication fileName
