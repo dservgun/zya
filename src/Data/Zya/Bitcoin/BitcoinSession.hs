@@ -266,12 +266,15 @@ readInputAccounts aFile = do
     contents <- System.IO.hGetContents h 
     return $ AccountAddress . Text.pack <$> (Prelude.lines contents)
 
---generalLedgerApplication :: Traversable t => t AccountAddress -> IO [()]
-generalLedgerApplication inputFileConfig = do 
-  config <- defaultFileLocation >>= readConfig 
+setupLogging = do 
   setup DEBUG
   addFileHandler "btc.debug.log" DEBUG
   addFileHandler "btc.info.log" INFO 
+
+--generalLedgerApplication :: Traversable t => t AccountAddress -> IO [()]
+generalLedgerApplication inputFileConfig = do 
+  setupLogging
+  config <- defaultFileLocation >>= readConfig 
   user <- btcUserName config
   passwordL <- btcPassword config
   port <- btcRpcPort config
