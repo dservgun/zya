@@ -5,6 +5,7 @@ module Data.Zya.Utils.Logger
     , errorMessage
     , infoMessage
     , debugMessage
+    , addFileHandler
   )
  where
 

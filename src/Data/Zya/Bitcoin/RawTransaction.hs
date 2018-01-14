@@ -30,9 +30,21 @@ data RawTransaction = RawTransaction {
   , __confirmations :: Integer
   , __time :: Integer
   , __blockTime :: Integer
-} deriving(Show, Generic)
+} deriving(Generic)
 
-
+instance Show RawTransaction where 
+  show (RawTransaction tx ha ver size vsize locktime vin vout _ blockHash conf time blocktime) = 
+      Text.unpack $ 
+        Text.intercalate "-" $ 
+          Text.pack 
+            <$> 
+            [show tx, show ha, show ver
+            , show size, show vsize
+            , show locktime
+            , show blockHash
+            , show conf 
+            , show time
+            , show blocktime]
 
 
 instance FromJSON RawTransaction where 

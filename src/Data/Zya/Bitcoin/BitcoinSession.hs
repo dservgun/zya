@@ -3,9 +3,10 @@
 
 module Data.Zya.Bitcoin.BitcoinSession
 (
-  Application
-  , SessionStatus
-  , SessionConfig(..)
+  generalLedgerApplication
+  , HostEndPoint(..)
+  , GeneralSessionParameters(..)
+  , addresses -- TODO remove this and read from a file.
 ) where
 
 import Control.Exception.Safe
@@ -27,17 +28,28 @@ import Data.Zya.Bitcoin.Transaction as Transaction
 import Data.Zya.Utils.IPC
 import Network.HTTP.Client hiding(responseBody)
 import Network.Socket
-import Network.Wreq
+import Network.Wreq as Wreq
+import System.Log.Logger
+import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage, addFileHandler)
 
+
+--import Network.Wreq.Internal.Types as WreqTypes
 
 -- Some constants such as transaction count when 
--- accessing the wallet. This should
--- more become a map rather than single instance,
--- each request type could have a set of defaults
--- that we would like to know about.
+-- accessing the wallet.
+
+data ResultSetSize = ResultSet Int | AllRows deriving (Show)
+
+instance Num ResultSetSize where 
+  ResultSet a + ResultSet b = ResultSet (a + b)
+  ResultSet a + AllRows = AllRows
+  AllRows + _ = AllRows
+  fromInteger = ResultSet . fromIntegral
+
+
 data GeneralSessionParameters = GeneralSessionParameters {
   transactionCount :: Integer
-  , resultSize :: Int
+  , resultSize :: ResultSetSize
 } deriving(Show)
 data HostEndPoint = HostEndPoint {
   hostName :: HostName
@@ -50,10 +62,7 @@ data HostEndPoint = HostEndPoint {
 createDefaultConfig :: SessionConfig 
 createDefaultConfig = 
     let 
-      -- someDefaults = ("127.0.0.1", "8332")
-      -- userName = UserName "loyakk_user1"
-      -- password = Password "loyakk_password1"
-      sessParams = GeneralSessionParameters 6 10
+      sessParams = GeneralSessionParameters 6 AllRows
       hostEndPoint = HostEndPoint "127.0.0.1" "8332" (UserName "loyakk_user1") (Password "loyakk_password1")
     in 
       SessionConfig 1 hostEndPoint sessParams "abc"
@@ -91,6 +100,7 @@ type SessionStatus a = Either String a
 newtype SessionRequest = SessionRequest {_unReq :: Text} deriving (Show)
 newtype SessionResponse = SessionResponse {_unRes :: Text} deriving(Show)
 
+
 {-- | Workflow for each account
   Retrieve
    * The address for the account.
@@ -106,12 +116,17 @@ processAccount address = do
   (SessionState nReqId) <- State.get
   let req = getAccountAddress address nReqId
   response <- liftIO $ doPost opts fullyFormedEndPoint req
-  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
+  debugMessage' $ Text.pack $ show response 
+  State.modify (\s -> s {nextRequestId = 1 + nReqId})
   transactionSummaries <- processListByAddress address
-  let transactionIds = Prelude.take resultRows $ Prelude.map (\x -> _transactions x) $ Prelude.concat transactionSummaries
+  let transactionIds = truncateResultSet resultRows $ Prelude.map (\x -> _transactions x) $ Prelude.concat transactionSummaries
   liftIO $ putStrLn $ "transaction ids " <> (show $ Prelude.length transactionIds)
-  r <- mapM transactionDetails $ Prelude.concat transactionIds
+  r <- mapM transactionDetails $ truncateResultSet resultRows $ Prelude.concat transactionIds
   return r
+
+truncateResultSet :: ResultSetSize ->  [a] -> [a]
+truncateResultSet (ResultSet n) a = Prelude.take n a 
+truncateResultSet AllRows a = a 
 
 
 getRawTransaction :: Text -> RequestId -> Value 
@@ -153,12 +168,10 @@ getAccountAddress (AccountAddress aString) (RequestId anId) =
 
 type NextRequest = RequestId -> Value
 
-incrementRequestId :: RequestId -> RequestId 
-incrementRequestId input = input + 1
 
 
 
-
+--doPost :: (WreqTypes.Postable a, Show a) => Wreq.Options -> String -> a -> IO (Maybe Value)
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
@@ -168,6 +181,11 @@ doPost opts endPoint aRequest = do
   else 
     return respBody
 
+errorMessage' :: Text -> Application ()
+errorMessage' = liftIO . errorMessage
+
+debugMessage' :: Text -> Application () 
+debugMessage' = liftIO . debugMessage
 
 transactionDetails :: Text -> Application (Result RawTransaction)
 transactionDetails anId = do 
@@ -175,24 +193,26 @@ transactionDetails anId = do
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hostEndPoint
   let request = getRawTransaction anId nReqId
-  resp <- liftIO $ doPost defaults fullyFormedEndPoint request
-  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
-  --liftIO $ putStrLn $ show resp
+  resp <- liftIO $ 
+    handle (\e@(SomeException ecp) -> return . Just . String .pack . show $ e) $ do 
+      doPost defaults fullyFormedEndPoint request
+  errorMessage' $ Text.pack $ show resp
+  State.modify (\s -> s {nextRequestId = 1 + nReqId})
   return $ 
     case resp of 
       Just x -> fromJSON x 
       Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
 
 
-processListByAddress ::  AccountAddress -> Application (Result [TransactionSummary])
+processListByAddress :: AccountAddress -> Application (Result [TransactionSummary])
 processListByAddress accountAddress = do
-  (SessionConfig _ hostEndPoint genParams outputFile) <- ask
+  (SessionConfig _ hEndPoint gP' oFile) <- ask
   (SessionState nReqId) <- State.get  
-  let fullyFormedEndPoint = endPoint hostEndPoint
-  let request = getListReceivedByAddress accountAddress (transactionCount genParams) includeEmpty includeWatchOnly nReqId
+  let fullyFormedEndPoint = endPoint hEndPoint
+  let request = getListReceivedByAddress accountAddress (transactionCount gP') includeEmpty includeWatchOnly nReqId
   response <- liftIO $ doPost defaults fullyFormedEndPoint request
-  liftIO $ putStrLn $ Prelude.take 1024 $ show response
-  State.modify (\s -> s {nextRequestId = incrementRequestId nReqId})
+  debugMessage' $ Text.take 1024 $ Text.pack $ show response
+  State.modify (\s -> s {nextRequestId = 1 + nReqId})
   case response of 
     Just x -> return $ fromJSON x
     Nothing -> return $ Error "No transactions found"
@@ -211,18 +231,15 @@ addresses = AccountAddress
             , "1DZzpDWEacmFVsw8KTRB6uqVxf7nAYdzmW"
             , "1C6nxuqAmytbXR162nC3Xw2TMsYkQJNw9C"]
 
-f1 addressList = do
-  mapM processAccount addressList
 
-f2 addressList = do 
+generalLedgerApplication :: Traversable t => t AccountAddress -> IO (t [Result RawTransaction], SessionState)
+generalLedgerApplication addressList = do 
+  setup DEBUG
+  addFileHandler "btc.debug.log" DEBUG
+  addFileHandler "btc.info.log" INFO
   let 
     config = createDefaultConfig
-    state = createDefaultState
-  runStateT (runReaderT (runA $ f1 addressList) config) state
-{-unwrapSendTransactionIO :: Socket -> String -> TransactionRequest -> IO(Maybe Value, SessionState) 
-unwrapSendTransactionIO socket accountAddress transactionRequest = do 
-  let 
-    config = SessionConfig 1 socket (read accountAddress) 0 0
-    state = SessionState 0 Nothing 
-  runStateT (runReaderT (runA (sendTransactionInSession transactionRequest)) config) state
--}
+    initialState = createDefaultState
+  runStateT (runReaderT (runA $ traverse processAccount addressList) config) initialState
+
+

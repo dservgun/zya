@@ -4,6 +4,7 @@ module Data.Zya.Bitcoin.TransactionTest where
 import Control.Applicative 
 import Data.Aeson
 import Data.Scientific
+import Data.Zya.Bitcoin.Common
 import Data.Zya.Bitcoin.Transaction
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Arbitrary.Generic

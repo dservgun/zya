@@ -17,7 +17,6 @@ import Data.Text as T
 import Data.Text.IO as TextIO
 import Data.Text.Encoding (decodeUtf8)
 import Data.Zya.Bitcoin.Common as BCommon
-import Data.Zya.Bitcoin.BitcoinSession as BSession(Application, SessionStatus, SessionConfig(..))
 import Data.Zya.Bitcoin.Transaction as Transaction
 import Data.Zya.Bitcoin.RawTransaction as RawTransaction
 import Data.Zya.Utils.IPC
@@ -73,7 +72,7 @@ loadAddresses defaults userName password addresses =
           (snd someDefaults) 
           userName
           password
-          $ getAccountAddress (RequestId "test") addr) addresses
+          $ getAccountAddress (RequestId 1) addr) addresses
 
 
 transactionSummaries :: IO (Maybe (Result [TransactionSummary]))
@@ -95,7 +94,7 @@ transactionSummaries =
           (snd someDefaults) 
           userName
           password
-          $ getListReceivedByAddress (RequestId "1") 6 True True
+          $ getListReceivedByAddress (RequestId 1) 6 True True
     let transactionSummaries = 
                       --(fmap . fmap)
                       --(Prelude.filter(\x -> notEmptyAccountAddress x))
@@ -113,7 +112,7 @@ transactionDetails userName password anId = do
             (snd someDefaults)
             userName 
             password 
-            $ getRawTransaction (RequestId "1") (anId)
+            $ getRawTransaction (RequestId 1) (anId)
   --System.IO.putStrLn $ show resp
   return $ fromJSON <$> resp
 
