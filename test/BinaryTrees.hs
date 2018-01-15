@@ -102,6 +102,3 @@ fructify (B a b) = B (fructify a) (fructify b)
 appBind :: (Monad f, Applicative f) => f (a -> b) -> f a -> f b
 appBind f1 container = f1 >>= \f -> f <$> container
 
-
-
-

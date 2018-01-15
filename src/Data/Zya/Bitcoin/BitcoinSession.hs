@@ -243,22 +243,14 @@ addresses = AccountAddress
             , "1C6nxuqAmytbXR162nC3Xw2TMsYkQJNw9C"]
 
 
-generalLedgerApplication' :: Traversable t => t AccountAddress -> IO (t [(AccountAddress, Address, Result RawTransaction)], SessionState)
-generalLedgerApplication' addressList = do 
-  setup DEBUG
-  addFileHandler "btc.debug.log" DEBUG
-  addFileHandler "btc.info.log" INFO
-  let 
-    config = createDefaultConfig
-    initialState = createDefaultState
-  runStateT (runReaderT (runA $ traverse processAccount addressList) config) initialState
-
+writeToFileWM aFile aMode aMessage = 
+  bracket (openFile aFile aMode) (hClose) $ \h -> do 
+    TextIO.hPutStrLn h aMessage
 
 --writeToFile :: [[Text]] -> FilePath -> IO () 
-writeToFile messages aFile = 
-  bracket (openFile aFile AppendMode) (hClose) $ \h -> do 
-    TextIO.hPutStrLn h "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
-    TextIO.hPutStrLn h (Text.unlines messages)
+writeToFile messages aFile aMode = 
+  bracket (openFile aFile aMode) (hClose) $ \h -> do 
+    TextIO.hPutStrLn h $ Text.unlines messages
 
 readInputAccounts :: FilePath -> IO [AccountAddress]
 readInputAccounts aFile = do
@@ -284,4 +276,7 @@ generalLedgerApplication inputFileConfig = do
   addressList <- readInputAccounts (inputFileConfig)
   transactionIds <- fst <$> (runStateT (runReaderT (runA $ traverse processAccount addressList) config1) initialState)
   messages <- return $ mapM (\y -> Prelude.map (\(x1, y1, z1) -> rawTransactionAsCSVR x1 y1 z1) y) transactionIds
-  mapM (\m -> writeToFile m (outputFile config1)) $ Prelude.take 3 messages
+  writeToFileWM (outputFile config1) WriteMode header -- Write the header, append messsages.
+  mapM (\m -> writeToFile m (outputFile config1) AppendMode) $ Prelude.take 3 messages
+  where 
+    header = "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
