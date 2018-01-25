@@ -1,5 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module TraversableTest where
 
 import Data.Monoid
@@ -91,3 +92,14 @@ newtype MaybeT m a = MaybeT {runMaybe :: m (Maybe a)}
 
 instance Monad m => Monad (MaybeT m) where
   return a = MaybeT $ return $ Just a-}
+
+
+flatmap :: (a -> [b]) -> [a] -> [b]
+flatmap f i = myconcat $ Prelude.map f i
+
+myconcat :: [[a]] -> [a]
+myconcat l = case l of
+    [[]] -> []
+    [] -> []
+    [] : t : t1 -> myconcat (t : t1)
+    (h : t) : t1 -> h : (myconcat (t : t1))
