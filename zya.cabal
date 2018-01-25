@@ -92,7 +92,6 @@ library
 
   -- Modules included in this library but not exported.
   other-modules:
-    Data.Zya.Parsers.Lexer
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
   build-tools: alex, happy
