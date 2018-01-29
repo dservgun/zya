@@ -11,6 +11,7 @@ import Data.Map as Map
 import Data.Monoid((<>))
 import Data.Scientific
 import Data.Text as Text
+import Data.Zya.Bitcoin.Block as BCommon
 import Data.Zya.Bitcoin.Common as BCommon
 import GHC.Generics
 

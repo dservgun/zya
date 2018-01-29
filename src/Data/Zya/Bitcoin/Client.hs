@@ -40,11 +40,12 @@ doPost opts endPoint aRequest = do
   else 
     return respBody
 
+putStrLnC aString = return () -- putStrLn
 
 getJSONRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
   let endPoint = "http://" <> userName <> ":" <> password <> "@" <> hostName <> ":" <> serviceName
   let opts = defaults  
-  System.IO.putStrLn $ show aRequest
+  putStrLnc $ show aRequest
   handle
       (\e@(SomeException s) -> return $ Just $ String $ T.pack $ show e) 
       $ return Nothing -- doPost opts endPoint aRequest

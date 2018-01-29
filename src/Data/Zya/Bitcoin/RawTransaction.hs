@@ -84,6 +84,7 @@ instance ToJSON RawTransaction where
     ]
 
 
+
 -- Need to understand how to fold this stuff.
 groupFormatCSV (AccountAddress acc) (Address addr) (RawTransaction t h v size vsize lT vin vout _ _ confirmations time blockTime) = 
   --Prelude.map formatCSV (\a -> Map.union footer a) valueOuts
@@ -106,3 +107,13 @@ rawTransactionAsCSVR account address = \a ->
   case a of 
     Success x -> rawTransactionAsCSV account address x 
     Error y -> Text.pack y
+
+
+hasVOAddress :: Address -> RawTransaction -> Bool
+hasVOAddress anAddress aTransaction = 
+  let
+    vout = __vout aTransaction
+    addresses = Prelude.concat $ Prelude.map(\v -> __keyAddresses $ __scriptPubKey v) vout
+    matches = Prelude.filter(\x -> x == anAddress) addresses
+  in
+    Prelude.length matches > 0

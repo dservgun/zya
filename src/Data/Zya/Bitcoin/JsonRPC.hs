@@ -1,19 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Zya.Bitcoin.JsonRPC
 (
-  getRawTransaction
-  , getAccountAddress
+  getAccountAddress
+  , getBlockHash
+  , getBlock
   , getListReceivedByAddress
+  , getRawTransaction
   , version 
 ) where 
 
 import Data.Aeson
 import Data.Scientific
+import Data.Zya.Bitcoin.Block
 import Data.Zya.Bitcoin.Common
-import Data.Text
+
+import Data.Text as Text(pack, Text)
+import Text.Printf(printf)
 
 version :: String
 version = "1.0"
+
+
+getBlock :: RequestId -> BlockHash -> Value 
+getBlock (RequestId anId) (BlockHash aHash) = 
+  object[
+    "jsonrpc" .= version
+    , "id" .= anId
+    , "method" .= ("getblock" :: Text)
+    , "params" .= [String $ Text.pack $ printf "%x" (aHash :: Integer)]
+    ]
+getBlockHash :: RequestId -> BlockHeight -> Value
+getBlockHash (RequestId anId) (BlockHeight aHeight) = 
+  object[
+    "jsonrpc" .= version
+    , "id" .= anId
+    , "method" .= ("getblockhash" :: Text)
+    , "params" .= [Number $ scientific (toInteger aHeight) 0]
+  ]
 
 getRawTransaction :: RequestId -> Text -> Value
 getRawTransaction (RequestId anId) aTransaction = 
@@ -23,6 +46,8 @@ getRawTransaction (RequestId anId) aTransaction =
     , "method" .= ("getrawtransaction" :: Text)
     , "params" .= [String aTransaction, Number 1]
   ]
+
+
 
 getAccountAddress :: RequestId -> AccountAddress -> Value
 getAccountAddress (RequestId anId) (AccountAddress aString) = 
