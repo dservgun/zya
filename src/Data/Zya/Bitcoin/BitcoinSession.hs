@@ -8,6 +8,7 @@ module Data.Zya.Bitcoin.BitcoinSession
   , GeneralSessionParameters(..)
   , addresses -- TODO remove this and read from a file.
   , searchTransactions
+  , getSingleTransaction
 ) where
 
 import Control.Exception.Safe
@@ -21,11 +22,12 @@ import Data.Aeson.Lens(key, nth)
 import Data.Monoid
 import Data.Scientific
 import Data.Text as Text
+import Text.Printf
 import Data.Text.IO as TextIO
 import Data.Zya.Bitcoin.Common 
 import Data.Zya.Bitcoin.Block
 import Data.Zya.Bitcoin.Common as BCommon
-import Data.Zya.Bitcoin.JsonRPC hiding (getListReceivedByAddress, getRawTransaction)
+import Data.Zya.Bitcoin.JsonRPC hiding (getListReceivedByAddress)
 import Data.Zya.Bitcoin.RawTransaction as RawTransaction
 import Data.Zya.Bitcoin.Transaction as Transaction
 import Data.Zya.Utils.IPC
@@ -141,7 +143,7 @@ processAccount address = do
                             Prelude.map (\x -> _transactions x) $ 
                               Prelude.filter(\x -> _account x == address) $ 
                                 Prelude.concat transactionSummaries
-  debugMessage' $ Text.pack $ "transaction ids " <> (show $ Prelude.length transactionIds)
+  
   r <- mapM transactionDetails $ truncateResultSet resultRows $ Prelude.concat transactionIds
   let r2 = Prelude.map (\(x,y) -> (address, Address x, y))r 
   return r2
@@ -153,18 +155,6 @@ truncateResultSet AllRows a = a
 notEmptyAccountAddress :: TransactionSummary -> Bool
 notEmptyAccountAddress summary = _account summary /= (AccountAddress "")
 
-
-getRawTransaction :: Text -> RequestId -> Value 
-getRawTransaction aTransactionId (RequestId anId) = 
-  let 
-    verbose = 1 -- 0 returns the hex bytestring.
-  in 
-    object[
-      "jsonrpc" .= version
-      , "id" .= anId
-      , "method" .= ("getrawtransaction" :: String)
-      , "params" .= [String aTransactionId, Number verbose]
-    ]
 
 getListReceivedByAddress :: AccountAddress -> Integer -> Bool -> Bool -> RequestId -> Value 
 getListReceivedByAddress accountAddress transactionCount includeEmpty includeWatchOnly (RequestId anId) = 
@@ -197,20 +187,25 @@ errorMessage' = liftIO . errorMessage
 debugMessage' :: Text -> Application () 
 debugMessage' = liftIO . debugMessage
 
+infoMessage' :: Text -> Application ()
+infoMessage' = liftIO . infoMessage 
+
 transactionDetails :: Text -> Application (Text, Result RawTransaction)
 transactionDetails anId = do 
   (SessionConfig _ hostEndPoint genParams outputFile _) <- ask
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hostEndPoint
-  let request = getRawTransaction anId nReqId
+  let request = getRawTransaction nReqId anId
+  debugMessage' $ Text.pack $ "Querying " <> (show anId)
   resp <- liftIO $ 
-    handle (\e@(SomeException ecp) -> return . Just . String .pack . show $ e) $ do 
-      doPost defaults fullyFormedEndPoint request
-  errorMessage' $ Text.pack $ show resp
+    handle (\e@(SomeException ecp) -> return . Just . String .pack $ "exception" <> (show e)) $ do 
+      doPost defaults fullyFormedEndPoint request  
   State.modify (\s -> s {nextRequestId = 1 + nReqId})
+
   let r = case resp of 
             Just x -> fromJSON x
             Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
+  infoMessage' $ Text.pack $ show r 
   return (anId, r)
 
 processListByAddress :: AccountAddress -> Application (Result [TransactionSummary])
@@ -301,7 +296,7 @@ generalLedgerApplication inputFileConfig = do
 
 
 putStrLnA :: String -> Application () 
-putStrLnA a = liftIO $ return () -- System.IO.putStrLn a
+putStrLnA a = liftIO $ return ()
 
 
 maybeToResult :: Maybe (Result a) -> Result a 
@@ -310,15 +305,18 @@ maybeToResult (Just a) = a
 
 
 queryMatches :: BlockQuery -> RawTransaction -> Bool
-queryMatches (BlockQuery (height, address)) aRawTransaction = hasVOAddress address aRawTransaction
+queryMatches (BlockQuery (height, address)) aRawTransaction = True -- hasVOAddress address aRawTransaction
 
 fetchBlockTransactions :: BlockQuery -> Block -> Application [RawTransaction]
 fetchBlockTransactions query aBlock = do 
   let transactions = transactionList aBlock
-  list <- mapM(\t -> transactionDetails t) transactions  
-  let txList = mapM snd list
+  infoMessage' $ Text.pack $ "Querying transactions " <> (show $ Prelude.take 10 transactions)
+  list <- mapM(\t -> transactionDetails t) $ Prelude.take 10 transactions  
+  txList <- return $ mapM (\(x,y) -> y) list
+  infoMessage' $ Text.pack $ "Tx list " <> (show txList)
+  infoMessage' $ Text.pack $ "Tx list " <> (show list)    
   case txList of 
-    Success txLs -> return $ Prelude.filter (queryMatches query) txLs
+    Success txLs -> return $ Prelude.filter (\x -> queryMatches query x) txLs
     Error s -> return []
 
 fetchBlockDetails :: BlockQuery -> BlockHash -> Application [RawTransaction]
@@ -355,6 +353,26 @@ fetchBlockHash bQ@(BlockQuery blockQuery) = do
 
 searchTransactions :: FilePath -> BlockQuery -> IO ([RawTransaction], SessionState)
 searchTransactions inputFileConfig blockQuery = do 
+  setupLogging
+  config <- defaultFileLocation >>= readConfig 
+  user <- btcUserName config
+  passwordL <- btcPassword config
+  port <- btcRpcPort config
+  let 
+    config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
+    initialState = createDefaultState
+  addressList <- readInputAccounts (inputFileConfig)
+  result <- (runStateT (runReaderT (runA $ fetchBlockHash blockQuery) config1) initialState)
+  infoMessage "--------------------------------"
+  mapM (\x -> infoMessage $ Text.pack $ show x) result 
+  return result
+  -- Get the hash for a block.
+
+
+
+
+getSingleTransaction :: FilePath -> BlockQuery -> IO ((Text, Result RawTransaction), SessionState)
+getSingleTransaction inputFileConfig (BlockQuery(blockHeight, address))  = do 
 --  setupLogging
   config <- defaultFileLocation >>= readConfig 
   user <- btcUserName config
@@ -364,7 +382,13 @@ searchTransactions inputFileConfig blockQuery = do
     config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
     initialState = createDefaultState
   addressList <- readInputAccounts (inputFileConfig)
-  (runStateT (runReaderT (runA $ fetchBlockHash blockQuery) config1) initialState)
+  r <- (runStateT (runReaderT (runA $ transactionDetails "21cce6eb5d6dbc86e9ff89dc24217fc4d2de1eae0037517d81225646c2f67fec") config1) initialState)
+  v <-return $  
+      case (snd . fst $ r) of 
+        Success r2 -> hasVOAddress (address) r2
+        Error s -> False
+  System.IO.putStrLn $ "Found address " <> (show v) <>  " " <> (show address)
+  return r
   -- Get the hash for a block.
 
 

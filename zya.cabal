@@ -51,6 +51,7 @@ library
   -- Modules exported by the library.
   exposed-modules:
     Data.Zya.Bitcoin.BitcoinSession
+    Data.Zya.Bitcoin.Block
     Data.Zya.Bitcoin.Client 
     Data.Zya.Bitcoin.Common
     Data.Zya.Bitcoin.Config

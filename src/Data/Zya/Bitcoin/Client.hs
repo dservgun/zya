@@ -35,6 +35,7 @@ type Resp = Response (Map String Value)
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
+  System.IO.putStrLn $ show $ r ^? responseBody
   if respBody ==  Nothing then 
     return $ Just $ (String $ T.pack $ "Failed to return response : " <> (show aRequest))
   else 
@@ -45,7 +46,6 @@ putStrLnC aString = return () -- putStrLn
 getJSONRpcResponse hostName serviceName (UserName userName) (Password password) aRequest= do 
   let endPoint = "http://" <> userName <> ":" <> password <> "@" <> hostName <> ":" <> serviceName
   let opts = defaults  
-  putStrLnc $ show aRequest
   handle
       (\e@(SomeException s) -> return $ Just $ String $ T.pack $ show e) 
       $ return Nothing -- doPost opts endPoint aRequest

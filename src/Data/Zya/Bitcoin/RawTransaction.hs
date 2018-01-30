@@ -40,6 +40,8 @@ instance Show RawTransaction where
             <$> 
             [show tx, show ha, show ver
             , show size, show vsize
+            , show vout
+            , show vin
             , show locktime
             , show blockHash
             , show conf 
