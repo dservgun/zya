@@ -94,12 +94,6 @@ data TransactionSummary = TransactionSummary {
 
 
 
-instance FromJSON AccountAddress where
-  parseJSON a = do 
-    v <- parseString a
-    return $ AccountAddress v
-instance ToJSON AccountAddress where 
-  toJSON (AccountAddress add) = String add
 
 
 instance FromJSON TransactionSummary where 

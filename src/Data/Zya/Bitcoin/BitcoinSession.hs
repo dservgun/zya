@@ -175,7 +175,6 @@ type NextRequest = RequestId -> Value
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
-  debugMessage $ Text.pack $ show aRequest
   if respBody ==  Nothing then 
     return $ Just $ (String $ Text.pack $ "Failed to return response : " <> (show aRequest))
   else 
@@ -196,7 +195,6 @@ transactionDetails anId = do
   (SessionState nReqId) <- State.get  
   let fullyFormedEndPoint = endPoint hostEndPoint
   let request = getRawTransaction nReqId anId
-  debugMessage' $ Text.pack $ "Querying " <> (show anId)
   resp <- liftIO $ 
     handle (\e@(SomeException ecp) -> return . Just . String .pack $ "exception" <> (show e)) $ do 
       doPost defaults fullyFormedEndPoint request  
@@ -205,7 +203,6 @@ transactionDetails anId = do
   let r = case resp of 
             Just x -> fromJSON x
             Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
-  infoMessage' $ Text.pack $ show r 
   return (anId, r)
 
 processListByAddress :: AccountAddress -> Application (Result [TransactionSummary])
@@ -305,19 +302,35 @@ maybeToResult (Just a) = a
 
 
 queryMatches :: BlockQuery -> RawTransaction -> Bool
-queryMatches (BlockQuery (height, address)) aRawTransaction = True -- hasVOAddress address aRawTransaction
+queryMatches (BlockQuery (height, address)) aRawTransaction = 
+    hasVOAddress address aRawTransaction
+
+queryMatchesR :: BlockQuery -> Result RawTransaction -> Bool 
+queryMatchesR q (Success t) = queryMatches q t 
+queryMatchesR q _ = False
+
+queryMatchesM :: BlockQuery -> RawTransaction -> Application Bool 
+queryMatchesM = \q t -> do 
+  result <- return $ queryMatches q t 
+  debugMessage' $ Text.pack $ "Querying " <> (show q) <> " : " <> (show t)
+  return result 
+
+isSuccessR :: Result RawTransaction -> Bool
+isSuccessR (Success _) = True
+isSuccessR _ = False
+
+successR :: [Result RawTransaction] -> [RawTransaction] 
+successR aList = 
+    Prelude.map(\x@(Success y) -> y) $ Prelude.filter(isSuccessR) aList
 
 fetchBlockTransactions :: BlockQuery -> Block -> Application [RawTransaction]
 fetchBlockTransactions query aBlock = do 
   let transactions = transactionList aBlock
-  infoMessage' $ Text.pack $ "Querying transactions " <> (show $ Prelude.take 10 transactions)
-  list <- mapM(\t -> transactionDetails t) $ Prelude.take 10 transactions  
-  txList <- return $ mapM (\(x,y) -> y) list
-  infoMessage' $ Text.pack $ "Tx list " <> (show txList)
-  infoMessage' $ Text.pack $ "Tx list " <> (show list)    
-  case txList of 
-    Success txLs -> return $ Prelude.filter (\x -> queryMatches query x) txLs
-    Error s -> return []
+  list <- mapM (\t -> transactionDetails t) transactions
+  list2 <- return $ Prelude.map (\(t, q) -> q) list
+  list3 <- return $ Prelude.filter(queryMatchesR query) list2
+  debugMessage' $ Text.pack $ " after map " <> (show list3)
+  return $ successR list3
 
 fetchBlockDetails :: BlockQuery -> BlockHash -> Application [RawTransaction]
 fetchBlockDetails blockQuery aHash = do 
@@ -329,8 +342,7 @@ fetchBlockDetails blockQuery aHash = do
   State.modify(\s -> s {nextRequestId = nReqId + 1})
   block <- return $ maybeToResult $ fromJSON <$> response
   case block of 
-    Success bl -> 
-      fetchBlockTransactions blockQuery bl
+    Success bl -> fetchBlockTransactions blockQuery bl
     Error s -> return $ []
 
 
@@ -364,7 +376,7 @@ searchTransactions inputFileConfig blockQuery = do
   addressList <- readInputAccounts (inputFileConfig)
   result <- (runStateT (runReaderT (runA $ fetchBlockHash blockQuery) config1) initialState)
   infoMessage "--------------------------------"
-  mapM (\x -> infoMessage $ Text.pack $ show x) result 
+  infoMessage $ Text.pack $ show result
   return result
   -- Get the hash for a block.
 

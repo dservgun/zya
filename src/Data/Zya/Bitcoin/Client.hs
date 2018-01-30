@@ -35,7 +35,6 @@ type Resp = Response (Map String Value)
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
-  System.IO.putStrLn $ show $ r ^? responseBody
   if respBody ==  Nothing then 
     return $ Just $ (String $ T.pack $ "Failed to return response : " <> (show aRequest))
   else 

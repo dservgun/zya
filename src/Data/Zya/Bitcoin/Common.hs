@@ -178,3 +178,11 @@ mergeScriptAddresses (ScriptPubKey _ _ _ _ addresses) =
   Text.intercalate "," $ _unaddress <$> addresses
 
 
+
+
+instance FromJSON AccountAddress where
+  parseJSON a = do 
+    v <- parseString a
+    return $ AccountAddress v
+instance ToJSON AccountAddress where 
+  toJSON (AccountAddress add) = String add
