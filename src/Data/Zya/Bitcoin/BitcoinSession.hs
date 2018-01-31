@@ -34,6 +34,7 @@ import Data.Zya.Utils.IPC
 import Network.HTTP.Client hiding(responseBody)
 import Network.Socket
 import Network.Wreq as Wreq
+import qualified Network.Wreq.Session as WreqSession
 import System.Log.Logger
 import System.IO
 import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage, addFileHandler)
@@ -171,6 +172,13 @@ type NextRequest = RequestId -> Value
 
 
 
+doPostWithS session opts endPoint aRequest = do 
+  r <- asValue =<< WreqSession.postWith session opts endPoint aRequest :: IO (Response Value)
+  let respBody = r ^? responseBody . key "result"
+  if respBody ==  Nothing then 
+    return $ Just $ (String $ Text.pack $ "Failed to return response : " <> (show aRequest))
+  else 
+    return respBody
 
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
@@ -188,6 +196,22 @@ debugMessage' = liftIO . debugMessage
 
 infoMessage' :: Text -> Application ()
 infoMessage' = liftIO . infoMessage 
+
+transactionDetailsWithSession :: WreqSession.Session -> Text -> Application(Text, Result RawTransaction)
+transactionDetailsWithSession session anId = do 
+  (SessionConfig _ hostEndPoint genParams outputFile _) <- ask
+  (SessionState nReqId) <- State.get  
+  let fullyFormedEndPoint = endPoint hostEndPoint
+  let request = getRawTransaction nReqId anId
+  resp <- liftIO $ 
+    handle (\e@(SomeException ecp) -> return . Just . String .pack $ "exception" <> (show e)) $ do 
+      doPost defaults fullyFormedEndPoint request  
+  State.modify (\s -> s {nextRequestId = 1 + nReqId})
+
+  let r = case resp of 
+            Just x -> fromJSON x
+            Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
+  return (anId, r)
 
 transactionDetails :: Text -> Application (Text, Result RawTransaction)
 transactionDetails anId = do 
@@ -329,6 +353,7 @@ successR aList =
 fetchBlockTransactions :: BlockQuery -> Block -> Application [RawTransaction]
 fetchBlockTransactions query aBlock = do 
   let transactions = transactionList aBlock
+  --session <- liftIO $ WreqSession.newSession
   list <- mapM (\t -> transactionDetails t) transactions
   list2 <- return $ Prelude.map (\(t, q) -> q) list
   list3 <- return $ Prelude.filter(queryMatchesR query) list2
@@ -365,6 +390,7 @@ fetchBlockHash bQ@(BlockQuery blockQuery) = do
 
 
 
+headerString = "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
 
 searchTransactions :: FilePath -> BlockQuery -> IO ([RawTransaction], SessionState)
 searchTransactions inputFileConfig blockQuery = do 
@@ -380,6 +406,11 @@ searchTransactions inputFileConfig blockQuery = do
   result <- (runStateT (runReaderT (runA $ fetchBlockHash blockQuery) config1) initialState)
   infoMessage "--------------------------------"
   infoMessage $ Text.pack $ show result
+  csvResults <- 
+    return $ 
+        (Prelude.map(\s -> rawTransactionAsCSV (AccountAddress "t")(Address "a") s) $ fst result)
+  infoMessage $ Text.pack $ show csvResults
+
   return result
   -- Get the hash for a block.
 

@@ -24,16 +24,16 @@ import Data.Zya.Utils.JsonRPC
 import Data.Zya.Bitcoin.JsonRPC
 import Network.HTTP.Client hiding(responseBody)
 import Network.Socket
-import Network.Wreq
+import Network.Wreq as NS -- no session
 import System.IO
-
+import Network.Wreq.Session as S
 
 
 type Resp = Response (Map String Value)
 
 
 doPost opts endPoint aRequest = do
-  r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
+  r <- asValue =<< NS.postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
   if respBody ==  Nothing then 
     return $ Just $ (String $ T.pack $ "Failed to return response : " <> (show aRequest))
