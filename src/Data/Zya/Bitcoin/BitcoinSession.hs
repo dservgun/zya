@@ -302,8 +302,11 @@ maybeToResult (Just a) = a
 
 
 queryMatches :: BlockQuery -> RawTransaction -> Bool
-queryMatches (BlockQuery (height, address)) aRawTransaction = 
-    hasVOAddress address aRawTransaction
+queryMatches (BlockQuery (height, addresses)) aRawTransaction = 
+    Prelude.foldr 
+      (\ele acc -> acc || ele) 
+      False 
+      $ Prelude.map(\x -> hasVOAddress x aRawTransaction) addresses
 
 queryMatchesR :: BlockQuery -> Result RawTransaction -> Bool 
 queryMatchesR q (Success t) = queryMatches q t 
@@ -384,7 +387,7 @@ searchTransactions inputFileConfig blockQuery = do
 
 
 getSingleTransaction :: FilePath -> BlockQuery -> IO ((Text, Result RawTransaction), SessionState)
-getSingleTransaction inputFileConfig (BlockQuery(blockHeight, address))  = do 
+getSingleTransaction inputFileConfig (BlockQuery(blockHeight, addresses))  = do 
 --  setupLogging
   config <- defaultFileLocation >>= readConfig 
   user <- btcUserName config
@@ -397,9 +400,10 @@ getSingleTransaction inputFileConfig (BlockQuery(blockHeight, address))  = do
   r <- (runStateT (runReaderT (runA $ transactionDetails "21cce6eb5d6dbc86e9ff89dc24217fc4d2de1eae0037517d81225646c2f67fec") config1) initialState)
   v <-return $  
       case (snd . fst $ r) of 
-        Success r2 -> hasVOAddress (address) r2
+        Success r2 -> 
+          Prelude.foldr (||) False $ Prelude.map(\address -> hasVOAddress address r2) addresses
         Error s -> False
-  System.IO.putStrLn $ "Found address " <> (show v) <>  " " <> (show address)
+  System.IO.putStrLn $ "Found address " <> (show v) <>  " " <> (show addresses)
   return r
   -- Get the hash for a block.
 

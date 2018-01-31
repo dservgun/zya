@@ -16,7 +16,11 @@ mainGL = do
 mainSearchBlock fileName aBlockId = do 
   searchTransactions 
     fileName
-    $ BlockQuery (BlockHeight aBlockId, Address $ pack "1L8zVjitQnCkweTnMY5ioAvvEnMksWvGxU")
+    $ BlockQuery (BlockHeight aBlockId, 
+        [
+          Address $ pack "1L8zVjitQnCkweTnMY5ioAvvEnMksWvGxU"
+          , Address $ pack "1L8zVjitQnCkweTnMY5ioAvvEnMksWvGxU"
+        ])
 
 main = do 
   [fileName] <- getArgs
