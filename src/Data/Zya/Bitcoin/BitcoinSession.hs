@@ -34,6 +34,7 @@ import Data.Zya.Utils.IPC
 import Network.HTTP.Client hiding(responseBody)
 import Network.Socket
 import Network.Wreq as Wreq
+import Network.Wreq.Types as WreqTypes
 import qualified Network.Wreq.Session as WreqSession
 import System.Log.Logger
 import System.IO
@@ -171,15 +172,16 @@ getListReceivedByAddress accountAddress transactionCount includeEmpty includeWat
 type NextRequest = RequestId -> Value
 
 
-
-doPostWithS session opts endPoint aRequest = do 
-  r <- asValue =<< WreqSession.postWith session opts endPoint aRequest :: IO (Response Value)
+doPostWithS :: (Postable a, Show a) => Wreq.Options -> WreqSession.Session -> String -> a -> IO (Maybe Value)
+doPostWithS opts session endPoint aRequest = do 
+  r <- asValue =<< WreqSession.postWith opts session endPoint aRequest
   let respBody = r ^? responseBody . key "result"
   if respBody ==  Nothing then 
     return $ Just $ (String $ Text.pack $ "Failed to return response : " <> (show aRequest))
   else 
     return respBody
 
+doPost :: (Postable a, Show a ) => Wreq.Options -> String -> a -> IO (Maybe Value)
 doPost opts endPoint aRequest = do
   r <- asValue =<< postWith opts endPoint aRequest :: IO (Response Value)
   let respBody = r ^? responseBody . key "result"
@@ -197,21 +199,55 @@ debugMessage' = liftIO . debugMessage
 infoMessage' :: Text -> Application ()
 infoMessage' = liftIO . infoMessage 
 
-transactionDetailsWithSession :: WreqSession.Session -> Text -> Application(Text, Result RawTransaction)
-transactionDetailsWithSession session anId = do 
-  (SessionConfig _ hostEndPoint genParams outputFile _) <- ask
-  (SessionState nReqId) <- State.get  
-  let fullyFormedEndPoint = endPoint hostEndPoint
-  let request = getRawTransaction nReqId anId
-  resp <- liftIO $ 
-    handle (\e@(SomeException ecp) -> return . Just . String .pack $ "exception" <> (show e)) $ do 
-      doPost defaults fullyFormedEndPoint request  
-  State.modify (\s -> s {nextRequestId = 1 + nReqId})
 
-  let r = case resp of 
-            Just x -> fromJSON x
-            Nothing -> Error $ show $ "unable to parse " <> anId <> " : " <> (Text.pack fullyFormedEndPoint)
-  return (anId, r)
+
+
+toTransaction :: Maybe Value -> Result RawTransaction
+toTransaction Nothing = Error $ "Unable to parse" 
+toTransaction (Just x) = fromJSON x  
+
+transactionDetailsRequest :: SessionState -> SessionConfig -> Text -> Value
+transactionDetailsRequest (SessionState nReqId) 
+              config@(SessionConfig _ hostEndPoint genParams outputFile _ ) anId =
+  let 
+    fullyFormedEndPoint = endPoint hostEndPoint
+  in 
+    getRawTransaction nReqId anId
+
+transactionDetailsWithSession :: WreqSession.Session -> Text -> Application(Text, Result RawTransaction)
+transactionDetailsWithSession aSession anId = do 
+  c@(SessionConfig _ hostEndPoint genParams outputFile _) <- ask
+  s@(SessionState nReqId) <- State.get  
+  let fullyFormedEndPoint = endPoint hostEndPoint
+  let request = transactionDetailsRequest s c anId
+  resp <- liftIO $ doPostWithS defaults aSession fullyFormedEndPoint request
+  State.modify(\s -> s {nextRequestId = nReqId + 1})
+  return $ (anId, toTransaction resp)
+
+transactionDetailsInBulk :: [Text] -> Application[Result RawTransaction]
+transactionDetailsInBulk requestIds = do 
+  c@(SessionConfig _ hostEndPoint genParams outputFile _) <- ask
+  s@(SessionState nReqId) <- State.get  
+  let fullyFormedEndPoint = endPoint hostEndPoint
+  requestObjects <- 
+        mapM (\requestId -> do 
+                  s'@(SessionState nReqId') <- State.get
+                  let r = transactionDetailsRequest s c requestId
+                  State.modify(\s -> s {nextRequestId = nReqId' + 1})
+                  return r
+                  ) requestIds
+  resp <- 
+      liftIO $ WreqSession.withSession $ \session ->  
+                mapM (\requestObj -> do
+                            handle(\e@(SomeException exc) -> return Nothing) $  
+                                doPostWithS 
+                                defaults 
+                                session 
+                                fullyFormedEndPoint 
+                                requestObj) requestObjects
+
+  --return $ (anId, toTransaction <$> resp)
+  return $ fmap toTransaction resp
 
 transactionDetails :: Text -> Application (Text, Result RawTransaction)
 transactionDetails anId = do 
@@ -316,15 +352,17 @@ generalLedgerApplication inputFileConfig = do
 --}
 
 
-putStrLnA :: String -> Application () 
-putStrLnA a = liftIO $ return ()
-
-
 maybeToResult :: Maybe (Result a) -> Result a 
 maybeToResult Nothing = Error "Nothing to do"
 maybeToResult (Just a) = a
 
+isSuccessR :: Result RawTransaction -> Bool
+isSuccessR (Success _) = True
+isSuccessR _ = False
 
+successR :: [Result RawTransaction] -> [RawTransaction] 
+successR aList = 
+    Prelude.map(\x@(Success y) -> y) $ Prelude.filter(isSuccessR) aList
 queryMatches :: BlockQuery -> RawTransaction -> Bool
 queryMatches (BlockQuery (height, addresses)) aRawTransaction = 
     Prelude.foldr 
@@ -342,13 +380,14 @@ queryMatchesM = \q t -> do
   debugMessage' $ Text.pack $ "Querying " <> (show q) <> " : " <> (show t)
   return result 
 
-isSuccessR :: Result RawTransaction -> Bool
-isSuccessR (Success _) = True
-isSuccessR _ = False
-
-successR :: [Result RawTransaction] -> [RawTransaction] 
-successR aList = 
-    Prelude.map(\x@(Success y) -> y) $ Prelude.filter(isSuccessR) aList
+fetchBlockTransactionsWithSession :: BlockQuery -> Block -> Application [RawTransaction]
+fetchBlockTransactionsWithSession query aBlock = do
+  let transactions = transactionList aBlock 
+  list <- transactionDetailsInBulk transactions
+  list2 <- return $ Prelude.filter(queryMatchesR query) list
+  debugMessage' $ Text.pack $ " after map " <> (show $ Prelude.take 10 list)
+  return $ successR list2
+  
 
 fetchBlockTransactions :: BlockQuery -> Block -> Application [RawTransaction]
 fetchBlockTransactions query aBlock = do 
@@ -360,6 +399,7 @@ fetchBlockTransactions query aBlock = do
   debugMessage' $ Text.pack $ " after map " <> (show list3)
   return $ successR list3
 
+
 fetchBlockDetails :: BlockQuery -> BlockHash -> Application [RawTransaction]
 fetchBlockDetails blockQuery aHash = do 
   (fullyFormedEndPoint, opts, resultRows) <- readHeaderInformation
@@ -370,7 +410,7 @@ fetchBlockDetails blockQuery aHash = do
   State.modify(\s -> s {nextRequestId = nReqId + 1})
   block <- return $ maybeToResult $ fromJSON <$> response
   case block of 
-    Success bl -> fetchBlockTransactions blockQuery bl
+    Success bl -> fetchBlockTransactionsWithSession blockQuery bl
     Error s -> return $ []
 
 
@@ -428,7 +468,10 @@ getSingleTransaction inputFileConfig (BlockQuery(blockHeight, addresses))  = do
     config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
     initialState = createDefaultState
   addressList <- readInputAccounts (inputFileConfig)
-  r <- (runStateT (runReaderT (runA $ transactionDetails "21cce6eb5d6dbc86e9ff89dc24217fc4d2de1eae0037517d81225646c2f67fec") config1) initialState)
+  r <- (runStateT (runReaderT 
+        (runA 
+            $ transactionDetails "21cce6eb5d6dbc86e9ff89dc24217fc4d2de1eae0037517d81225646c2f67fec") 
+          config1) initialState)
   v <-return $  
       case (snd . fst $ r) of 
         Success r2 -> 
