@@ -1,12 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where 
 
-import Data.Zya.Bitcoin.Block
-import Data.Zya.Bitcoin.Common
-import Data.Zya.Bitcoin.BitcoinSession
+
 import Data.Text
 import Data.Traversable
+import Data.Zya.Bitcoin.BitcoinSession
+import Data.Zya.Bitcoin.Block
+import Data.Zya.Bitcoin.Common
+import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage, addFileHandler)
 import System.Environment(getArgs)
+import System.Log.Logger
+
+
+setupLogging = do 
+  setup DEBUG
+  addFileHandler "btc.debug.log" DEBUG
+  addFileHandler "btc.info.log" INFO 
 
 
 mainGL = do
@@ -38,11 +47,13 @@ listAddresses =
     ,"1L8zVjitQnCkweTnMY5ioAvvEnMksWvGxU"
     ,"1Pc2hje5qW62oajtZqayfs83bcSn2EiGbJ"
     ]
-mainSearchBlock fileName aBlockId = do 
+mainSearchBlock fileName blockId = do 
   searchTransactions 
     fileName
-    $ BlockQuery (BlockHeight aBlockId, listAddresses)
-
+    $ BlockQuery (BlockHeight blockId, listAddresses)
 main = do 
   [fileName] <- getArgs
-  mainSearchBlock fileName 492828
+  setupLogging  
+  let blocksToTravel = 10
+  mapM (\ block -> mainSearchBlock fileName block) $ 
+      Prelude.take blocksToTravel $ Prelude.take 2 [508707 ..]

@@ -8,7 +8,6 @@ module Data.Zya.Bitcoin.BitcoinSession
   , GeneralSessionParameters(..)
   , addresses -- TODO remove this and read from a file.
   , searchTransactions
-  , getSingleTransaction
 ) where
 
 import Control.Exception.Safe
@@ -434,7 +433,6 @@ headerString = "Account, Address, Confirmation, Time, BlockTime, Amount, Address
 
 searchTransactions :: FilePath -> BlockQuery -> IO ([RawTransaction], SessionState)
 searchTransactions inputFileConfig blockQuery = do 
-  setupLogging
   config <- defaultFileLocation >>= readConfig 
   user <- btcUserName config
   passwordL <- btcPassword config
@@ -450,35 +448,13 @@ searchTransactions inputFileConfig blockQuery = do
     return $ 
         (Prelude.map(\s -> rawTransactionAsCSV (AccountAddress "t")(Address "a") s) $ fst result)
   infoMessage $ Text.pack $ show csvResults
-
+  writeToFileWM (outputFile config1) AppendMode header -- Write the header, append messsages.
+  writeToFile csvResults (outputFile config1) AppendMode
   return result
-  -- Get the hash for a block.
+  where 
+    header = "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
 
 
-
-
-getSingleTransaction :: FilePath -> BlockQuery -> IO ((Text, Result RawTransaction), SessionState)
-getSingleTransaction inputFileConfig (BlockQuery(blockHeight, addresses))  = do 
---  setupLogging
-  config <- defaultFileLocation >>= readConfig 
-  user <- btcUserName config
-  passwordL <- btcPassword config
-  port <- btcRpcPort config
-  let 
-    config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
-    initialState = createDefaultState
-  addressList <- readInputAccounts (inputFileConfig)
-  r <- (runStateT (runReaderT 
-        (runA 
-            $ transactionDetails "21cce6eb5d6dbc86e9ff89dc24217fc4d2de1eae0037517d81225646c2f67fec") 
-          config1) initialState)
-  v <-return $  
-      case (snd . fst $ r) of 
-        Success r2 -> 
-          Prelude.foldr (||) False $ Prelude.map(\address -> hasVOAddress address r2) addresses
-        Error s -> False
-  System.IO.putStrLn $ "Found address " <> (show v) <>  " " <> (show addresses)
-  return r
   -- Get the hash for a block.
 
 
