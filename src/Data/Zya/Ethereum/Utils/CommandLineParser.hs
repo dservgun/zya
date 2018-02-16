@@ -11,8 +11,7 @@ import System.Environment(getArgs)
 import Options.Applicative
 import Data.Semigroup((<>))
 
-import Data.Zya.Utils.JsonRPC
-import Data.Zya.Ethereum.Internal.Types.RPCRequest
+import Data.Zya.Utils.JsonRPC(Address(..))
 
 data EtherClientCommand = 
   TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}

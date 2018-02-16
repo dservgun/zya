@@ -7,6 +7,8 @@ module Data.Zya.Bitcoin.JsonRPC
   , getListReceivedByAddress
   , getRawTransaction
   , version 
+  , getCreateNewAddress
+  , getDumpPrivKey
 ) where 
 
 import Data.Aeson
@@ -71,4 +73,28 @@ getListReceivedByAddress (RequestId anId) transactionCount includeEmpty includeW
     , "id" .= anId
     , "method" .= ("listreceivedbyaddress" :: String)
     , "params" .= ([Number tranFrac, Bool includeEmpty, Bool includeWatchOnly] :: [Value])
+  ]
+
+
+getCreateNewAddress :: RequestId -> Value 
+getCreateNewAddress (RequestId anId) = 
+  object
+  [
+    "jsonrpc" .= version
+    , "id" .= anId
+    , "method" .= ("getnewaddress" :: String)
+    , "params" .= ([String ""])
+  ]
+
+getDumpPrivKey :: RequestId -> Address -> Value 
+getDumpPrivKey (RequestId anId) (Address anAddress) = 
+  let 
+    params = object["address" .= anAddress]
+  in
+  object
+  [
+    "jsonrpc" .= version
+    , "id" .= anId
+    , "method" .= ("dumpprivkey" :: String)
+    , "params" .= params
   ]

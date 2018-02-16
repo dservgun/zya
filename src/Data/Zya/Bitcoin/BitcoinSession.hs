@@ -8,6 +8,7 @@ module Data.Zya.Bitcoin.BitcoinSession
   , GeneralSessionParameters(..)
   , addresses -- TODO remove this and read from a file.
   , searchTransactions
+  , createAddresses
 ) where
 
 import Control.Exception.Safe
@@ -362,6 +363,7 @@ isSuccessR _ = False
 successR :: [Result RawTransaction] -> [RawTransaction] 
 successR aList = 
     Prelude.map(\x@(Success y) -> y) $ Prelude.filter(isSuccessR) aList
+
 queryMatches :: BlockQuery -> RawTransaction -> Bool
 queryMatches (BlockQuery (height, addresses)) aRawTransaction = 
     Prelude.foldr 
@@ -399,6 +401,25 @@ fetchBlockTransactions query aBlock = do
   return $ successR list3
 
 
+createAddress :: Application(Result Address, Result Address)
+createAddress = do 
+  (fullyFormedEndPoint, opts, resultRows) <- readHeaderInformation 
+  (SessionState nReqId) <- State.get 
+  let req = getCreateNewAddress nReqId 
+  response <- liftIO $ doPost opts fullyFormedEndPoint req
+  let returnedAddress = maybeToResult $ fromJSON <$> response
+  State.modify(\s -> s {nextRequestId = nReqId + 1})
+  (SessionState nReqId) <- State.get
+  responseAddress <-
+      case returnedAddress of 
+        Success address -> do 
+          let addressDetails = getDumpPrivKey nReqId address
+          dumpPrivKey <- liftIO $ doPost opts fullyFormedEndPoint addressDetails
+          return $ maybeToResult $ fromJSON <$> dumpPrivKey
+  return (returnedAddress, responseAddress) 
+createAddressesM :: Int -> Application[(Result Address, Result Address)]
+createAddressesM n = replicateM n createAddress 
+
 fetchBlockDetails :: BlockQuery -> BlockHash -> Application [RawTransaction]
 fetchBlockDetails blockQuery aHash = do 
   (fullyFormedEndPoint, opts, resultRows) <- readHeaderInformation
@@ -431,6 +452,7 @@ fetchBlockHash bQ@(BlockQuery blockQuery) = do
 
 headerString = "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
 
+
 searchTransactions :: FilePath -> BlockQuery -> IO ([RawTransaction], SessionState)
 searchTransactions inputFileConfig blockQuery = do 
   config <- defaultFileLocation >>= readConfig 
@@ -455,6 +477,23 @@ searchTransactions inputFileConfig blockQuery = do
     header = "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
 
 
-  -- Get the hash for a block.
+
+-- Create n number of addresses with public and private key
+createAddresses :: Int -> IO ([(Result Address, Result Address)], SessionState)
+createAddresses n = do 
+  config1 <- defaultFileLocation >>= readConfig 
+  user <- btcUserName config1
+  passwordL <- btcPassword config1
+  port <- btcRpcPort config1 
+  let config = 
+        createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
+      initialState = createDefaultState
+  runStateT (runReaderT (runA $ createAddressesM n) config) initialState
 
 
+
+generateAddresses n = do 
+  (addressesL, state) <- createAddresses n 
+  return $ 
+      Prelude.map (\(Success (Address x), Success (Address y)) -> 
+        (show x) <> "->" <>  (show y)) addressesL
