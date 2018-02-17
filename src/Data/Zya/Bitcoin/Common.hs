@@ -24,7 +24,8 @@ newtype UserName = UserName {_uName :: String} deriving(Show)
 newtype Password = Password {_uPassword :: String} deriving(Show)
 
 
-newtype BlockQuery = BlockQuery { _b :: (BlockHeight, [Address])} deriving (Show, Eq, Generic)
+newtype BlockQuery = 
+  BlockQuery { _b :: (BlockHeight, [Address])} deriving (Show, Eq, Generic)
 
 
 instance Num RequestId where 
