@@ -13,7 +13,8 @@ import Data.Scientific
 import Data.Text as Text
 import GHC.Generics
 import Data.Zya.Bitcoin.Block
-
+import System.IO(openFile, IOMode(..), hGetContents)
+import Control.Exception(bracket)
 
 
 newtype RequestId = RequestId {id :: Integer} deriving(Show, Eq, Generic)
@@ -186,3 +187,12 @@ instance FromJSON AccountAddress where
     return $ AccountAddress v
 instance ToJSON AccountAddress where 
   toJSON (AccountAddress add) = String add
+
+
+
+readInputLines :: FilePath -> IO [String] 
+readInputLines aFile = do
+  bracket (openFile aFile ReadMode) 
+          (\_ -> return()) $ \h -> do 
+            contents <- hGetContents h
+            return $ Prelude.lines contents

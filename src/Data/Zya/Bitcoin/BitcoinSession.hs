@@ -9,6 +9,7 @@ module Data.Zya.Bitcoin.BitcoinSession
   , addresses -- TODO remove this and read from a file.
   , searchTransactions
   , createAddresses
+  , generateAddresses
 ) where
 
 import Control.Exception.Safe
@@ -43,11 +44,6 @@ import Data.Zya.Bitcoin.Config
 
 
 
---import Network.Wreq.Internal.Types as WreqTypes
-
--- Some constants such as transaction count when 
--- accessing the wallet.
-
 data ResultSetSize = ResultSet Int | AllRows deriving (Show)
 
 instance Num ResultSetSize where 
@@ -61,6 +57,7 @@ data GeneralSessionParameters = GeneralSessionParameters {
   transactionCount :: Integer
   , resultSize :: ResultSetSize
 } deriving(Show)
+
 data HostEndPoint = HostEndPoint {
   hostName :: HostName
   , serviceName :: ServiceName
@@ -246,7 +243,6 @@ transactionDetailsInBulk requestIds = do
                                 fullyFormedEndPoint 
                                 requestObj) requestObjects
 
-  --return $ (anId, toTransaction <$> resp)
   return $ fmap toTransaction resp
 
 transactionDetails :: Text -> Application (Text, Result RawTransaction)
@@ -302,11 +298,12 @@ writeToFile messages aFile aMode =
   bracket (openFile aFile aMode) (hClose) $ \h -> do 
     TextIO.hPutStrLn h $ Text.unlines messages
 
+
 readInputAccounts :: FilePath -> IO [AccountAddress]
-readInputAccounts aFile = do
-  bracket (openFile aFile ReadMode) (\_ -> return()) $ \h -> do 
-    contents <- System.IO.hGetContents h 
-    return $ AccountAddress . Text.pack <$> (Prelude.lines contents)
+readInputAccounts aFile = do 
+  lines <- readInputLines aFile
+  return $ Prelude.map (AccountAddress . Text.pack)lines
+
 
 setupLogging = do 
   setup DEBUG
@@ -459,6 +456,7 @@ searchTransactions inputFileConfig blockQuery = do
   user <- btcUserName config
   passwordL <- btcPassword config
   port <- btcRpcPort config
+  infoMessage $ Text.pack $ "Query " <> show blockQuery
   let 
     config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
     initialState = createDefaultState
@@ -494,6 +492,7 @@ createAddresses n = do
 
 generateAddresses n = do 
   (addressesL, state) <- createAddresses n 
-  return $ 
-      Prelude.map (\(Success (Address x), Success (Address y)) -> 
-        (show x) <> "->" <>  (show y)) addressesL
+  TextIO.putStrLn $ 
+      intercalate "\n" $ 
+        Prelude.map (\(Success (Address x), Success (Address y)) -> 
+          (Text.pack $ show x) <> "->" <>  (Text.pack $ show y)) addressesL

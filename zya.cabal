@@ -54,6 +54,7 @@ library
     Data.Zya.Bitcoin.Block
     Data.Zya.Bitcoin.Client 
     Data.Zya.Bitcoin.Common
+    Data.Zya.Bitcoin.CommandLineParser
     Data.Zya.Bitcoin.Config
     Data.Zya.Bitcoin.JsonRPC
     Data.Zya.Bitcoin.RawTransaction

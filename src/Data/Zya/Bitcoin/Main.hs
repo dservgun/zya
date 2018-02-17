@@ -10,7 +10,7 @@ import Data.Zya.Bitcoin.Common
 import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage, addFileHandler)
 import System.Environment(getArgs)
 import System.Log.Logger
-
+import Data.Zya.Bitcoin.CommandLineParser(mainCLI)
 
 setupLogging = do 
   setup DEBUG
@@ -18,9 +18,6 @@ setupLogging = do
   addFileHandler "btc.info.log" INFO 
 
 
-mainGL = do
-  [fileName] <- getArgs
-  generalLedgerApplication fileName
 {-- 
 "16R9ffu5BPcKHoy3dvZLQeghqHgHecEVWF"
 "1Pc2hje5qW62oajtZqayfs83bcSn2EiGbJ"
@@ -51,9 +48,19 @@ mainSearchBlock fileName blockId = do
   searchTransactions 
     fileName
     $ BlockQuery (BlockHeight blockId, listAddresses)
-main = do 
+generateAddressesM = do
+  [numAdd] <- getArgs 
+  generateAddresses $ (read numAdd)
+main1 = do 
   [fileName] <- getArgs
   setupLogging  
   let blocksToTravel = 10
   mapM (\ block -> mainSearchBlock fileName block) $ 
       Prelude.take blocksToTravel $ Prelude.take 2 [508707 ..]
+
+
+main = do
+  setupLogging 
+  mainCLI
+
+
