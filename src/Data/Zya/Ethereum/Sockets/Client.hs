@@ -5,7 +5,7 @@ module Data.Zya.Ethereum.Sockets.Client where
 
 import Control.Applicative
 import Control.Concurrent(forkIO)
-import Control.Exception(bracket, handle, SomeException(..))
+import Control.Exception(bracket, handle, SomeException(..), catch)
 import Control.Monad(forever, unless)
 import Control.Monad.Reader
 import Control.Monad.State
@@ -23,6 +23,7 @@ import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Ethereum.Internal.Types.RPCResponse
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
+import Data.Zya.Utils.FileUtil
 import Network.Socket(Socket)
 import Network.Socket.ByteString
 import qualified Data.Text as T
@@ -211,7 +212,7 @@ gethSession = do
   --TODO : Cleanup
   s2 <- get
   block <- getAllFilteredTransactionsForAddress
-  liftIO $ infoMessage $ Text.pack $ "Transaction " <> show (Prelude.length block) <> " " <> (show block)
+
   return block
 
 
@@ -225,19 +226,22 @@ getAllFilteredTransactionsForAddress = do
   let end = endBlock cfg
   let requestId = nextRequestId sessionState 
   let currentBlockId = curBlock sessionState
-  liftIO $ debugMessage $ T.pack $ " Request id " 
-                <> (show requestId) <>  " State " <> (show sessionState) <> " " <> (show start)
-                <>  " " <> (show end)
   result <- mapM (\x -> do 
     prev <- get
     modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
     s <- get
     let reqId = nextRequestId s
-    liftIO $ debugMessage $ T.pack $ "Request id " <> (show reqId) <>  " " <> (show start) <> " - " <> (show end)
+    liftIO $ debugMessage 
+      $ T.pack $ "Request id " 
+        <> (show reqId) <>  " " <> (show start) <> " - " <> (show end) <> " - "
+        <> (show x)
     liftIO $ getBlockByHash socket reqId (BlockId x)
     ) [start .. end]
-  liftIO $ debugMessage $ T.pack $ "Blocks returned " <> (show (Prelude.length result))
-  let transactionList = Prelude.map (\x -> filterTransactions accountAddr $ getTransactions x) result
+  liftIO $ debugMessage $ T.pack $ "Blocks returned "
+  let transactionList = Prelude.map (\x -> 
+                            filterTransactions accountAddr $ getTransactions x
+                        ) result
+  liftIO $ debugMessage $ T.pack $ "Returning transaction lists..."
   return $ (Prelude.concat transactionList)
 
 
@@ -272,11 +276,25 @@ queryTransactionIO filePath addressId txId =
 
 finalInterface :: Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
 finalInterface socket accountAddress (start, numberOfBlocks) = do 
-  let 
+  let    
     config = SessionConfig 1 socket (read accountAddress) start (start + numberOfBlocks)
     state = SessionState 0 Nothing
+  debugMessage $ Text.pack ("finalInterface " <> show config)  
   runStateT (runReaderT (runA gethSession) config) state
 
+finalInterfaceWithBracketT :: FilePath -> [String] -> (Integer, Integer) -> (Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)) -> IO[([Transaction], SessionState)]
+finalInterfaceWithBracketT aFilePath accountAddresses (start, end) finalInterface = do
+  x <- bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do
+          accts <- return accountAddresses 
+          debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
+          result <- 
+            mapM (\a -> do 
+                          debugMessage $ Text.pack $ show a
+                          finalInterface socket a (start, end)) accts
+
+          debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " ----> " <> (show end) <>  " " <> (show result)
+          return $ result
+  return x
 
 finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> (Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)) -> IO([Transaction], SessionState)
 finalInterfaceWithBracket aFilePath accountAddress (start, end) finalInterface = do 
@@ -289,11 +307,35 @@ finalInterfaceWithBracket aFilePath accountAddress (start, end) finalInterface =
 
 
 chunkBlocks (start, numberOfBlocks, defaultBlockSize) =
-    Prelude.takeWhile (\x -> x <= (start + numberOfBlocks))  $ Prelude.iterate (+defaultBlockSize) start
+    Prelude.takeWhile 
+      (\x -> x <= (start + numberOfBlocks))  $ Prelude.iterate (+ defaultBlockSize) start
 
 
 printTransactions :: [Transaction] -> OutputFormat -> [Text]
-printTransactions transactionList (a@(CSV ",")) = Prelude.map (\t -> transactionOutput t a) transactionList
+printTransactions transactionList (a@(CSV ",")) = 
+  Prelude.map (\t -> transactionOutput t a) transactionList
+
+
+
+blockBrowserIOFromFile ipcPath outputFile accountsFile (start, range, defaultBlocks) = do
+  let unfoldList = chunkBlocks(start, range, defaultBlocks)
+  accountAddresses <- readInputLines accountsFile
+  bracket(openFile outputFile WriteMode)(hClose) (\h -> do
+        TextIO.hPutStrLn h "Hash, Currency, target-address, sender-address, value, gasPrice, gas")
+
+  transactions <- 
+      mapM (\x -> 
+        finalInterfaceWithBracketT 
+          ipcPath
+          accountAddresses
+          (x, defaultBlocks) finalInterface) unfoldList
+  debugMessage $ "Processed transactions..."
+  bracket(openFile outputFile AppendMode)(hClose) (\h -> do
+        --debugMessage $ Text.pack $ show transactions  
+        TextIO.hPutStrLn h $ Text.unlines $ 
+            printTransactions (Prelude.concat $ fst <$> Prelude.concat transactions) (CSV ",")
+        )
+  return ()
 
 
 blockBrowserIO ipcPath outputFile accountAddress (start, range, defaultBlocks) = do 
@@ -306,10 +348,8 @@ blockBrowserIO ipcPath outputFile accountAddress (start, range, defaultBlocks) =
           ipcPath
           accountAddress
           (x, defaultBlocks) finalInterface) unfoldList
-  bracket(openFile outputFile WriteMode)(hClose) (\h -> do
-        TextIO.hPutStrLn h "Hash, Currency, target-address, sender-address, value, gasPrice, gas"
+  bracket(openFile outputFile AppendMode)(hClose) (\h -> do
         TextIO.hPutStrLn h $ Text.unlines $ printTransactions (Prelude.concat $ fst <$> transactions) (CSV ","))
-  debugMessage $ pack1 $ show $ Prelude.concat $ fst <$> transactions
   return ()
 
 closeHandle :: Show a => a -> IO ()

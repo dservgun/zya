@@ -43,12 +43,9 @@ plainOldSocket hostName portNumber = do
 sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
 sendMessageWithSockets sock request = do
   let requestBS = L.toStrict . encode $ request 
-  Prelude.putStrLn $ "Sending " <> (show requestBS)
   debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
   _ <- Network.Socket.ByteString.send sock requestBS
   msg <- Network.Socket.ByteString.recv sock defaultBufferSize
-  Prelude.putStrLn $ show msg
-  debugMessage $ T.pack $ "Received " <> (show $ Data.ByteString.length msg)
   return . decode . fromStrict $ msg
 
 

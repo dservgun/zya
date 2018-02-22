@@ -15,7 +15,7 @@ import Data.Zya.Utils.JsonRPC(Address(..))
 
 data EtherClientCommand = 
   TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}
-    | BlockBrowser {ipcPath :: FilePath, outputPath :: FilePath, address :: String, blockId :: Integer, numberOfBlocks :: Integer, defaultBlockChunks :: Integer}
+    | BlockBrowser {ipcPath :: FilePath, outputPath :: FilePath, addressFile :: FilePath, blockId :: Integer, numberOfBlocks :: Integer, defaultBlockChunks :: Integer}
     | SendTransaction {commandType :: String
                         , ipcPath :: FilePath
                         , address :: String
@@ -74,9 +74,9 @@ addressParser :: String -> Parser String
 addressParser metaVarName= 
   strOption
     (
-      long "address" 
+      long "addressFile" 
       <> metavar metaVarName
-      <> help ("The hash for the address")
+      <> help ("File containing hash for an address")
     )
 
 transactionIdParser :: Parser Text 
@@ -141,13 +141,13 @@ commandParser = blockBrowserCommandParser <|> transactionCommandParser <|> sendT
 etherClientCommandHandler :: EtherClientCommand -> IO ()
 etherClientCommandHandler aCommand = do
   setup DEBUG 
-  addFileHandler "debug.log" DEBUG
-  addFileHandler "info.log" INFO 
+  addFileHandler "eth.debug.log" DEBUG
+  addFileHandler "eth.info.log" INFO 
   case aCommand of 
     TransactionQuery ipcPath address transactionId -> do
       queryTransactionIO ipcPath address [transactionId] >> return ()
-    BlockBrowser ipcPath outputFile address blockId numberOfBlocks defaultBlocks -> 
-      blockBrowserIO ipcPath outputFile address (blockId, numberOfBlocks, defaultBlocks)
+    BlockBrowser ipcPath outputFile addressFile blockId numberOfBlocks defaultBlocks -> 
+      blockBrowserIOFromFile ipcPath outputFile addressFile (blockId, numberOfBlocks, defaultBlocks)
     SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce ->
       sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)    
 
