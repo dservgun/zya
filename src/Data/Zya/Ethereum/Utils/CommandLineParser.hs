@@ -10,6 +10,7 @@ import Data.Text as Text
 import System.Environment(getArgs)
 import Options.Applicative
 import Data.Semigroup((<>))
+import Control.Exception
 
 import Data.Zya.Utils.JsonRPC(Address(..))
 
@@ -152,7 +153,7 @@ etherClientCommandHandler aCommand = do
       sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)    
 
 
-mainCLI = 
+mainCLI' = 
   etherClientCommandHandler =<< execParser opts 
     where 
       opts = info
@@ -162,3 +163,7 @@ mainCLI =
                 <> header "EthClient - to communicate on ipc"
                 )
 
+
+mainCLI = do 
+  putStrLn "Starting...."
+  mainCLI' `catch` (\e@(SomeException c) -> putStrLn $ show e)

@@ -275,12 +275,17 @@ queryTransactionIO filePath addressId txId =
 
 
 finalInterface :: Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
-finalInterface socket accountAddress (start, numberOfBlocks) = do 
-  let    
-    config = SessionConfig 1 socket (read accountAddress) start (start + numberOfBlocks)
-    state = SessionState 0 Nothing
-  debugMessage $ Text.pack ("finalInterface " <> show config)  
-  runStateT (runReaderT (runA gethSession) config) state
+finalInterface socket accountAddress (start, numberOfBlocks) = 
+  action `catch` (\e@(SomeException c) -> do 
+      System.IO.putStrLn (show e)
+      return (([], (SessionState 0 Nothing))))
+  where 
+    action = do 
+      let    
+        config = SessionConfig 1 socket (read accountAddress) start (start + numberOfBlocks)
+        state = SessionState 0 Nothing
+      debugMessage $ Text.pack ("finalInterface " <> show config) 
+      runStateT (runReaderT (runA gethSession) config) state
 
 finalInterfaceWithBracketT :: FilePath -> [String] -> (Integer, Integer) -> (Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)) -> IO[([Transaction], SessionState)]
 finalInterfaceWithBracketT aFilePath accountAddresses (start, end) finalInterface = do
@@ -291,8 +296,10 @@ finalInterfaceWithBracketT aFilePath accountAddresses (start, end) finalInterfac
             mapM (\a -> do 
                           debugMessage $ Text.pack $ show a
                           finalInterface socket a (start, end)) accts
-
-          debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " ----> " <> (show end) <>  " " <> (show result)
+          debugMessage $ Text.pack $ 
+              "Processing block range " 
+              <> (show start) <> " ----> " 
+              <> (show end) <>  " " <> (show result)
           return $ result
   return x
 
