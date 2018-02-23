@@ -105,6 +105,7 @@ filterTransactions address transactions =
 data SessionConfig = SessionConfig {
   startRequestId :: Integer
   , sessionSocket :: Socket
+  , outputFileHandle :: Handle
   , accountAddress :: Integer
   , startBlock :: Integer
   , endBlock :: Integer
@@ -147,15 +148,16 @@ gethSession = do
   s2 <- get
   block <- getAllFilteredTransactionsForAddress
 
-  return block
+  return [] -- TODO fix this.
 
 
 getAllFilteredTransactionsForAddress :: 
-  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => m [Transaction]
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => m ()
 getAllFilteredTransactionsForAddress = do 
   sessionState <- get 
   cfg <- ask
   let socket = sessionSocket cfg 
+  let outputFileH = outputFileHandle cfg
   let accountAddr = accountAddress cfg
   let start = startBlock cfg
   let end = endBlock cfg
@@ -177,7 +179,12 @@ getAllFilteredTransactionsForAddress = do
                             filterTransactions accountAddr $ getTransactions x
                         ) result
   liftIO $ debugMessage $ T.pack $ "Returning transaction lists..."
-  return $ (Prelude.concat transactionList)
+  liftIO $ TextIO.hPutStrLn outputFileH $ Text.unlines $ 
+     printTransactions 
+        (Prelude.concat transactionList) 
+        (CSV ",")
+  
+  return ()
 
 
 
@@ -194,8 +201,9 @@ queryTransactionByHash transactionHash = do
 queryTransaction :: 
   (MonadIO m) => Socket -> String -> Text -> m (Result Transaction, SessionState) 
 queryTransaction socket accountAddress transactionHash = do 
+  defFileHandle <- liftIO $ openFile "defaultQueryTransaction.csv" WriteMode
   let 
-    config = SessionConfig 1 socket (read accountAddress) 0 0
+    config = SessionConfig 1 socket defFileHandle (read accountAddress) 0 0
     state = SessionState 0 Nothing 
   liftIO $ runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
 
@@ -216,29 +224,29 @@ queryTransactionIO filePath addressId txId =
 
 
 
-runGethSession :: Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
-runGethSession socket accountAddress (start, numberOfBlocks) = 
+runGethSession :: Socket -> Handle -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
+runGethSession socket fHandle accountAddress (start, numberOfBlocks) = 
   action `catch` (\e@(SomeException c) -> do 
       errorMessage $ Text.pack (show e)
       return (([], (SessionState 0 Nothing))))
   where 
     action = do 
       let    
-        config = SessionConfig 1 socket (read accountAddress) start (start + numberOfBlocks)
+        config = SessionConfig 1 socket fHandle (read accountAddress) start (start + numberOfBlocks)
         state = SessionState 0 Nothing
       debugMessage $ Text.pack ("finalInterface " <> show config) 
       runStateT (runReaderT (runA gethSession) config) state
 
 
-runGethSessionWithAccounts :: FilePath -> [String] -> (Integer, Integer) -> IO[([Transaction], SessionState)]
-runGethSessionWithAccounts aFilePath accountAddresses (start, end) = do
+runGethSessionWithAccounts :: FilePath -> Handle -> [String] -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+runGethSessionWithAccounts aFilePath outputFileHandle accountAddresses (start, end) = do
   x <- bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do
           accts <- return accountAddresses 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
           result <- 
             mapM (\a -> do 
                           debugMessage $ Text.pack $ show a
-                          runGethSession socket a (start, end)) accts
+                          runGethSession socket outputFileHandle a (start, end)) accts
           debugMessage $ Text.pack $ 
               "Processing block range " 
               <> (show start) <> " ----> " 
@@ -250,9 +258,9 @@ runGethSessionWithAccounts aFilePath accountAddresses (start, end) = do
   Browse for an account with account address between start and end.
   Function uses bracket to deal with any errors on the handle.
 --}
-runGethSessionWithBracket :: FilePath -> String -> (Integer, Integer) -> IO[([Transaction], SessionState)]
-runGethSessionWithBracket aFilePath accountAddress (start, end) = 
-  runGethSessionWithAccounts aFilePath [accountAddress] (start, end)
+runGethSessionWithBracket :: FilePath -> Handle -> String -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+runGethSessionWithBracket aFilePath handle accountAddress (start, end) = do 
+  runGethSessionWithAccounts aFilePath handle [accountAddress] (start, end)
 
 {-- | 
   Given a starting block, step through blocks using the block size.
@@ -282,22 +290,17 @@ browseBlocks :: FilePath -> FilePath -> FilePath -> (Integer, Integer, Integer) 
 browseBlocks ipcPath outputFile accountsFile (start, range, defaultBlocks) = do
   let unfoldList = chunkBlocks(start, range, defaultBlocks)
   accountAddresses <- readInputLines accountsFile
-  bracket(openFile outputFile WriteMode)(hClose) (\h -> do
-        TextIO.hPutStrLn h "Hash, Currency, target-address, sender-address, value, gasPrice, gas")
-  transactions <- 
-      mapM (\x -> 
-        runGethSessionWithAccounts 
-          ipcPath
-          accountAddresses
-          (x, defaultBlocks)) unfoldList
-  debugMessage $ "Processed transactions..."
-  bracket(openFile outputFile AppendMode)(hClose) (\h -> do
-        --debugMessage $ Text.pack $ show transactions  
-        TextIO.hPutStrLn h $ Text.unlines $ 
-            printTransactions 
-              (Prelude.concat $ fst <$> Prelude.concat transactions) 
-              (CSV ",")
-        )
+  bracket(openFile outputFile WriteMode)(hClose) (\outputFileHandle -> do
+        TextIO.hPutStrLn outputFileHandle "Hash, Currency, target-address, sender-address, value, gasPrice, gas"
+        transactions <- 
+          mapM (\x -> 
+            runGethSessionWithAccounts 
+              ipcPath
+              outputFileHandle
+              accountAddresses          
+              (x, defaultBlocks)) unfoldList
+        debugMessage $ "Processed transactions..."
+        TextIO.hPutStrLn outputFileHandle $ "End processing")
   return ()
 
 
@@ -335,8 +338,10 @@ runSendTransaction ::
   (MonadIO m) => 
     Socket -> String -> TransactionRequest -> m (Maybe Value, SessionState) 
 runSendTransaction socket accountAddress transactionRequest = do 
+  -- Overwrite to avoid filling up space.
+  defFileHandle <- liftIO $ openFile "defautSendTransaction.csv" WriteMode 
   let 
-    config = SessionConfig 1 socket (read accountAddress) 0 0
+    config = SessionConfig 1 socket defFileHandle (read accountAddress) 0 0
     state = SessionState 0 Nothing 
   liftIO $ runStateT (runReaderT (runA (sendTransactionInSession transactionRequest)) config) state
 
