@@ -1,6 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Data.Zya.Ethereum.Sockets.Client where
+{-# LANGUAGE FlexibleContexts #-}
+module Data.Zya.Ethereum.Sockets.Client 
+(
+  browseBlocks
+  , queryTransactionIO
+  , sendTransactionMain
+)
+
+where
 
 
 import Control.Applicative
@@ -24,7 +32,7 @@ import Data.Zya.Ethereum.Internal.Types.RPCResponse
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
 import Data.Zya.Utils.FileUtil
-import Network.Socket(Socket)
+import Network.Socket(Socket, close)
 import Network.Socket.ByteString
 import qualified Data.Text as T
 import qualified Data.Text.IO as T 
@@ -38,30 +46,6 @@ import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage)
 
 import Text.Printf 
 
-
-{-initializeSysLog :: IO () 
-initializeSysLog = do
-  l <- openlog "Zya.Ethereum.Client" [PID] USER DEBUG
-  updateGlobalLogger rootLoggerName (addHandler l)
-  updateGlobalLogger rootLoggerName (setLevel DEBUG)
-  return ()
-
-
-errorMessage :: String -> IO ()
-errorMessage = errorM rootLoggerName
-
-infoMessage :: String -> IO () 
-infoMessage = infoM rootLoggerName
-
-debugMessage :: String -> IO ()
-debugMessage = debugM rootLoggerName
--}
-
-
--- Should probably be a generic handle. 
--- should recursively read the message till the buffer is completely
--- read and have an upper cap on the number of bytes we allow 
--- as response. Or i should probably be using conduit.
 
 
 sendMessage :: Value -> FilePath -> IO (Maybe Value)
@@ -88,48 +72,6 @@ getTransactionsByAccount aFilePath account start end = do
       _ -> []
 
 
-
-{-
-Source algorithm : 
-function getTransactionsByAccount(myaccount, startBlockNumber, endBlockNumber) {
-  if (endBlockNumber == null) {
-    endBlockNumber = eth.blockNumber;
-    console.log("Using endBlockNumber: " + endBlockNumber);
-  }
-  if (startBlockNumber == null) {
-    startBlockNumber = endBlockNumber - 1000;
-    console.log("Using startBlockNumber: " + startBlockNumber);
-  }
-  console.log("Searching for transactions to/from account \"" + myaccount + "\" within blocks "  + startBlockNumber + " and " + endBlockNumber);
-
-  for (var i = startBlockNumber; i <= endBlockNumber; i++) {
-    if (i % 1000 == 0) {
-      console.log("Searching block " + i);
-    }
-    var block = eth.getBlock(i, true);
-    if (block != null && block.transactions != null) {
-      block.transactions.forEach( function(e) {
-        if (myaccount == "*" || myaccount == e.from || myaccount == e.to) {
-          console.log("  tx hash          : " + e.hash + "\n"
-            + "   nonce           : " + e.nonce + "\n"
-            + "   blockHash       : " + e.blockHash + "\n"
-            + "   blockNumber     : " + e.blockNumber + "\n"
-            + "   transactionIndex: " + e.transactionIndex + "\n"
-            + "   from            : " + e.from + "\n" 
-            + "   to              : " + e.to + "\n"
-            + "   value           : " + e.value + "\n"
-            + "   time            : " + block.timestamp + " " + new Date(block.timestamp * 1000).toGMTString() + "\n"
-            + "   gasPrice        : " + e.gasPrice + "\n"
-            + "   gas             : " + e.gas + "\n"
-            + "   input           : " + e.input);
-        }
-      })
-    }
-  }
-}
-
--}
-
 type RequestId = Int
 type BlockIdAsInt = Integer
 
@@ -139,13 +81,13 @@ getBlockByHash :: Socket -> RequestId -> BlockQuantity -> IO (Result BlockByHash
 getBlockByHash aSocket aRequestId aBlockId = do
   let details = True -- This gets all the transaction details for a block. 
   -- how large can a block get?
-
   let request = eth_getBlockByNumber aRequestId aBlockId details
   result <- sendMessageWithSockets aSocket request
   debugMessage $ T.pack $ "Get block by hash " <> " " <> (show request)
   return $ joinResponse $ fmap fromJSON result
 
-getTransactionByHash :: Socket -> RequestId -> EthData -> IO (Result Transaction)
+getTransactionByHash :: 
+  (MonadIO m) => Socket -> RequestId -> EthData -> m (Result Transaction)
 getTransactionByHash aSocket aRequestId aTransactionHash = do  
   let request = eth_getTransactionByHash aRequestId aTransactionHash 
   result <- sendMessageWithSockets aSocket request 
@@ -203,7 +145,8 @@ joinResponse Nothing = Error "No response.."
 -- 5. If not, decrement the block and repeat, until there are no blocks to process.
 
 
-gethSession :: EthereumSessionApp [Transaction]
+gethSession :: 
+      (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => m [Transaction]
 gethSession = do 
   cfg <- ask
   sessionState <- get
@@ -216,7 +159,8 @@ gethSession = do
   return block
 
 
-getAllFilteredTransactionsForAddress :: EthereumSessionApp [Transaction]
+getAllFilteredTransactionsForAddress :: 
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => m [Transaction]
 getAllFilteredTransactionsForAddress = do 
   sessionState <- get 
   cfg <- ask
@@ -245,7 +189,9 @@ getAllFilteredTransactionsForAddress = do
   return $ (Prelude.concat transactionList)
 
 
-queryTransactionByHash :: EthData -> EthereumSessionApp (Result Transaction)
+
+queryTransactionByHash :: 
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => EthData -> m (Result Transaction)
 queryTransactionByHash transactionHash = do 
   sessionState <- get 
   cfg <- ask 
@@ -254,21 +200,26 @@ queryTransactionByHash transactionHash = do
   liftIO $ getTransactionByHash socket requestId transactionHash 
 
 
-queryTransaction :: Socket -> String -> Text -> IO(Result Transaction, SessionState) 
+queryTransaction :: 
+  (MonadIO m) => Socket -> String -> Text -> m (Result Transaction, SessionState) 
 queryTransaction socket accountAddress transactionHash = do 
   let 
     config = SessionConfig 1 socket (read accountAddress) 0 0
     state = SessionState 0 Nothing 
-  runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
+  liftIO $ runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
 
-queryTransactionWithBracket :: FilePath -> String -> EthData -> IO(Result Transaction, SessionState)
+
+queryTransactionWithBracket :: 
+  (MonadIO m) => FilePath -> String -> EthData -> m (Result Transaction, SessionState)
 queryTransactionWithBracket aFilePath accountAddress transactionHash = do 
-  bracket (domainSocket aFilePath) (\h -> closeHandle h ) $ \socket -> do 
+  liftIO $ 
+    bracket (domainSocket aFilePath) (\h -> closeHandle h ) $ \socket -> do 
           debugMessage $ Text.pack $ "Processing transaction " <> (show transactionHash)
           result <- queryTransaction socket accountAddress transactionHash
           return result
 
-
+queryTransactionIO :: 
+    (Traversable t, MonadIO m) => FilePath -> String -> t EthData -> m ()
 queryTransactionIO filePath addressId txId = 
   mapM (queryTransactionWithBracket filePath addressId) txId >> return ()
 
@@ -287,8 +238,8 @@ finalInterface socket accountAddress (start, numberOfBlocks) =
       debugMessage $ Text.pack ("finalInterface " <> show config) 
       runStateT (runReaderT (runA gethSession) config) state
 
-finalInterfaceWithBracketT :: FilePath -> [String] -> (Integer, Integer) -> (Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)) -> IO[([Transaction], SessionState)]
-finalInterfaceWithBracketT aFilePath accountAddresses (start, end) finalInterface = do
+finalInterfaceWithBracketT :: FilePath -> [String] -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+finalInterfaceWithBracketT aFilePath accountAddresses (start, end) = do
   x <- bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do
           accts <- return accountAddresses 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
@@ -303,8 +254,11 @@ finalInterfaceWithBracketT aFilePath accountAddresses (start, end) finalInterfac
           return $ result
   return x
 
-finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> (Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)) -> IO([Transaction], SessionState)
-finalInterfaceWithBracket aFilePath accountAddress (start, end) finalInterface = do 
+-- Browse for an account with account address between start and end.
+-- Function uses bracket to deal with any errors on the handle.
+-- 
+finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
+finalInterfaceWithBracket aFilePath accountAddress (start, end) = do 
   bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
           result <- finalInterface socket accountAddress (start, end)
@@ -312,59 +266,60 @@ finalInterfaceWithBracket aFilePath accountAddress (start, end) finalInterface =
           return result
 
 
-
+{-- | 
+  Given a starting block, step through blocks using the block size.
+  For example, 
+  >chunkBlocks (1, 9, 1) = [1 .. 10]
+  >chunkBlocks (1, 9, 2) = [1, 3, 5, 7, 9]
+  >chunkBlocks (1, 9, 3) = [1, 4, 7, 10] 
+--}
+chunkBlocks :: (Ord a, Num a) => (a, a, a) -> [a] 
 chunkBlocks (start, numberOfBlocks, defaultBlockSize) =
     Prelude.takeWhile 
       (\x -> x <= (start + numberOfBlocks))  $ Prelude.iterate (+ defaultBlockSize) start
 
 
+-- | Print transactions as text.
 printTransactions :: [Transaction] -> OutputFormat -> [Text]
 printTransactions transactionList (a@(CSV ",")) = 
   Prelude.map (\t -> transactionOutput t a) transactionList
 
 
-
-blockBrowserIOFromFile ipcPath outputFile accountsFile (start, range, defaultBlocks) = do
+{-- | 
+  * ipcPath : the path to the ethereum node. 
+  * outputFile : the output.
+  * accountsFile : a file that lists accounts to browse for.
+--}
+browseBlocks :: FilePath -> FilePath -> FilePath -> (Integer, Integer, Integer) -> IO ()
+browseBlocks ipcPath outputFile accountsFile (start, range, defaultBlocks) = do
   let unfoldList = chunkBlocks(start, range, defaultBlocks)
   accountAddresses <- readInputLines accountsFile
   bracket(openFile outputFile WriteMode)(hClose) (\h -> do
         TextIO.hPutStrLn h "Hash, Currency, target-address, sender-address, value, gasPrice, gas")
-
   transactions <- 
       mapM (\x -> 
         finalInterfaceWithBracketT 
           ipcPath
           accountAddresses
-          (x, defaultBlocks) finalInterface) unfoldList
+          (x, defaultBlocks)) unfoldList
   debugMessage $ "Processed transactions..."
   bracket(openFile outputFile AppendMode)(hClose) (\h -> do
         --debugMessage $ Text.pack $ show transactions  
         TextIO.hPutStrLn h $ Text.unlines $ 
-            printTransactions (Prelude.concat $ fst <$> Prelude.concat transactions) (CSV ",")
+            printTransactions 
+              (Prelude.concat $ fst <$> Prelude.concat transactions) 
+              (CSV ",")
         )
   return ()
 
 
-blockBrowserIO ipcPath outputFile accountAddress (start, range, defaultBlocks) = do 
-  let unfoldList = chunkBlocks(start, range, defaultBlocks)
-  let pack1 = Text.pack 
-  debugMessage . pack1 . show $ unfoldList
-  transactions <- 
-      mapM (\x -> 
-        finalInterfaceWithBracket 
-          ipcPath
-          accountAddress
-          (x, defaultBlocks) finalInterface) unfoldList
-  bracket(openFile outputFile AppendMode)(hClose) (\h -> do
-        TextIO.hPutStrLn h $ Text.unlines $ printTransactions (Prelude.concat $ fst <$> transactions) (CSV ","))
-  return ()
-
-closeHandle :: Show a => a -> IO ()
+-- | Print closing handle.
+closeHandle :: (MonadIO m) => Socket -> m ()
 closeHandle h = do 
-  debugMessage $ Text.pack $ "Closing handle " <> show h
+  liftIO $ debugMessage $ Text.pack $ "Closing handle " <> show h
+  liftIO . close $ h
 
 -- | Balance transfers
-
 type TransactionRequest = (Address, Address, Integer, Integer, Integer, Integer, Integer)
 sendTransaction :: Socket -> RequestId -> TransactionRequest -> IO (Maybe Value)
 sendTransaction aSocket aRequestId (fromAddress, toAddress, gas, gasPrice, value, contractData, nonce) = do 
@@ -385,42 +340,25 @@ sendTransactionInSession r@(fromAddress, toAddress, gas, gasPrice, value, contra
   let requestId = nextRequestId sessionState 
   liftIO $ sendTransaction socket requestId r
 
-unwrapSendTransactionIO :: Socket -> String -> TransactionRequest -> IO(Maybe Value, SessionState) 
-unwrapSendTransactionIO socket accountAddress transactionRequest = do 
+-- runSendTransaction
+runSendTransaction :: Socket -> String -> TransactionRequest -> IO(Maybe Value, SessionState) 
+runSendTransaction socket accountAddress transactionRequest = do 
   let 
     config = SessionConfig 1 socket (read accountAddress) 0 0
     state = SessionState 0 Nothing 
   runStateT (runReaderT (runA (sendTransactionInSession transactionRequest)) config) state
 
+
 sendTransactionIOWithBracket :: FilePath -> String -> TransactionRequest -> IO(Maybe Value, SessionState)
 sendTransactionIOWithBracket aFilePath accountAddress transactionRequest = do 
-  bracket (domainSocket aFilePath) (\h -> closeHandle h ) $ \socket -> do 
+  bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
           debugMessage $ Text.pack $ "Processing transaction " <> (show transactionRequest)
-          result <- unwrapSendTransactionIO socket accountAddress transactionRequest
+          result <- runSendTransaction socket accountAddress transactionRequest
           return result
 
 
+-- | Send a transaction request.
 sendTransactionMain filePath addressId transactionRequest = 
   mapM (sendTransactionIOWithBracket filePath addressId) [transactionRequest] >> return ()
 
 
--- TODO: Cleanup
-
-testMethod (start, numberOfBlocks, defaultBlockSize) = do
-  let unfoldList = chunkBlocks(start, numberOfBlocks, defaultBlockSize)
-  let pack1 = Text.pack 
-  debugMessage . pack1 . show $ unfoldList
-  transactions <- 
-      mapM (\x -> 
-        finalInterfaceWithBracket 
-          "/home/dinkarganti/local_test/geth_test.ipc" 
-          "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20"
-          (x, defaultBlockSize) finalInterface) unfoldList
-  return (Prelude.concat $ fst <$> transactions)
-
-testFilePath = "/home/dinkarganti/local_test/geth_test.ipc" 
-
-
-queryTransactionTestMethod txId = 
-  mapM(queryTransactionWithBracket testFilePath "0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20")
-      [Text.pack txId]

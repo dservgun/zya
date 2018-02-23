@@ -1,5 +1,6 @@
 module Data.Zya.Utils.IPC where
 
+import Control.Monad.Trans
 import Data.Aeson
 import Data.ByteString hiding (hPutStrLn, hGetLine)
 import Data.ByteString.Lazy as L hiding(hGetContents)
@@ -19,11 +20,11 @@ import System.Log.Handler.Syslog
 import System.Log.Logger
 
 
-domainSocket :: FilePath -> IO (Socket) 
+domainSocket :: (MonadIO m) => FilePath -> m Socket
 domainSocket filePath = do 
-  sock <- socket AF_UNIX Stream 0 
-  setSocketOption sock KeepAlive 0
-  connect sock (SockAddrUnix filePath)
+  sock <- liftIO $ socket AF_UNIX Stream 0 
+  _ <- liftIO $ setSocketOption sock KeepAlive 0
+  _ <- liftIO $ connect sock (SockAddrUnix filePath)
   return sock
 
 plainOldSocket :: HostName -> ServiceName -> IO Socket
@@ -40,12 +41,12 @@ plainOldSocket hostName portNumber = do
 
 
 
-sendMessageWithSockets :: Socket -> Value -> IO (Maybe Value)
+sendMessageWithSockets :: (MonadIO m) => Socket -> Value -> m (Maybe Value)
 sendMessageWithSockets sock request = do
   let requestBS = L.toStrict . encode $ request 
   debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
-  _ <- Network.Socket.ByteString.send sock requestBS
-  msg <- Network.Socket.ByteString.recv sock defaultBufferSize
+  _ <- liftIO $ Network.Socket.ByteString.send sock requestBS
+  msg <- liftIO $ Network.Socket.ByteString.recv sock defaultBufferSize
   return . decode . fromStrict $ msg
 
 

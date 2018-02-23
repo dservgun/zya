@@ -148,7 +148,7 @@ etherClientCommandHandler aCommand = do
     TransactionQuery ipcPath address transactionId -> do
       queryTransactionIO ipcPath address [transactionId] >> return ()
     BlockBrowser ipcPath outputFile addressFile blockId numberOfBlocks defaultBlocks -> 
-      blockBrowserIOFromFile ipcPath outputFile addressFile (blockId, numberOfBlocks, defaultBlocks)
+      browseBlocks ipcPath outputFile addressFile (blockId, numberOfBlocks, defaultBlocks)
     SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce ->
       sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)    
 

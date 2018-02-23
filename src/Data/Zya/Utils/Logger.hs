@@ -10,19 +10,21 @@ module Data.Zya.Utils.Logger
  where
 
 import Data.Text
+import Control.Monad.Trans
 import System.Log.Formatter
 import System.Log.Handler (setFormatter)
 import System.Log.Handler.Simple
-import System.Log.Handler.Syslog
 import System.Log.Handler.Syslog
 import System.Log.Logger
 
 
 
-setup :: Priority-> IO ()
+updateGlobalLoggerMIO :: (MonadIO m) => String -> (Logger -> Logger) -> m ()
+updateGlobalLoggerMIO loggerName logTrans = liftIO $ updateGlobalLogger loggerName logTrans
+
+setup :: (MonadIO m) => Priority-> m ()
 setup priority = do 
-  updateGlobalLogger rootLoggerName (setLevel priority)
-  return ()
+  updateGlobalLoggerMIO rootLoggerName (setLevel priority)
 
 
 addSysLogHandler priority = do
@@ -34,12 +36,14 @@ addFileHandler fileName priority = do
       setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg") 
   updateGlobalLogger rootLoggerName (addHandler h)
 
-errorMessage :: Text -> IO ()
-errorMessage message = errorM rootLoggerName (unpack message)
 
-infoMessage :: Text -> IO () 
-infoMessage message = infoM rootLoggerName (unpack message)
 
-debugMessage :: Text -> IO ()
-debugMessage message = debugM rootLoggerName (unpack message)
+errorMessage :: (MonadIO m) => Text -> m ()
+errorMessage message = liftIO $ errorM rootLoggerName (unpack message)
+
+infoMessage :: (MonadIO m) => Text -> m () 
+infoMessage message = liftIO $ infoM rootLoggerName (unpack message)
+
+debugMessage :: (MonadIO m) => Text -> m ()
+debugMessage message = liftIO $ debugM rootLoggerName (unpack message)
 
