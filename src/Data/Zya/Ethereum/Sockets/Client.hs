@@ -62,15 +62,6 @@ sendMessage aValue aFilePath = do
 
 type Account = Text 
 
-getTransactionsByAccount :: FilePath -> Account -> Integer -> Integer -> IO [Transaction]
-getTransactionsByAccount aFilePath account start end = do 
-  domSocket <- domainSocket aFilePath
-  let sync = eth_syncResponse $ eth_syncing 12 []
-  return $ 
-    case sync of 
-      Success (SyncResponse s c a b e) -> []
-      _ -> []
-
 
 type RequestId = Int
 type BlockIdAsInt = Integer
@@ -225,10 +216,10 @@ queryTransactionIO filePath addressId txId =
 
 
 
-finalInterface :: Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
-finalInterface socket accountAddress (start, numberOfBlocks) = 
+runGethSession :: Socket -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
+runGethSession socket accountAddress (start, numberOfBlocks) = 
   action `catch` (\e@(SomeException c) -> do 
-      System.IO.putStrLn (show e)
+      errorMessage $ Text.pack (show e)
       return (([], (SessionState 0 Nothing))))
   where 
     action = do 
@@ -238,15 +229,16 @@ finalInterface socket accountAddress (start, numberOfBlocks) =
       debugMessage $ Text.pack ("finalInterface " <> show config) 
       runStateT (runReaderT (runA gethSession) config) state
 
-finalInterfaceWithBracketT :: FilePath -> [String] -> (Integer, Integer) -> IO[([Transaction], SessionState)]
-finalInterfaceWithBracketT aFilePath accountAddresses (start, end) = do
+
+runGethSessionWithAccounts :: FilePath -> [String] -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+runGethSessionWithAccounts aFilePath accountAddresses (start, end) = do
   x <- bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do
           accts <- return accountAddresses 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
           result <- 
             mapM (\a -> do 
                           debugMessage $ Text.pack $ show a
-                          finalInterface socket a (start, end)) accts
+                          runGethSession socket a (start, end)) accts
           debugMessage $ Text.pack $ 
               "Processing block range " 
               <> (show start) <> " ----> " 
@@ -254,17 +246,13 @@ finalInterfaceWithBracketT aFilePath accountAddresses (start, end) = do
           return $ result
   return x
 
--- Browse for an account with account address between start and end.
--- Function uses bracket to deal with any errors on the handle.
--- 
-finalInterfaceWithBracket :: FilePath -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
-finalInterfaceWithBracket aFilePath accountAddress (start, end) = do 
-  bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
-          debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
-          result <- finalInterface socket accountAddress (start, end)
-          debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " ----> " <> (show end) <>  " " <> (show result)
-          return result
-
+{-- | 
+  Browse for an account with account address between start and end.
+  Function uses bracket to deal with any errors on the handle.
+--}
+runGethSessionWithBracket :: FilePath -> String -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+runGethSessionWithBracket aFilePath accountAddress (start, end) = 
+  runGethSessionWithAccounts aFilePath [accountAddress] (start, end)
 
 {-- | 
   Given a starting block, step through blocks using the block size.
@@ -298,7 +286,7 @@ browseBlocks ipcPath outputFile accountsFile (start, range, defaultBlocks) = do
         TextIO.hPutStrLn h "Hash, Currency, target-address, sender-address, value, gasPrice, gas")
   transactions <- 
       mapM (\x -> 
-        finalInterfaceWithBracketT 
+        runGethSessionWithAccounts 
           ipcPath
           accountAddresses
           (x, defaultBlocks)) unfoldList
@@ -321,7 +309,7 @@ closeHandle h = do
 
 -- | Balance transfers
 type TransactionRequest = (Address, Address, Integer, Integer, Integer, Integer, Integer)
-sendTransaction :: Socket -> RequestId -> TransactionRequest -> IO (Maybe Value)
+sendTransaction :: MonadIO m => Socket -> RequestId -> TransactionRequest -> m (Maybe Value)
 sendTransaction aSocket aRequestId (fromAddress, toAddress, gas, gasPrice, value, contractData, nonce) = do 
   let request = eth_sendTransaction 
                   aRequestId fromAddress toAddress
@@ -332,7 +320,9 @@ sendTransaction aSocket aRequestId (fromAddress, toAddress, gas, gasPrice, value
   return result
 
 
-sendTransactionInSession :: TransactionRequest -> EthereumSessionApp (Maybe Value) 
+sendTransactionInSession :: 
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
+      TransactionRequest -> m (Maybe Value) 
 sendTransactionInSession r@(fromAddress, toAddress, gas, gasPrice, value, contractData, nonce) = do 
   sessionState <- get 
   cfg <- ask
@@ -341,24 +331,29 @@ sendTransactionInSession r@(fromAddress, toAddress, gas, gasPrice, value, contra
   liftIO $ sendTransaction socket requestId r
 
 -- runSendTransaction
-runSendTransaction :: Socket -> String -> TransactionRequest -> IO(Maybe Value, SessionState) 
+runSendTransaction :: 
+  (MonadIO m) => 
+    Socket -> String -> TransactionRequest -> m (Maybe Value, SessionState) 
 runSendTransaction socket accountAddress transactionRequest = do 
   let 
     config = SessionConfig 1 socket (read accountAddress) 0 0
     state = SessionState 0 Nothing 
-  runStateT (runReaderT (runA (sendTransactionInSession transactionRequest)) config) state
+  liftIO $ runStateT (runReaderT (runA (sendTransactionInSession transactionRequest)) config) state
 
 
-sendTransactionIOWithBracket :: FilePath -> String -> TransactionRequest -> IO(Maybe Value, SessionState)
+sendTransactionIOWithBracket :: 
+  (MonadIO m) => FilePath -> String -> TransactionRequest -> m (Maybe Value, SessionState)
 sendTransactionIOWithBracket aFilePath accountAddress transactionRequest = do 
-  bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
-          debugMessage $ Text.pack $ "Processing transaction " <> (show transactionRequest)
+  liftIO $ bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do 
+          liftIO $ debugMessage $ Text.pack $ "Processing transaction " <> (show transactionRequest)
           result <- runSendTransaction socket accountAddress transactionRequest
           return result
 
 
 -- | Send a transaction request.
+sendTransactionMain :: (MonadIO m) => FilePath -> String -> TransactionRequest -> m ()
 sendTransactionMain filePath addressId transactionRequest = 
-  mapM (sendTransactionIOWithBracket filePath addressId) [transactionRequest] >> return ()
+  mapM 
+    (sendTransactionIOWithBracket filePath addressId) [transactionRequest] >> return ()
 
 
