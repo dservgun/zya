@@ -12,8 +12,13 @@ import Data.Monoid
 import GHC.Generics
 import Data.HashMap.Strict as HM
 import Data.Text as Text
-
+import Text.Printf 
 data OutputFormat = CSV Text | JSON deriving (Show)
+
+
+confirmations :: Transaction -> Integer 
+confirmations aTransaction = -1 -- blockNumber aTransaction - transactionIndex aTransaction
+
 
 data Transaction = 
   Transaction {
@@ -80,7 +85,7 @@ instance FromJSON Transaction where
                         (read valueS) (read gasPriceS)
                         (read gasS) (read inputS)
                         False Nothing -- need to fix this.
-            _ -> return $ Transaction 0 0 0 
+            _ -> return $ Transaction 0 0 0
                             0 0 
                             0  -- from can be null, because the contract perhaps got created.
                             0 
@@ -125,6 +130,10 @@ currency = "ETH"
 transactionOutput :: Transaction -> OutputFormat -> Text
 transactionOutput = 
   \t format -> Text.pack $ 
-      (show . hash $ t) <> "," <> currency <> "," <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
-      <> (show $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) <> "," <> (show $ value t)
-      <> "," <> (show $ gasPrice t) <> "," <> (show $ gas t) <> "\n"
+      (printf "0x%x" $ hash $ t) <> "," <> currency <> "," <> 
+      (printf "0x%x" $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
+      <> (printf "0x%x" $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) 
+      <> "," <> (show $ value t)
+      <> "," <> (show $ gasPrice t) <> "," <> (show $ gas t)
+      <> "," <> (show $ confirmations t) <> 
+      "\n"

@@ -34,6 +34,7 @@ import Data.Zya.Utils.JsonRPC
 import Data.Zya.Utils.FileUtil
 import Network.Socket(Socket, close)
 import Network.Socket.ByteString
+import Text.Printf
 import qualified Data.Text as T
 import qualified Data.Text.IO as T 
 import System.IO
@@ -52,11 +53,8 @@ sendMessage :: Value -> FilePath -> IO (Maybe Value)
 sendMessage aValue aFilePath = do 
   let packS = Text.pack
   sock <- domainSocket aFilePath 
-  System.IO.putStrLn(T.unpack $ decodeUtf8 $ L.toStrict $ encode $ aValue)
   handle (\e@(SomeException e1) -> errorMessage . packS $ (show e) <> " : Error") $ Network.Socket.ByteString.sendAll sock (L.toStrict $ encode $ aValue)
   msg <- Network.Socket.ByteString.recv sock 4096
-  System.IO.putStrLn(show msg)
-  System.IO.putStrLn(Text.unpack $ decodeUtf8 msg)
   return $ decode . fromStrict $ msg
 
 
@@ -74,7 +72,7 @@ getBlockByHash aSocket aRequestId aBlockId = do
   -- how large can a block get?
   let request = eth_getBlockByNumber aRequestId aBlockId details
   result <- sendMessageWithSockets aSocket request
-  debugMessage $ T.pack $ "Get block by hash " <> " " <> (show request)
+  debugMessage $ T.pack $ "Get block by hash " <> " " <> (show result)
   return $ joinResponse $ fmap fromJSON result
 
 getTransactionByHash :: 
@@ -96,6 +94,10 @@ filterTransactions :: Integer -> [Transaction] -> [Transaction]
 filterTransactions address transactions = 
   Prelude.filter(\a -> from a == address || to a == address) transactions
 
+filterTransactionsA :: [String] -> [Transaction] -> [Transaction]
+filterTransactionsA addresses transactions = 
+  Prelude.concat $
+    Prelude.map (\a -> filterTransactions (read a) transactions) addresses
 
 --- Design
 --- The application session contains a read only socket
@@ -105,6 +107,7 @@ filterTransactions address transactions =
 data SessionConfig = SessionConfig {
   startRequestId :: Integer
   , sessionSocket :: Socket
+  , socketPath :: FilePath  
   , outputFileHandle :: Handle
   , accountAddress :: Integer
   , startBlock :: Integer
@@ -130,11 +133,20 @@ joinResponse :: Maybe(Result a) -> Result a
 joinResponse (Just a) = a 
 joinResponse Nothing = Error "No response.."
 
--- 1. Send a sync request.
--- 2. If the response is a success, 
--- 3. Send a request to query all transactions for the block.
--- 4. If the transactions match the address, add them to the result, 
--- 5. If not, decrement the block and repeat, until there are no blocks to process.
+
+gethSessionAccounts :: 
+      (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
+        [String] -> m [Transaction]
+gethSessionAccounts accountAddresses = do 
+  cfg <- ask
+  sessionState <- get
+  let socket = sessionSocket cfg
+  let nReq = nextRequestId sessionState 
+  --TODO : Cleanup
+  s2 <- get
+  block <- getAllFilteredTransactionsForAddresses accountAddresses
+
+  return [] -- TODO fix this.
 
 
 gethSession :: 
@@ -151,6 +163,51 @@ gethSession = do
   return [] -- TODO fix this.
 
 
+getAllFilteredTransactionsForAddresses :: 
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => [String] -> m ()
+getAllFilteredTransactionsForAddresses accountAddresses = do 
+  sessionState <- get 
+  cfg <- ask
+  let socket = sessionSocket cfg 
+  let ipcPath = socketPath cfg
+  let outputFileH = outputFileHandle cfg
+  let start = startBlock cfg
+  let end = endBlock cfg
+  let requestId = nextRequestId sessionState 
+  let currentBlockId = curBlock sessionState
+  result <- mapM (\x -> do 
+    prev <- get
+    modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
+    s <- get
+    let reqId = nextRequestId s
+    liftIO $ debugMessage 
+      $ T.pack $ "Request id " 
+        <> (show reqId) <>  " " <> (show start) <> " - " <> (show end) <> " - "
+        <> (show x)
+    liftIO $ bracket (domainSocket ipcPath) 
+      (closeHandle) (\socket -> do 
+          r <- getBlockByHash socket reqId (BlockId x)
+          liftIO $ debugMessage $ 
+            T.pack $ "returned truncated ... " <> (show r)
+          return r
+        )
+    ) [start .. end]
+  let transactionList = Prelude.map (\x -> 
+                            filterTransactionsA accountAddresses $ getTransactions x
+                        ) result
+  liftIO $ debugMessage $ T.pack $ "Returning transaction lists..." 
+            <> (show (Prelude.length transactionList))
+  let transactionTexts = printTransactions (Prelude.concat transactionList) (CSV ",")
+  let textToBePrinted = Text.unlines transactionTexts
+  if (textToBePrinted /= "") then do
+    liftIO $ TextIO.hPutStrLn outputFileH $ textToBePrinted
+    liftIO $ System.IO.hFlush outputFileH
+    return ()
+  else
+    return ()
+
+
+-- TODO dead code removal.
 getAllFilteredTransactionsForAddress :: 
   (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => m ()
 getAllFilteredTransactionsForAddress = do 
@@ -178,13 +235,17 @@ getAllFilteredTransactionsForAddress = do
   let transactionList = Prelude.map (\x -> 
                             filterTransactions accountAddr $ getTransactions x
                         ) result
-  liftIO $ debugMessage $ T.pack $ "Returning transaction lists..."
-  liftIO $ TextIO.hPutStrLn outputFileH $ Text.unlines $ 
-     printTransactions 
-        (Prelude.concat transactionList) 
-        (CSV ",")
-  
-  return ()
+  liftIO $ debugMessage $ T.pack $ "Returning transaction lists..." 
+            <> (show (Prelude.length transactionList))
+  let transactionTexts = printTransactions (Prelude.concat transactionList) (CSV ",")
+  let textToBePrinted = Text.unlines transactionTexts
+  if (textToBePrinted /= "") then do
+    liftIO $ TextIO.hPutStrLn outputFileH $ textToBePrinted
+    liftIO $ System.IO.hFlush outputFileH
+    return ()
+  else
+    return ()
+
 
 
 
@@ -203,7 +264,7 @@ queryTransaction ::
 queryTransaction socket accountAddress transactionHash = do 
   defFileHandle <- liftIO $ openFile "defaultQueryTransaction.csv" WriteMode
   let 
-    config = SessionConfig 1 socket defFileHandle (read accountAddress) 0 0
+    config = SessionConfig 1 socket "tbd" defFileHandle (read accountAddress) 0 0
     state = SessionState 0 Nothing 
   liftIO $ runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
 
@@ -223,6 +284,17 @@ queryTransactionIO filePath addressId txId =
   mapM (queryTransactionWithBracket filePath addressId) txId >> return ()
 
 
+runGethSessionMultipleAccounts socket fHandle ipcPath accountAddresses (start, numberOfBlocks) = 
+  action `catch` (\e@(SomeException c) -> do 
+      errorMessage $ Text.pack (show e)
+      return (([], (SessionState 0 Nothing))))
+  where 
+    action = do 
+      let    
+        config = SessionConfig 1 socket ipcPath fHandle (0) start (start + numberOfBlocks)
+        state = SessionState 0 Nothing
+      debugMessage $ Text.pack ("finalInterface " <> show config) 
+      runStateT (runReaderT (runA $ gethSessionAccounts accountAddresses) config) state
 
 runGethSession :: Socket -> Handle -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
 runGethSession socket fHandle accountAddress (start, numberOfBlocks) = 
@@ -232,25 +304,22 @@ runGethSession socket fHandle accountAddress (start, numberOfBlocks) =
   where 
     action = do 
       let    
-        config = SessionConfig 1 socket fHandle (read accountAddress) start (start + numberOfBlocks)
+        config = SessionConfig 1 socket "tbd" fHandle (read accountAddress) start (start + numberOfBlocks)
         state = SessionState 0 Nothing
       debugMessage $ Text.pack ("finalInterface " <> show config) 
       runStateT (runReaderT (runA gethSession) config) state
 
 
-runGethSessionWithAccounts :: FilePath -> Handle -> [String] -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+runGethSessionWithAccounts :: FilePath -> Handle -> [String] -> (Integer, Integer) -> IO([Transaction], SessionState)
 runGethSessionWithAccounts aFilePath outputFileHandle accountAddresses (start, end) = do
   x <- bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do
           accts <- return accountAddresses 
           debugMessage $ Text.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
-          result <- 
-            mapM (\a -> do 
-                          debugMessage $ Text.pack $ show a
-                          runGethSession socket outputFileHandle a (start, end)) accts
+          result <- runGethSessionMultipleAccounts socket outputFileHandle aFilePath accts (start, end)
           debugMessage $ Text.pack $ 
-              "Processing block range " 
+              "Processed block range " 
               <> (show start) <> " ----> " 
-              <> (show end) <>  " " <> (show result)
+              <> (show end)
           return $ result
   return x
 
@@ -258,7 +327,7 @@ runGethSessionWithAccounts aFilePath outputFileHandle accountAddresses (start, e
   Browse for an account with account address between start and end.
   Function uses bracket to deal with any errors on the handle.
 --}
-runGethSessionWithBracket :: FilePath -> Handle -> String -> (Integer, Integer) -> IO[([Transaction], SessionState)]
+runGethSessionWithBracket :: FilePath -> Handle -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
 runGethSessionWithBracket aFilePath handle accountAddress (start, end) = do 
   runGethSessionWithAccounts aFilePath handle [accountAddress] (start, end)
 
@@ -298,7 +367,7 @@ browseBlocks ipcPath outputFile accountsFile (start, range, defaultBlocks) = do
               ipcPath
               outputFileHandle
               accountAddresses          
-              (x, defaultBlocks)) unfoldList
+              (x, defaultBlocks - 1)) unfoldList
         debugMessage $ "Processed transactions..."
         TextIO.hPutStrLn outputFileHandle $ "End processing")
   return ()
@@ -341,7 +410,7 @@ runSendTransaction socket accountAddress transactionRequest = do
   -- Overwrite to avoid filling up space.
   defFileHandle <- liftIO $ openFile "defautSendTransaction.csv" WriteMode 
   let 
-    config = SessionConfig 1 socket defFileHandle (read accountAddress) 0 0
+    config = SessionConfig 1 socket "tbd" defFileHandle (read accountAddress) 0 0
     state = SessionState 0 Nothing 
   liftIO $ runStateT (runReaderT (runA (sendTransactionInSession transactionRequest)) config) state
 

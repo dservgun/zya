@@ -86,7 +86,7 @@ data BlockByHash = BlockByHash {
   -- | Root of the transaction trie of the block.
   , transactionsRoot :: Integer
   -- | Root of the final state trie of the block.
-  , stateRoot :: Integer 
+  , stateRoot :: Integer
   -- | Receipts root of the recepits of the trie of the block.  
   , receiptsRoot :: Integer
   -- | Address of the beneficiary to whom mining rewards
@@ -140,7 +140,7 @@ instance FromJSON BlockByHash where
               (read hash) (read parentHash)
               (read nonce) (read sha3Uncles)
               (read logsBloom) (read transactionsRoot) 
-              (read stateRoot) (read receiptsRoot) 
+              (read stateRoot) (read receiptsRoot)
               (read miner) (read difficulty) (read totalDifficulty) 
               (read extraData) (read size) (read gasLimit) (read gasUsed)
               (read timestamp) transactions uncles

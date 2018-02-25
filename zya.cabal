@@ -321,7 +321,7 @@ executable zya_ethereum_client
     , websockets
     , zya
 
-  ghc-options : -Wall
+  ghc-options : -Wall -O2 -threaded "-with-rtsopts=-N -g1"
   default-language:   Haskell2010
   hs-source-dirs : ethClient
   other-modules :  

@@ -23,6 +23,7 @@ import System.Log.Logger
 domainSocket :: (MonadIO m) => FilePath -> m Socket
 domainSocket filePath = do 
   sock <- liftIO $ socket AF_UNIX Stream 0 
+  liftIO $ debugMessage $ Text.pack $ "Opening socket " <> (show filePath)
   _ <- liftIO $ setSocketOption sock KeepAlive 0
   _ <- liftIO $ connect sock (SockAddrUnix filePath)
   return sock
