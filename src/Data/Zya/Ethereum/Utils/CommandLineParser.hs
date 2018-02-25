@@ -141,7 +141,7 @@ commandParser = blockBrowserCommandParser <|> transactionCommandParser <|> sendT
 
 etherClientCommandHandler :: EtherClientCommand -> IO ()
 etherClientCommandHandler aCommand = do
-  setup DEBUG 
+  setup INFO 
   addFileHandler "eth.debug.log" DEBUG
   addFileHandler "eth.info.log" INFO 
   case aCommand of 

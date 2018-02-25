@@ -10,7 +10,7 @@ module Data.Zya.Ethereum.Sockets.Client
 
 where
 
-
+import Debug.Trace(trace)
 import Control.Applicative
 import Control.Concurrent(forkIO)
 import Control.Exception(bracket, handle, SomeException(..), catch)
@@ -91,8 +91,8 @@ getTransactions aBlockByHash =
       Error s -> []
 
 filterTransactions :: Integer -> [Transaction] -> [Transaction]
-filterTransactions address transactions = 
-  Prelude.filter(\a -> from a == address || to a == address) transactions
+filterTransactions address transactions =
+    Prelude.filter(\a -> from a == address || to a == address) transactions
 
 filterTransactionsA :: [String] -> [Transaction] -> [Transaction]
 filterTransactionsA addresses transactions = 
@@ -144,7 +144,8 @@ gethSessionAccounts accountAddresses = do
   let nReq = nextRequestId sessionState 
   --TODO : Cleanup
   s2 <- get
-  block <- getAllFilteredTransactionsForAddresses accountAddresses
+  block <- 
+    getAllFilteredTransactionsForAddresses accountAddresses
 
   return [] -- TODO fix this.
 
@@ -187,12 +188,12 @@ getAllFilteredTransactionsForAddresses accountAddresses = do
     liftIO $ bracket (domainSocket ipcPath) 
       (closeHandle) (\socket -> do 
           r <- getBlockByHash socket reqId (BlockId x)
-          liftIO $ debugMessage $ 
-            T.pack $ "returned truncated ... " <> (show r)
           return r
         )
     ) [start .. end]
-  let transactionList = Prelude.map (\x -> 
+
+  liftIO $ debugMessage $ T.pack $ "Filter transactions A"
+  let transactionList = Prelude.map (\x -> do
                             filterTransactionsA accountAddresses $ getTransactions x
                         ) result
   liftIO $ debugMessage $ T.pack $ "Returning transaction lists..." 

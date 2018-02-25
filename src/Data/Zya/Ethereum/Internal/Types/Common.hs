@@ -11,6 +11,7 @@ module Data.Zya.Ethereum.Internal.Types.Common (
   , EthParameter(..)
   ) where
 import Data.Aeson
+import Data.Aeson.Types(modifyFailure)
 import GHC.Generics
 import Data.Text
 import Text.Printf
@@ -74,76 +75,80 @@ data BlockByHash = BlockByHash {
   -- | the block number or null if pending.
   number :: BlockQuantity
   -- | Hash of the block
-  , hash :: Integer 
+  , hash :: String 
   -- | Parent hash 
-  , parentHash :: Integer
+  , parentHash :: String
   -- | 8 byte hash of the generated proof of work.
-  , nonce :: Integer
+  , nonce :: String
   -- | SHA3 of the uncle blocks.
-  , sha3Uncles :: Integer 
+  , sha3Uncles :: String
   -- | Bloom filter logs of the block.
-  , logsBloom :: Integer
+  , logsBloom :: String
   -- | Root of the transaction trie of the block.
-  , transactionsRoot :: Integer
+  , transactionsRoot :: String
   -- | Root of the final state trie of the block.
-  , stateRoot :: Integer
+  , stateRoot :: String
   -- | Receipts root of the recepits of the trie of the block.  
-  , receiptsRoot :: Integer
+  , receiptsRoot :: String
   -- | Address of the beneficiary to whom mining rewards
   -- | are given. 
-  , miner :: Integer
+  , miner :: String
   -- | Difficulty of this block.  
-  , difficulty :: Integer
+  , difficulty :: BlockQuantity
   -- | Total difficulty of this block.
-  , totalDifficulty :: Integer
+  , totalDifficulty :: BlockQuantity
   -- | Extra data associated with this block.
-  , extraData :: Integer
+  , extraData :: String
   -- | Size of this block in bytes. 
   -- Should the size have anothe property to check if the block was modified anywhere?
-  , size :: Integer
+  , size :: BlockQuantity
   -- | Gas limit allowed for this block.
-  , gasLimit :: Integer
+  , gasLimit :: BlockQuantity
   -- | Total used gas by all the transactions in this block.
-  , gasUsed :: Integer
+  , gasUsed :: BlockQuantity
   -- | timestamp
-  , timestamp :: Integer
+  , timestamp :: BlockQuantity
   -- | Transactions array
   , transactions :: [Transaction]
   -- | Array of uncle hashes.
-  , uncles :: [Integer]
+  , uncles :: [String]
 } deriving (Generic, Show)
 
 instance FromJSON BlockByHash where 
-  parseJSON = withObject "BlockByHash" $ \w -> do
-    v <- w .: "result"
-    number <- v .: "number" 
-    hash <- v .: "hash" 
-    parentHash <- v .: "parentHash"
-    nonce <- v .: "nonce"
-    sha3Uncles <- v .: "sha3Uncles" 
-    logsBloom <- v .: "logsBloom" 
-    transactionsRoot <- v .: "transactionsRoot"
-    stateRoot <- v .: "stateRoot" 
-    receiptsRoot <- v .: "receiptsRoot"
-    miner <- v .: "miner" 
-    difficulty <- v .: "difficulty" 
-    totalDifficulty <- v .: "totalDifficulty" 
-    extraData <- v .: "extraData"
-    size <- v .: "size" 
-    gasLimit <- v .: "gasLimit"
-    gasUsed <- v .: "gasUsed" 
-    timestamp <- v .: "timestamp" 
-    transactions <- v .: "transactions"
-    uncles <- v .: "uncles"
-    return $ BlockByHash 
-              (number)
-              (read hash) (read parentHash)
-              (read nonce) (read sha3Uncles)
-              (read logsBloom) (read transactionsRoot) 
-              (read stateRoot) (read receiptsRoot)
-              (read miner) (read difficulty) (read totalDifficulty) 
-              (read extraData) (read size) (read gasLimit) (read gasUsed)
-              (read timestamp) transactions uncles
+  parseJSON x = 
+    modifyFailure 
+      ("Parsing BlockByHash failed " ++ )
+      (parseJSONBlock x)
+parseJSONBlock = withObject "BlockByHash" $ \w -> do
+  v <- w .: "result"
+  number <- v .: "number" 
+  hash <- v .: "hash" 
+  parentHash <- v .: "parentHash"
+  nonce <- v .: "nonce"
+  sha3Uncles <- v .: "sha3Uncles" 
+  logsBloom <- v .: "logsBloom" 
+  transactionsRoot <- v .: "transactionsRoot"
+  stateRoot <- v .: "stateRoot" 
+  receiptsRoot <- v .: "receiptsRoot"
+  miner <- v .: "miner" 
+  difficulty <- v .: "difficulty" 
+  totalDifficulty <- v .: "totalDifficulty" 
+  extraData <- v .: "extraData"
+  size <- v .: "size" 
+  gasLimit <- v .: "gasLimit"
+  gasUsed <- v .: "gasUsed" 
+  timestamp <- v .: "timestamp" 
+  transactions <- v .: "transactions"
+  uncles <- v .: "uncles"
+  return $ BlockByHash 
+            (number)
+            (hash) (parentHash)
+            (nonce) (sha3Uncles)
+            (logsBloom) (read transactionsRoot) 
+            (read stateRoot) (read receiptsRoot)
+            (read miner) (difficulty) (totalDifficulty) 
+            (read extraData) (size) (gasLimit) (gasUsed)
+            (timestamp) transactions uncles
 
 instance ToJSON BlockByHash where 
   toJSON (BlockByHash number hash parentHash nonce sha3Uncles 
@@ -161,13 +166,13 @@ instance ToJSON BlockByHash where
           , "stateRoot" .= (String . pack $ printf "0x%x" stateRoot)
           , "receiptsRoot" .= (String . pack $ printf "0x%x" receiptsRoot) 
           , "miner" .= (String . pack $ printf "0x%x" miner)
-          , "difficulty" .= (String . pack $ printf "0x%x" difficulty) 
-          , "totalDifficulty" .= (String . pack $ printf "0x%x" totalDifficulty) 
+          , "difficulty" .= (String . pack $ show difficulty) 
+          , "totalDifficulty" .= (String . pack $ show totalDifficulty) 
           , "extraData" .= (String . pack $ printf "0x%x" extraData)
-          , "size" .= (String . pack $ printf "0x%x" size)
-          , "gasLimit" .= (String . pack $ printf "0x%x" gasLimit)
-          , "gasUsed" .= (String . pack $ printf "0x%x" gasUsed)
-          , "timestamp" .= (String . pack $ printf "0x%x" timestamp)
+          , "size" .= (String . pack $ show size)
+          , "gasLimit" .= (String . pack $ show gasLimit)
+          , "gasUsed" .= (String . pack $ show gasUsed)
+          , "timestamp" .= (String . pack $ show timestamp)
           , "transactions" .= transactions
       ] 
 

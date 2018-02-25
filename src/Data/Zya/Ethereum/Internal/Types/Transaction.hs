@@ -8,6 +8,7 @@ module Data.Zya.Ethereum.Internal.Types.Transaction
   )
 where
 import Data.Aeson
+import Data.Aeson.Types
 import Data.Monoid
 import GHC.Generics
 import Data.HashMap.Strict as HM
@@ -52,76 +53,84 @@ data Transaction =
   }deriving(Generic, Show)
 
 instance FromJSON Transaction where 
-  parseJSON = withObject "Transaction" $ \vOuter -> do
-      let rField = HM.lookup "result" vOuter
-      case rField of 
-        Just v1 -> do
-          case v1 of 
-            Object v -> do  
-                  hashS <- v .: "hash"
-                  nonceS <- v .: "nonce"
-                  blockHashS <- v .: "blockHash" 
-                  blockNumberS <- v .: "blockNumber" 
-                  transactionIndexS <- v .: "transactionIndex"                  
-                  frJ <- v .: "from"
-                  frS <- case frJ of 
-                    String s -> return (Text.unpack s)
-                    _ -> return ("0x00000"  :: String)
-                  toAJ <- v .: "to"
-                  toA <- case toAJ of 
-                    String s -> return (Text.unpack s)                    
-                    _ -> return ("0x00000"  :: String)
-                  valueS <- v .: "value"
-                  gasPriceS <- v .: "gasPrice"
-                  gasS <- v .: "gas" 
-                  inputS <- return "0x00" -- v .: "input"
-            --      replayProtected <- v .: "replayProtected"
-            --      chainId <- v .: "chainId"
-                  return $ Transaction (read hashS) (read nonceS) (read blockHashS) 
-                        (read blockNumberS)
-                        (read transactionIndexS)
-                        (read frS) 
-                        (read toA)
-                        (read valueS) (read gasPriceS)
-                        (read gasS) (read inputS)
-                        False Nothing -- need to fix this.
-            _ -> return $ Transaction 0 0 0
-                            0 0 
-                            0  -- from can be null, because the contract perhaps got created.
-                            0 
-                            0 
-                            0 
-                            0 
-                            0 False Nothing
-        Nothing -> do 
-                hashS <- vOuter .: "hash"
-                nonceS <- vOuter .: "nonce"
-                blockHashS <- vOuter .: "blockHash" 
-                blockNumberS <- vOuter .: "blockNumber" 
-                transactionIndexS <- vOuter .: "transactionIndex"
-                frJ <- vOuter .: "from"
+  parseJSON = 
+    \x -> 
+    modifyFailure
+      ("Parsing transaction failed " ++)
+      (parseJSONTransactionObject x)
+
+parseJSONTransactionObject =  
+  withObject "Transaction" $ \vOuter -> do
+    let rField = HM.lookup "result" vOuter
+    case rField of 
+      Just v1 -> do
+        case v1 of 
+          Object v -> do  
+                hashS <- v .: "hash"
+                nonceS <- v .: "nonce"
+                blockHashS <- v .: "blockHash" 
+                blockNumberS <- v .: "blockNumber" 
+                transactionIndexS <- v .: "transactionIndex"                  
+                frJ <- v .: "from"
                 frS <- case frJ of 
                   String s -> return (Text.unpack s)
                   _ -> return ("0x00000"  :: String)
-
-                toAJ <- vOuter .: "to"
+                toAJ <- v .: "to"
                 toA <- case toAJ of 
                   String s -> return (Text.unpack s)                    
                   _ -> return ("0x00000"  :: String)
-
-                valueS <- vOuter .: "value"
-                gasPriceS <- vOuter .: "gasPrice"
-                gasS <- vOuter .: "gas" 
+                valueS <- v .: "value"
+                gasPriceS <- v .: "gasPrice"
+                gasS <- v .: "gas" 
                 inputS <- return "0x00" -- v .: "input"
           --      replayProtected <- v .: "replayProtected"
           --      chainId <- v .: "chainId"
                 return $ Transaction (read hashS) (read nonceS) (read blockHashS) 
                       (read blockNumberS)
                       (read transactionIndexS)
-                      (read frS) (read toA)
+                      (read frS) 
+                      (read toA)
                       (read valueS) (read gasPriceS)
                       (read gasS) (read inputS)
                       False Nothing -- need to fix this.
+          _ -> return $ Transaction 0 0 0
+                          0 0 
+                          0  -- from can be null, because the contract perhaps got created.
+                          0 
+                          0 
+                          0 
+                          0 
+                          0 False Nothing
+      Nothing -> do 
+              hashS <- vOuter .: "hash"
+              nonceS <- vOuter .: "nonce"
+              blockHashS <- vOuter .: "blockHash" 
+              blockNumberS <- vOuter .: "blockNumber" 
+              transactionIndexS <- vOuter .: "transactionIndex"
+              frJ <- vOuter .: "from"
+              frS <- case frJ of 
+                String s -> return (Text.unpack s)
+                _ -> return ("0x00000"  :: String)
+
+              toAJ <- vOuter .: "to"
+              toA <- case toAJ of 
+                String s -> return (Text.unpack s)                    
+                _ -> return ("0x00000"  :: String)
+
+              valueS <- vOuter .: "value"
+              gasPriceS <- vOuter .: "gasPrice"
+              gasS <- vOuter .: "gas" 
+              inputS <- return "0x00" -- v .: "input"
+        --      replayProtected <- v .: "replayProtected"
+        --      chainId <- v .: "chainId"
+              return $ Transaction (read hashS) (read nonceS) (read blockHashS) 
+                    (read blockNumberS)
+                    (read transactionIndexS)
+                    (read frS) (read toA)
+                    (read valueS) (read gasPriceS)
+                    (read gasS) (read inputS)
+                    False Nothing -- need to fix this.
+                      
 
 instance ToJSON Transaction
 
