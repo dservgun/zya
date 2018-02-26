@@ -1,0 +1,25 @@
+## Comments on the code.
+
+
+Something i never liked about record wild cards was that it  simply broke the encapsulation principle and so never got around
+to using it. Though the cost of not using them is verbosity, on the other hand, it hides the complexity of a structure. I am not
+really convinced that this was the right approach. Well, we just move with it because it shortens the code. 
+
+```
+   • No instance for (Num (Maybe Integer))
+        arising from the literal ‘0’
+    • In the second argument of ‘(.!=)’, namely ‘0’
+      In a stmt of a 'do' block:
+        __confirmations <- o .:? "confirmations" .!= 0
+      In the expression:
+        do { __amount <- o .: "amount";
+             __confirmations <- o .:? "confirmations" .!= 0;
+             __blockHash <- o .: "blockhash";
+             __blockTime <- o .: "blocktime";
+             .... }
+
+```
+
+##### Notes on the blog post
+Some comments i just didnt know where to put. 
+

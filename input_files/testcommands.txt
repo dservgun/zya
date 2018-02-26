@@ -1,0 +1,16 @@
+ .stack-work/dist/x86_64-linux-nopie/Cabal-1.24.2.0/build/loyakk_client/loyakk_client --ipcPath /home/dinkarganti/local_test/geth_test.ipc --address 0x4959d87500eabc9e9e7b061b4a25ed000c9c0c20 --blockId 4528049 --range 20 --chunkSize 10
+
+
+["0x8640d5a24867b87e4f58afa52ee57b94d90f883a", "0xb268ceff45ae733fe1dba2cab76f0e2dd84dde7f", "0xa674eee999b4bc9bb918d3abfa25b9cac1f47968", "0x2df5e037d91e506b5a83b1e94826e96cd964eea8"]
+
+
+eth.sendTransaction({from : "0x7f11982c76c160bf2a8a9f5e0f8e79f942e21875", to : "0xec1e5eaa33cee17a6d53eb9fe14363519bc3baac", value : 10})
+
+
+ .stack-work/dist/x86_64-linux-nopie/Cabal-1.24.2.0/build/loyakk_client/loyakk_client --commandType sendtransaction --ipcPath /home/dinkarganti/local_test/geth_test.ipc --address 0x8640d5a24867b87e4f58afa52ee57b94d90f883a --address "0xb268ceff45ae733fe1dba2cab76f0e2dd84dde7f" --address "0x2df5e037d91e506b5a83b1e94826e96cd964eea8" --gas 90000 --gasPrice 100 --value 2
+
+
+ .stack-work/dist/x86_64-linux-nopie/Cabal-1.24.2.0/build/zya_ethereum_client/zya_ethereum_client --ipcPath /home/dinkarganti/local_test/geth_test.ipc --address 0x9f55529bf1fc40875a918de22f582fba5f5cef29 --blockId 5128140 --range 20 --chunkSize 10
+
+
+.stack-work/dist/x86_64-linux-nopie/Cabal-1.24.2.0/build/zya_ethereum_client/zya_ethereum_client --ipcPath /home/dinkarganti/local_test/geth_test.ipc --addressFile eth_addresses.txt --blockId 480000 --range 1000 --chunkSize 200 --outputFile ico_0223.csv
