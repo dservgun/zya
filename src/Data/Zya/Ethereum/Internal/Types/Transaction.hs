@@ -5,6 +5,7 @@ module Data.Zya.Ethereum.Internal.Types.Transaction
     Transaction(..)
     , transactionOutput
     , OutputFormat(..)
+    , printTransactions
   )
 where
 import Data.Aeson
@@ -146,3 +147,10 @@ transactionOutput =
       <> "," <> (show $ gasPrice t) <> "," <> (show $ gas t)
       <> "," <> (show $ confirmations t) <> 
       "\n"
+
+
+
+-- | Print transactions as text.
+printTransactions :: [Transaction] -> OutputFormat -> [Text]
+printTransactions transactionList (a@(CSV ",")) = 
+  Prelude.map (\t -> transactionOutput t a) transactionList

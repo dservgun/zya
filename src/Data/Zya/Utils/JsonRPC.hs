@@ -59,3 +59,8 @@ createRPCRequest defaultParams method requestId params =
 
 createRPCRequestWithDefaults = createRPCRequest defaultParameters 
 
+
+joinResponse :: Maybe(Result a) -> Result a
+joinResponse (Just a) = a 
+joinResponse Nothing = Error "No response.."
+

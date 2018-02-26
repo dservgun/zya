@@ -51,6 +51,12 @@ sendMessageWithSockets sock request = do
   return . decode . fromStrict $ msg
 
 
+-- | Print closing handle.
+closeHandle :: (MonadIO m) => Socket -> m ()
+closeHandle h = do 
+  liftIO $ debugMessage $ Text.pack $ "Closing handle " <> show h
+  liftIO . close $ h
+
 
 
 defaultBufferSize :: Int 

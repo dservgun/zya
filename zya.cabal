@@ -79,6 +79,8 @@ library
     Data.Zya.Ethereum.Internal.Types.RPCResponse
     Data.Zya.Ethereum.Internal.Types.Transaction
     Data.Zya.Ethereum.Sockets.Client
+    Data.Zya.Ethereum.Sockets.BrowseBlocks
+    Data.Zya.Ethereum.Sockets.GethApplication
     Data.Zya.Ethereum.Utils.CommandLineParser
     Data.Zya.Kafka.Client 
     Data.Zya.Kafka.Util
