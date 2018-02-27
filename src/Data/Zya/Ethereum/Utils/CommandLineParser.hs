@@ -170,10 +170,11 @@ etherClientCommandHandler aCommand = do
         t <- browseBlocks ipcPath outputFile addressFile 
                 reconFile (blockId, numberOfBlocks, defaultChunkSize) -- Defaulting this to 1. Too many parameters.
         return ()
-    SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce ->
-      sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)    
+    SendTransaction 
+        commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value1 txData1 nonce1 ->
+      sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value1, txData1, nonce1)    
 
-
+mainCLI' :: IO ()
 mainCLI' = 
   etherClientCommandHandler =<< execParser opts 
     where 
@@ -184,7 +185,7 @@ mainCLI' =
                 <> header "EthClient - to communicate on ipc"
                 )
 
-
+mainCLI :: IO ()
 mainCLI = do 
   putStrLn "Starting...."
   mainCLI' `catch` (\e@(SomeException c) -> errorMessage $ Text.pack $ show e)

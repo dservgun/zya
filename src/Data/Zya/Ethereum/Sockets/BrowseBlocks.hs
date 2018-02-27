@@ -145,13 +145,11 @@ getAllFilteredTransactionsForAddresses ::
 getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do 
   sessionState <- get 
   cfg <- ask
-  let socket = sessionSocket cfg 
-  let ipcPath = socketPath cfg
+  let (socket, ipcPath) = (sessionSocket cfg , socketPath cfg)
   let outputFileH = outputFileHandle cfg
-  let start = startBlock cfg
-  let end = endBlock cfg
-  let requestId = nextRequestId sessionState 
-  let currentBlockId = curBlock sessionState
+  let (start, end) = (startBlock cfg, endBlock cfg) 
+  let (requestId, currentBlockId) = (nextRequestId sessionState , curBlock sessionState)
+
   result <- mapM (\x -> do 
     prev <- get
     modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
@@ -168,7 +166,6 @@ getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do
         )
     ) [start .. end]
 
-  liftIO $ debugMessage $ T.pack $ "Filter transactions A"
   let transactionList = Prelude.map (\x -> do
                             filterTransactionsA accountAddresses $ getTransactions x
                         ) result
