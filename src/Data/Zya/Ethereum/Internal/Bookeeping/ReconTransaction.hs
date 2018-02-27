@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Zya.Ethereum.Internal.Bookeeping.ReconTransaction
   (
-    reconTransactions, makeRecon, ReconTransaction
+    reconTransactions, makeRecon, ReconTransaction, address, intentionAmount, toCSV
   ) where
 
 import Control.Applicative
@@ -60,12 +60,8 @@ readReconTransactions aFilePath = do
                 return $ ReconTransaction (read rAddress) (parseDouble amount)
         return $ V.toList vector
 
-reconTransactions :: [Transaction] -> FilePath -> IO [(Transaction, ReconTransaction)]
-reconTransactions confirmedTransactions reconFile = do 
-  recons <- readReconTransactions reconFile 
-  return $ 
-    [(t, r) | 
-        t <- confirmedTransactions, 
-        r <- recons, 
-        to t == address r
-    ]
+reconTransactions :: FilePath -> IO [ReconTransaction]
+reconTransactions reconFile = readReconTransactions reconFile 
+
+toCSV :: ReconTransaction -> T.Text 
+toCSV (ReconTransaction address amount) = T.pack $ (show address) <> "," <> (show amount)

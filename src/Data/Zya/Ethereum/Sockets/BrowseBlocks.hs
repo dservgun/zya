@@ -13,6 +13,7 @@ import Data.Aeson
 import Data.Monoid
 import Data.Text.IO as TextIO
 import Data.Zya.Ethereum.Internal.Bookeeping.ReconTransaction
+        (ReconTransaction, reconTransactions, toCSV, address)
 import Data.Zya.Ethereum.Internal.Types.Common
 import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Ethereum.Internal.Types.RPCResponse
@@ -58,13 +59,15 @@ browseBlocks ::
 browseBlocks ipcPath outputFile accountsFile reconFile (start, range, defaultBlocks) = do
   let unfoldList = chunkBlocks(start, range, defaultBlocks)
   accountAddresses <- readInputLines accountsFile
+  reconTransactions <- reconTransactions reconFile
   transactions <- bracket(openFile outputFile WriteMode)(hClose) (\outputFileHandle -> do
-        TextIO.hPutStrLn outputFileHandle "Hash, Currency, target-address, sender-address, value, gasPrice, gas"
+        TextIO.hPutStrLn outputFileHandle "Hash, Currency, target-address, sender-address, value, gasPrice, gas, intentAddress, intentAmount"
         transactions <- 
           mapM (\x -> 
             runGethSessionWithAccounts 
               ipcPath
               outputFileHandle
+              reconTransactions
               accountAddresses          
               (x, defaultBlocks - 1)) unfoldList
         debugMessage $ "Processed transactions..."
@@ -72,20 +75,18 @@ browseBlocks ipcPath outputFile accountsFile reconFile (start, range, defaultBlo
         return transactions
         )
   trans <- return . (Prelude.concat) $ fmap fst transactions
-  reconTransactions <- reconTransactions trans reconFile
   
-  System.IO.putStrLn $ show reconTransactions
   return transactions
 
 
 
 
-runGethSessionWithAccounts :: FilePath -> Handle -> [String] -> (Integer, Integer) -> IO([Transaction], SessionState)
-runGethSessionWithAccounts aFilePath outputFileHandle accountAddresses (start, end) = do
+runGethSessionWithAccounts :: FilePath -> Handle -> [ReconTransaction] -> [String] -> (Integer, Integer) -> IO([Transaction], SessionState)
+runGethSessionWithAccounts aFilePath outputFileHandle reconTransactions accountAddresses (start, end) = do
   x <- bracket (domainSocket aFilePath) (\h -> closeHandle h) $ \socket -> do
           accts <- return accountAddresses 
           debugMessage $ T.pack $ "Processing block range " <> (show start) <> " --> " <> (show end)
-          result <- runGethSessionMultipleAccounts socket outputFileHandle aFilePath accts (start, end)
+          result <- runGethSessionMultipleAccounts socket outputFileHandle aFilePath reconTransactions accts (start, end)
           debugMessage $ T.pack $ 
               "Processed block range " 
               <> (show start) <> " ----> " 
@@ -95,7 +96,7 @@ runGethSessionWithAccounts aFilePath outputFileHandle accountAddresses (start, e
 
 
 
-runGethSessionMultipleAccounts socket fHandle ipcPath accountAddresses (start, numberOfBlocks) = 
+runGethSessionMultipleAccounts socket fHandle ipcPath reconTransactions accountAddresses (start, numberOfBlocks) = 
   action `catch` (\e@(SomeException c) -> do 
       errorMessage $ T.pack (show e)
       return (([], (SessionState 0 Nothing))))
@@ -105,13 +106,13 @@ runGethSessionMultipleAccounts socket fHandle ipcPath accountAddresses (start, n
         config = SessionConfig 1 socket ipcPath fHandle (0) start (start + numberOfBlocks)
         state = SessionState 0 Nothing
       debugMessage $ T.pack ("finalInterface " <> show config) 
-      runStateT (runReaderT (runA $ gethSessionAccounts accountAddresses) config) state
+      runStateT (runReaderT (runA $ gethSessionAccounts reconTransactions accountAddresses) config) state
 
 
 gethSessionAccounts :: 
       (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
-        [String] -> m [Transaction]
-gethSessionAccounts accountAddresses = do 
+        [ReconTransaction] -> [String] -> m [Transaction]
+gethSessionAccounts reconTransactions accountAddresses = do 
   cfg <- ask
   sessionState <- get
   let socket = sessionSocket cfg
@@ -119,15 +120,29 @@ gethSessionAccounts accountAddresses = do
   --TODO : Cleanup
   s2 <- get
   block <- 
-    getAllFilteredTransactionsForAddresses accountAddresses
+    getAllFilteredTransactionsForAddresses reconTransactions accountAddresses
   return block
 
 
+printRecons :: [ReconTransaction] -> [Transaction] -> OutputFormat -> [T.Text]
+printRecons reconTransactions transactions format = do  
+  let 
+    c = collectTransactions reconTransactions transactions
+  Prelude.map (\(r, t) -> transactionOutput t format <> "," <> toCSV r) c 
 
-
+collectTransactions :: [ReconTransaction] -> [Transaction] -> [(ReconTransaction, Transaction)]
+collectTransactions reconTransactions transactions = 
+    [
+      (intent, trans) | 
+        intent <- reconTransactions
+        , trans <- transactions
+        , (address intent == to trans)
+    ]
+  
 getAllFilteredTransactionsForAddresses :: 
-  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => [String] -> m [Transaction]
-getAllFilteredTransactionsForAddresses accountAddresses = do 
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
+    [ReconTransaction] -> [String] -> m [Transaction]
+getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do 
   sessionState <- get 
   cfg <- ask
   let socket = sessionSocket cfg 
@@ -159,7 +174,7 @@ getAllFilteredTransactionsForAddresses accountAddresses = do
                         ) result
   liftIO $ debugMessage $ T.pack $ "Returning transaction lists..." 
             <> (show (Prelude.length transactionList))
-  let transactionTexts = printTransactions (Prelude.concat transactionList) (CSV ",")
+  let transactionTexts = printRecons (reconTransactions) (Prelude.concat transactionList) (CSV ",")
   let textToBePrinted = T.unlines transactionTexts
   if (textToBePrinted /= "") then do
     liftIO $ TextIO.hPutStrLn outputFileH $ textToBePrinted

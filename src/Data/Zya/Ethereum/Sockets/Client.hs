@@ -167,13 +167,6 @@ runGethSession socket fHandle accountAddress (start, numberOfBlocks) =
       runStateT (runReaderT (runA gethSession) config) state
 
 
-{-- | 
-  Browse for an account with account address between start and end.
-  Function uses bracket to deal with any errors on the handle.
---}
-runGethSessionWithBracket :: FilePath -> Handle -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
-runGethSessionWithBracket aFilePath handle accountAddress (start, end) = do 
-  runGethSessionWithAccounts aFilePath handle [accountAddress] (start, end)
 
 {-- | 
   Given a starting block, step through blocks using the block size.
