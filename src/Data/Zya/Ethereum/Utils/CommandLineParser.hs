@@ -14,9 +14,19 @@ import Control.Exception
 
 import Data.Zya.Utils.JsonRPC(Address(..))
 
+{-- | 
+  * BlockBrowser notes
+  -- addressFile : the input file.
+  -- reconFile : an input file with potential set of transactions.  
+--}
 data EtherClientCommand = 
-  TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}
-    | BlockBrowser {ipcPath :: FilePath, outputPath :: FilePath, addressFile :: FilePath, blockId :: Integer, numberOfBlocks :: Integer, defaultBlockChunks :: Integer}
+    BlockBrowser {ipcPath :: FilePath
+                      , outputPath :: FilePath                  
+                      , addressFile :: FilePath
+                      , reconFile :: FilePath
+                      , blockId :: Integer
+                      , numberOfBlocks :: Integer
+                    }
     | SendTransaction {commandType :: String
                         , ipcPath :: FilePath
                         , address :: String
@@ -28,6 +38,8 @@ data EtherClientCommand =
                         , txData :: Integer 
                         , nonce :: Integer
                       }
+    | TransactionQuery {ipcPath :: FilePath, address :: String, transactionId :: Text}
+
   deriving(Show)  
 
 
@@ -120,7 +132,11 @@ transactionCommandParser =
 blockBrowserCommandParser :: Parser EtherClientCommand 
 blockBrowserCommandParser =  
   BlockBrowser
-  <$> ipcPathParser <*> outputFileParser <*> (addressParser "Account address") <*> blockIdParser <*> numberOfBlocksParser <*> defaultBlockChunksParser
+  <$> ipcPathParser <*> outputFileParser 
+    <*> (addressParser "Account address")
+    <*> (addressParser "Reconciliation file")
+    <*> blockIdParser <*> numberOfBlocksParser
+
 
 sendTransactionParser = 
   SendTransaction 
@@ -139,6 +155,8 @@ commandParser = blockBrowserCommandParser <|> transactionCommandParser <|> sendT
 
 
 
+defaultChunkSize :: Integer
+defaultChunkSize = 1
 etherClientCommandHandler :: EtherClientCommand -> IO ()
 etherClientCommandHandler aCommand = do
   setup INFO 
@@ -147,8 +165,11 @@ etherClientCommandHandler aCommand = do
   case aCommand of 
     TransactionQuery ipcPath address transactionId -> do
       queryTransactionIO ipcPath address [transactionId] >> return ()
-    BlockBrowser ipcPath outputFile addressFile blockId numberOfBlocks defaultBlocks -> 
-      browseBlocks ipcPath outputFile addressFile (blockId, numberOfBlocks, defaultBlocks)
+    BlockBrowser ipcPath outputFile addressFile reconFile blockId numberOfBlocks -> 
+      do 
+        t <- browseBlocks ipcPath outputFile addressFile 
+                reconFile (blockId, numberOfBlocks, defaultChunkSize) -- Defaulting this to 1. Too many parameters.
+        return ()
     SendTransaction commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value txData nonce ->
       sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value, txData, nonce)    
 
@@ -166,4 +187,4 @@ mainCLI' =
 
 mainCLI = do 
   putStrLn "Starting...."
-  mainCLI' `catch` (\e@(SomeException c) -> putStrLn $ show e)
+  mainCLI' `catch` (\e@(SomeException c) -> errorMessage $ Text.pack $ show e)
