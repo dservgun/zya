@@ -137,17 +137,23 @@ instance ToJSON Transaction
 
 currency = "ETH"
 
-wei = 1 `div` 1000000000000000000
+wei :: Int
+wei = 1000000000000000000
+
 transactionOutput :: Transaction -> OutputFormat -> Text
 transactionOutput = 
   \t format -> Text.pack $ 
       (printf "0x%x" $ hash $ t) <> "," <> currency <> "," <> 
       (printf "0x%x" $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
       <> (printf "0x%x" $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) 
-      <> "," <> (show ((value t) * wei))
-      <> "," <> (show $ (gasPrice t) * wei) <> "," <> (show $ (gas t) * wei)
+      <> "," <> show (tValue t)
+      <> "," <> show (tGasPrice t)
+      <> "," <> show (tGas t)
       <> "," <> (show $ confirmations t)
-
+  where 
+    tValue t  = (fromIntegral (value t)) / fromIntegral wei
+    tGasPrice t = gasPrice t 
+    tGas t = gas t
 
 -- | Print transactions as text.
 printTransactions :: [Transaction] -> OutputFormat -> [Text]

@@ -28,7 +28,7 @@ import Network.Socket.ByteString
 import qualified Data.Text as T
 import qualified Data.Text.IO as T 
 import System.IO
-import Text.Printf
+import Text.Printf as Printf
 import qualified Data.ByteString.Lazy as BL 
 import Data.Csv 
 import qualified Data.Vector as V 
@@ -64,4 +64,5 @@ reconTransactions :: FilePath -> IO [ReconTransaction]
 reconTransactions reconFile = readReconTransactions reconFile 
 
 toCSV :: ReconTransaction -> T.Text 
-toCSV (ReconTransaction address amount) = T.pack $ (show address) <> "," <> (show amount)
+toCSV (ReconTransaction address amount) = 
+    T.pack $ ((Printf.printf "0x%x" address)) <> "," <> (show amount)

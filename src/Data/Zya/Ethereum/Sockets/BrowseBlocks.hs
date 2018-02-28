@@ -149,7 +149,7 @@ getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do
   let outputFileH = outputFileHandle cfg
   let (start, end) = (startBlock cfg, endBlock cfg) 
   let (requestId, currentBlockId) = (nextRequestId sessionState , curBlock sessionState)
-
+  socketF <- liftIO $ domainSocket ipcPath
   result <- mapM (\x -> do 
     prev <- get
     modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
@@ -170,7 +170,7 @@ getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do
                             filterTransactionsA accountAddresses $ getTransactions x
                         ) result
   liftIO $ debugMessage $ T.pack $ "Returning transaction lists..." 
-            <> (show (Prelude.length transactionList))
+            <> (show (transactionList))
   let transactionTexts = printRecons (reconTransactions) (Prelude.concat transactionList) (CSV ",")
   let textToBePrinted = T.unlines transactionTexts
   if (textToBePrinted /= "") then do
