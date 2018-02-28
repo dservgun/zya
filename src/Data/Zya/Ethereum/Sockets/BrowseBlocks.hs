@@ -138,7 +138,25 @@ collectTransactions reconTransactions transactions =
         , trans <- transactions
         , (address intent == to trans)
     ]
-  
+
+
+
+filterTransactionForBlock :: 
+  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
+    Socket -> Integer -> m (Result BlockByHash)
+filterTransactionForBlock socket blockId = return $ Error "test"
+{-  do
+    prev <- get
+    modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
+    s <- get
+    let reqId = nextRequestId s
+    liftIO $ debugMessage 
+      $ T.pack $ "Request id " 
+        <> (show reqId) <>  " " <> (show blockId)
+    r <- liftIO $ getBlockByHash socket reqId (BlockId blockId)
+    return r
+-}      
+
 getAllFilteredTransactionsForAddresses :: 
   (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
     [ReconTransaction] -> [String] -> m [Transaction]
@@ -149,23 +167,8 @@ getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do
   let outputFileH = outputFileHandle cfg
   let (start, end) = (startBlock cfg, endBlock cfg) 
   let (requestId, currentBlockId) = (nextRequestId sessionState , curBlock sessionState)
-  socketF <- liftIO $ domainSocket ipcPath
-  result <- mapM (\x -> do 
-    prev <- get
-    modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
-    s <- get
-    let reqId = nextRequestId s
-    liftIO $ debugMessage 
-      $ T.pack $ "Request id " 
-        <> (show reqId) <>  " " <> (show start) <> " - " <> (show end) <> " - "
-        <> (show x)
-    liftIO $ bracket (domainSocket ipcPath) 
-      (closeHandle) (\socket -> do 
-          r <- getBlockByHash socket reqId (BlockId x)
-          return r
-        )
-    ) [start .. end]
-
+  result <- mapM (\x ->  filterTransactionForBlock socket x) [start .. end]
+  _ <- closeHandle socket
   let transactionList = Prelude.map (\x -> do
                             filterTransactionsA accountAddresses $ getTransactions x
                         ) result
