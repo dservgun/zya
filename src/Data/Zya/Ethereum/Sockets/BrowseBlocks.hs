@@ -112,16 +112,8 @@ runGethSessionMultipleAccounts socket fHandle ipcPath reconTransactions accountA
 gethSessionAccounts :: 
       (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
         [ReconTransaction] -> [String] -> m [Transaction]
-gethSessionAccounts reconTransactions accountAddresses = do 
-  cfg <- ask
-  sessionState <- get
-  let socket = sessionSocket cfg
-  let nReq = nextRequestId sessionState 
-  --TODO : Cleanup
-  s2 <- get
-  block <- 
-    getAllFilteredTransactionsForAddresses reconTransactions accountAddresses
-  return block
+gethSessionAccounts reconTransactions accountAddresses =  
+  getAllFilteredTransactionsForAddresses reconTransactions accountAddresses
 
 
 printRecons :: [ReconTransaction] -> [Transaction] -> OutputFormat -> [T.Text]
@@ -167,7 +159,6 @@ getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do
   let (start, end) = (startBlock cfg, endBlock cfg) 
   let (requestId, currentBlockId) = (nextRequestId sessionState , curBlock sessionState)
   result <- mapM (\x ->  filterTransactionForBlock socket x) [start .. end]
-  _ <- closeHandle socket
   let transactionList = Prelude.map (\x -> do
                             filterTransactionsA accountAddresses $ getTransactions x
                         ) result
