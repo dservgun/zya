@@ -144,8 +144,7 @@ collectTransactions reconTransactions transactions =
 filterTransactionForBlock :: 
   (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
     Socket -> Integer -> m (Result BlockByHash)
-filterTransactionForBlock socket blockId = return $ Error "test"
-{-  do
+filterTransactionForBlock socket blockId = do
     prev <- get
     modify (\s -> s {nextRequestId = (nextRequestId prev) + 1})
     s <- get
@@ -155,7 +154,7 @@ filterTransactionForBlock socket blockId = return $ Error "test"
         <> (show reqId) <>  " " <> (show blockId)
     r <- liftIO $ getBlockByHash socket reqId (BlockId blockId)
     return r
--}      
+
 
 getAllFilteredTransactionsForAddresses :: 
   (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => 
