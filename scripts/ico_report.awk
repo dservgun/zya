@@ -6,4 +6,4 @@ BEGIN {
   sum += $5
 }
 
-END { print sum/1000000000000000000 }
+END { print sum}
