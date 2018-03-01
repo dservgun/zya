@@ -1,6 +1,7 @@
 module Data.Zya.Utils.IPC where
 
 import Control.Monad.Trans
+import Control.Exception(SomeException(..), handle)
 import Data.Aeson
 import Data.ByteString hiding (hPutStrLn, hGetLine)
 import Data.ByteString.Lazy as L hiding(hGetContents)
@@ -41,14 +42,17 @@ plainOldSocket hostName portNumber = do
     return sock
 
 
-
+monadIOHandle excHandler safeFunction = liftIO $ handle excHandler safeFunction
 sendMessageWithSockets :: (MonadIO m) => Socket -> Value -> m (Maybe Value)
-sendMessageWithSockets sock request = do
-  let requestBS = L.toStrict . encode $ request 
-  debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
-  _ <- liftIO $ Network.Socket.ByteString.send sock requestBS
-  msg <- liftIO $ Network.Socket.ByteString.recv sock defaultBufferSize
-  return . decode . fromStrict $ msg
+sendMessageWithSockets sock request =
+  monadIOHandle
+    (\e@(SomeException exception) -> 
+        (errorMessage $ T.pack $ show e) >> return Nothing) $ do 
+    let requestBS = L.toStrict . encode $ request 
+    debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
+    _ <- liftIO $ Network.Socket.ByteString.send sock requestBS
+    msg <- liftIO $ Network.Socket.ByteString.recv sock defaultBufferSize
+    return . decode . fromStrict $ msg
 
 
 -- | Print closing handle.
