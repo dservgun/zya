@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Zya.Ethereum.Utils.CommandLineParser 
 (
   mainCLI  
@@ -6,6 +7,7 @@ where
 import Data.Zya.Ethereum.Sockets.Client
 import System.Log.Logger
 import Data.Zya.Utils.Logger
+import Data.Zya.Utils.CommandHistory as CommandHistory
 import Data.Text as Text
 import System.Environment(getArgs)
 import Options.Applicative
@@ -175,7 +177,8 @@ etherClientCommandHandler aCommand = do
       sendTransactionMain ipcPath accountAddress ((Address fromAddress), Address toAddress, gas, gasPrice, value1, txData1, nonce1)    
 
 mainCLI' :: IO ()
-mainCLI' = 
+mainCLI' = do 
+  CommandHistory.save
   etherClientCommandHandler =<< execParser opts 
     where 
       opts = info
