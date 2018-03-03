@@ -47,7 +47,7 @@ sendMessageWithSockets :: (MonadIO m) => Socket -> Value -> m (Maybe Value)
 sendMessageWithSockets sock request =
   monadIOHandle
     (\e@(SomeException exception) -> 
-        (errorMessage $ T.pack $ show e) >> return Nothing) $ do 
+        (errorMessage $ T.pack $ "Exception " <> show e) >> return Nothing) $ do 
     let requestBS = L.toStrict . encode $ request 
     debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)
     _ <- liftIO $ Network.Socket.ByteString.send sock requestBS

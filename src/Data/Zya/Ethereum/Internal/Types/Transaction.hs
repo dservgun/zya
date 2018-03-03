@@ -150,6 +150,7 @@ transactionOutput =
       <> "," <> show (tGasPrice t)
       <> "," <> show (tGas t)
       <> "," <> (show $ confirmations t)
+      <> "," <> (show $ blockNumber t)
   where 
     tValue t  = (fromIntegral (value t)) / fromIntegral wei
     tGasPrice t = gasPrice t 

@@ -56,7 +56,7 @@ readReconTransactions aFilePath = do
     Right v -> do 
         vector <-       
             V.forM (v) $ 
-              \(email :: String, rAddress :: String, amount :: String, actual :: String, ver :: String, verDate :: String, verBy :: String, createdTs :: String) -> 
+              \(createdTs :: String, email :: String, rAddress :: String, amount :: String, actual :: String, ver :: String, verDate :: String, verBy :: String) -> 
                 return $ ReconTransaction (read rAddress) (parseDouble amount)
         return $ V.toList vector
 

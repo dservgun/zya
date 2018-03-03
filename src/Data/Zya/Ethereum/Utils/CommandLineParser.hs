@@ -169,8 +169,8 @@ etherClientCommandHandler aCommand = do
       queryTransactionIO ipcPath address [transactionId] >> return ()
     BlockBrowser ipcPath outputFile addressFile reconFile blockId numberOfBlocks -> 
       do 
-        t <- browseBlocks ipcPath outputFile addressFile 
-                reconFile (blockId, numberOfBlocks, defaultChunkSize) -- Defaulting this to 1. Too many parameters.
+        t <- browseBlocksAsync ipcPath outputFile addressFile 
+                reconFile (blockId, numberOfBlocks, defaultChunkSize) 4 -- Defaulting this to 1. Too many parameters.
         return ()
     SendTransaction 
         commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value1 txData1 nonce1 ->

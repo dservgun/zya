@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Data.Zya.Ethereum.Sockets.BrowseBlocks where 
 
+import Control.Concurrent.Async
 import Control.Exception (bracket, handle, SomeException(..), catch)
 import Control.Monad (forever, unless)
 import Control.Monad.IO.Class
@@ -28,8 +29,8 @@ import Network.Socket.ByteString
 import qualified Data.Text as T
 import qualified Data.Text.IO as T 
 import System.IO
-import Text.Printf
-
+import Text.Printf (printf)
+import Data.List.Split
 
 type RequestId = Int
 type BlockIdAsInt = Integer
@@ -48,6 +49,9 @@ chunkBlocks (start, numberOfBlocks, defaultBlockSize) =
     Prelude.takeWhile 
       (\x -> x <= (start + numberOfBlocks))  $ Prelude.iterate (+ defaultBlockSize) start
 
+
+
+
 {-- | 
   * ipcPath : the path to the ethereum node. 
   * outputFile : the output.
@@ -60,8 +64,8 @@ browseBlocks ipcPath outputFile accountsFile reconFile (start, range, defaultBlo
   let unfoldList = chunkBlocks(start, range, defaultBlocks)
   accountAddresses <- readInputLines accountsFile
   reconTransactions <- reconTransactions reconFile
-  transactions <- bracket(openFile outputFile WriteMode)(hClose) (\outputFileHandle -> do
-        TextIO.hPutStrLn outputFileHandle "Hash, Currency, target-address, sender-address, value, gasPrice, gas, intentAddress, intentAmount"
+  transactions <- bracket(openFile outputFile AppendMode)(hClose) (\outputFileHandle -> do
+        TextIO.hPutStrLn outputFileHandle "Hash, Currency, target-address, sender-address, value, gasPrice, gas, blockNumber, intentAddress, intentAmount"
         transactions <- 
           mapM (\x -> 
             runGethSessionWithAccounts 
@@ -164,7 +168,9 @@ getAllFilteredTransactionsForAddresses reconTransactions accountAddresses = do
                         ) result
   liftIO $ debugMessage $ T.pack $ "Returning transaction lists..." 
             <> (show (transactionList))
-  let transactionTexts = printRecons (reconTransactions) (Prelude.concat transactionList) (CSV ",")
+
+  let transactionTextsWithRecon = printRecons (reconTransactions) (Prelude.concat transactionList) (CSV ",")
+  let transactionTexts = Prelude.map (\t -> transactionOutput t (CSV ",")) $ Prelude.concat transactionList 
   let textToBePrinted = T.unlines transactionTexts
   if (textToBePrinted /= "") then do
     liftIO $ TextIO.hPutStrLn outputFileH $ textToBePrinted
@@ -214,3 +220,41 @@ filterTransactionsA addresses transactions =
     Prelude.map (\a -> filterTransactions (read a) transactions) addresses
 
 
+
+type Parallelism = Int
+
+browseBlocksAsync :: 
+  FilePath -> FilePath -> FilePath -> FilePath -> (Integer, Integer, Integer) -> Parallelism ->  
+    IO ()
+browseBlocksAsync ipcPath outputFile accountsFile reconFile (start, range, defaultBlocks) parallelism = do
+  let chunks = chunksOf ((fromIntegral range) `div` parallelism) $ Prelude.take (fromIntegral range) [start .. ] 
+  tasks <- mapM (\x -> async $ browseBlockList ipcPath outputFile accountsFile reconFile x) chunks
+  result <- mapM wait tasks
+  return ()
+
+
+browseBlock :: 
+  FilePath -> FilePath -> FilePath -> FilePath -> Integer -> 
+    IO ()
+browseBlock ipcPath outputFile accountsFile reconFile blockId = do
+  accountAddresses <- readInputLines accountsFile
+  reconTransactions <- reconTransactions reconFile
+  transactions <- bracket(openFile outputFile AppendMode)(hClose) (\outputFileHandle -> do
+        transactions <- 
+            runGethSessionWithAccounts 
+              ipcPath
+              outputFileHandle
+              reconTransactions
+              accountAddresses          
+              (blockId, 1) 
+        debugMessage $ "Processed transactions..."
+        TextIO.hPutStrLn outputFileHandle $ "End processing"
+        return transactions
+        )
+  return () -- TODO fix this
+
+browseBlockList ipcPath outputFile accountsFile reconFile blockIds = do 
+  mapM (\x -> browseBlock ipcPath (mkFile outputFile blockIds) accountsFile reconFile x) blockIds
+  where 
+    mkFile :: FilePath -> [Integer] -> FilePath  
+    mkFile outputFile (h : t) = printf "%d_%s" h outputFile

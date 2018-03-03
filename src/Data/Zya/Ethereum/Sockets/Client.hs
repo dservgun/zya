@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Data.Zya.Ethereum.Sockets.Client 
 (
-  BrowseBlocks.browseBlocks
+  BrowseBlocks.browseBlocksAsync
   , queryTransactionIO
   , sendTransactionMain
 )
