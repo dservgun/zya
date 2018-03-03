@@ -28,6 +28,7 @@ data EtherClientCommand =
                       , reconFile :: FilePath
                       , blockId :: Integer
                       , numberOfBlocks :: Integer
+                      , parallelism :: Int -- We should use idris here.
                     }
     | SendTransaction {commandType :: String
                         , ipcPath :: FilePath
@@ -54,7 +55,13 @@ blockIdParser =
         <> metavar "BLOCK ID"
         <> help "Block id to start scanning from")
 
-
+parallelismParser :: Parser Int 
+parallelismParser  =
+  read <$> 
+    strOption 
+      (long "parallelism" 
+        <> metavar "Parallelism"
+        <> help "Use a number that is a function of the cores.")
 numberOfBlocksParser :: Parser Integer 
 numberOfBlocksParser = 
   read <$> 
@@ -89,7 +96,7 @@ addressParser :: String -> Parser String
 addressParser metaVarName= 
   strOption
     (
-      long "addressFile" 
+      long metaVarName 
       <> metavar metaVarName
       <> help ("File containing hash for an address")
     )
@@ -135,9 +142,10 @@ blockBrowserCommandParser :: Parser EtherClientCommand
 blockBrowserCommandParser =  
   BlockBrowser
   <$> ipcPathParser <*> outputFileParser 
-    <*> (addressParser "Account address")
-    <*> (addressParser "Reconciliation file")
+    <*> (addressParser "addressFile")
+    <*> (addressParser "reconFile")
     <*> blockIdParser <*> numberOfBlocksParser
+    <*> parallelismParser
 
 
 sendTransactionParser = 
@@ -167,10 +175,10 @@ etherClientCommandHandler aCommand = do
   case aCommand of 
     TransactionQuery ipcPath address transactionId -> do
       queryTransactionIO ipcPath address [transactionId] >> return ()
-    BlockBrowser ipcPath outputFile addressFile reconFile blockId numberOfBlocks -> 
+    BlockBrowser ipcPath outputFile addressFile reconFile blockId numberOfBlocks parallelism -> 
       do 
         t <- browseBlocksAsync ipcPath outputFile addressFile 
-                reconFile (blockId, numberOfBlocks, defaultChunkSize) 4 -- Defaulting this to 1. Too many parameters.
+                reconFile (blockId, numberOfBlocks, defaultChunkSize) parallelism -- Defaulting this to 1. Too many parameters.
         return ()
     SendTransaction 
         commandType ipcPath accountAddress fromAddress toAddress gas gasPrice value1 txData1 nonce1 ->
