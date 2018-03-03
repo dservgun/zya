@@ -248,7 +248,6 @@ browseBlock ipcPath outputFile accountsFile reconFile blockId = do
               accountAddresses          
               (blockId, 1) 
         debugMessage $ "Processed transactions..."
-        TextIO.hPutStrLn outputFileHandle $ "End processing"
         return transactions
         )
   return () -- TODO fix this
