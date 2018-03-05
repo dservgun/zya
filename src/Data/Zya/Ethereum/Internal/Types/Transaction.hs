@@ -143,9 +143,9 @@ wei = 1000000000000000000
 transactionOutput :: Transaction -> OutputFormat -> Text
 transactionOutput = 
   \t format -> Text.pack $ 
-      (printf "0x%x" $ hash $ t) <> "," <> currency <> "," <> 
-      (printf "0x%x" $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
-      <> (printf "0x%x" $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) 
+      (printf "0x%040x" $ hash $ t) <> "," <> currency <> "," <> 
+      (printf "0x%040x" $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
+      <> (printf "0x%040x" $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) 
       <> "," <> show (tValue t)
       <> "," <> show (tGasPrice t)
       <> "," <> show (tGas t)
