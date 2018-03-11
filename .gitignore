@@ -1,0 +1,45 @@
+# Application temp directory 
+.temp
+
+# Application logs directory
+.logs
+
+# Cabal and sanbox
+
+.cabal
+.cabal-sandbox
+
+# Stack
+.stack-work/
+
+# backup files 
+*~
+
+#lock files
+*# 
+
+# Distribution directory
+dist
+
+# Tags 
+tags 
+
+# Sublime workspaces if any
+*sublime*
+
+# Data files
+*.csv
+# Trace files
+*.txt
+
+# Hidden directories
+.zya/
+
+# Webserver temp files
+*.aes
+
+# sqlite database files
+*.db
+
+# some logs
+*.log
