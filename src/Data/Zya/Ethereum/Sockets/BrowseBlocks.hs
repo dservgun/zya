@@ -212,14 +212,18 @@ getTransactions aBlockByHash =
 
 filterTransactions :: Integer -> [Transaction] -> [Transaction]
 filterTransactions address transactions =
-    Prelude.filter(\a -> from a == address || to a == address) transactions
+    let 
+      cr = 
+        Prelude.filter (\crX -> to crX == address) transactions
+      debit = Prelude.filter (\x -> from x == address) transactions
+    in
+      cr ++ (Prelude.map (\x -> x {value = (value x ) * (-1)}) debit)
+
 
 filterTransactionsA :: [String] -> [Transaction] -> [Transaction]
 filterTransactionsA addresses transactions = 
   Prelude.concat $
     Prelude.map (\a -> filterTransactions (read a) transactions) addresses
-
-
 
 type Parallelism = Int
 
