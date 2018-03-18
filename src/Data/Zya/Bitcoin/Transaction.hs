@@ -53,7 +53,10 @@ instance Show Transaction where
       "transaction " <> (show a) <> " : " <> (show c) <> " : " <> (show b) <> " : " <> (show bl) <> " : " <> (show tx)
                     <> " : " <> show time <> " : " <> show timeR 
 instance FromJSON Transaction where
-  parseJSON = withObject "transaction" $ \o -> do 
+  parseJSON = 
+      \x -> modifyFailure ("Failed to parse Transaction " ++) (parseJSONTransaction x)
+
+parseJSONTransaction = withObject "transaction" $ \o -> do 
     __amount <- o .: "amount"
     __confirmations <- o .:? "confirmations" .!= 0 
     __blockhash <- o .: "blockhash"

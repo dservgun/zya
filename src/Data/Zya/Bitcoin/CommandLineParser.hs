@@ -30,7 +30,7 @@ handleCommand (CreateAddresses n) = generateAddresses n
 handleCommand (SearchTransactions accountsFile b range c) = do 
     accFile <- return accountsFile
     listAddresses <- readInputLines c
-    query' <- return $ Prelude.map (Address . Text.pack) listAddresses
+    query' <- return $ Prelude.map (\x -> Address $ strip $ Text.pack x) listAddresses
     mapM (\ bl -> searchTransactions 
                       accFile
                       $ BlockQuery (bl, query')) $ Prelude.take range $ [b .. ]

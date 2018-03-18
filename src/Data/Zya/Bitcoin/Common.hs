@@ -2,11 +2,13 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstrainedClassMethods #-}
 
 module Data.Zya.Bitcoin.Common where
 
 import Data.Aeson
 import Data.Monoid((<>))
+import Data.Maybe
 import Data.Aeson.Types
 import Data.Map as Map
 import Data.Scientific
@@ -36,7 +38,7 @@ instance Num RequestId where
 
 instance FromJSON Address where 
   parseJSON a = do 
-    v <- parseString a
+    v <- modifyFailure ((errorMessageReport "Failed to parse address" a) ++) (parseString a)
     return (Address v)
 
 instance ToJSON Address where
@@ -47,32 +49,39 @@ type KeyType = Text
 
 data ScriptPubKey = ScriptPubKey {
   __asm :: Text
-  , __scriptPubKeyHex :: Text
-  , __reqSigs :: Integer
+  , __hex :: Text
+  , __reqSigs :: Maybe Integer
   , __type :: KeyType
   , __keyAddresses :: [Address]
 } deriving(Show, Generic)
 
 
 instance ToJSON ScriptPubKey where 
-  toJSON (ScriptPubKey a s r t addresses) = 
+  toJSON (ScriptPubKey a h r t addresses) = 
     object
       [
         "asm" .= a 
-        , "hex" .= s 
+        , "hex" .= h 
         , "reqSigs" .= r 
         , "type" .= t 
         , "addresses" .= addresses
       ]    
 
 instance FromJSON ScriptPubKey where 
-  parseJSON = withObject "script pub key" $ \o -> do 
-    __asm <- o .: "asm"
-    __scriptPubKeyHex <- o .: "hex"
-    __reqSigs <- o .: "reqSigs"
+  parseJSON = \x -> 
+    modifyFailure ((errorMessageReport "Failed to parse script pub key" x) ++ ) 
+      (parseScriptPubKeyObject x)
+
+
+parseScriptPubKeyObject = withObject "script pub key" $ \o -> do 
+    __asm <- (o .:? "asm") -- return an empty string.
+    __hex <- o .: "hex"
+    __reqSigs <- o .:? "reqSigs"
     __type <- o .: "type"
     __keyAddresses <- o .: "addresses"
-    return ScriptPubKey{..}
+    return $ 
+      ScriptPubKey 
+        (fromMaybe "defAsm" __asm) __hex __reqSigs __type __keyAddresses
 
 -- field names prefixed with type name to prevent duplicate declarations
 -- error.
@@ -89,17 +98,20 @@ instance ToJSON ScriptSig where
     ]
 
 instance FromJSON ScriptSig where 
-  parseJSON = withObject "script sig" $ \o -> do
+  parseJSON = 
+    \x -> modifyFailure ("Failed to parse script sig" ++ ) (parseScriptSigObject x)
+
+parseScriptSigObject = withObject "script sig" $ \o -> do
     __scriptSigAsm <- o .: "asm" 
     __scriptSigHex <- o .: "hex" 
     return ScriptSig{..}
 -- Value in is to maintain a chain, that can be used to build the chain
 -- upward. So, vin-> vouts must contain the current transaction.
 data ValueIn = ValueIn {
-  __inputTxId :: Text
-  , __inputVout :: Integer
-  , __scriptSig :: ScriptSig
-  , __sequence :: Integer
+  __inputTxId :: Maybe Text
+  , __inputVout :: Maybe Integer
+  , __scriptSig :: Maybe ScriptSig
+  , __sequence :: Maybe Integer
 } deriving(Show)
 
 data ValueOut = ValueOut {
@@ -110,11 +122,26 @@ data ValueOut = ValueOut {
 
 
 instance FromJSON ValueOut where
-  parseJSON = withObject "valueout" $ \o -> do 
-    __value <- o .: "value"
-    __n <- o .: "n"
-    __scriptPubKey <- o .: "scriptPubKey"
-    return ValueOut{..}
+  parseJSON = \x -> modifyFailure((errorMessageReport "Failed to parse ValueOut" x) ++) 
+                    (parseJSONValueOut x)
+
+instance ErrorReporter Value where 
+  errorMessageReport customError aValue = customError ++ " " ++ (show aValue)
+
+class ErrorReporter a where
+  errorMessageReport :: (Show a) => String -> a -> String 
+
+instance ErrorReporter ValueOut where 
+  errorMessageReport customError v = customError ++ " " ++ show v
+
+instance ErrorReporter ScriptPubKey where 
+  errorMessageReport customError v = customError ++ ":" ++ show v
+
+parseJSONValueOut = withObject "valueout" $ \o -> do 
+  __value <- o .: "value"
+  __n <- o .: "n"
+  __scriptPubKey <- o .: "scriptPubKey"
+  return ValueOut{..}
 
 instance ToJSON ValueOut where 
   toJSON (ValueOut v n s) = 
@@ -136,12 +163,17 @@ instance ToJSON ValueIn where
     ]
 
 instance FromJSON ValueIn where 
-  parseJSON = withObject "valuein" $ \o -> do 
-    __inputTxId <- o .: "txid" 
-    __inputVout <- o .: "vout"
-    __scriptSig <- o .: "scriptSig"
-    __sequence <- o .: "sequence"
-    return ValueIn{..}    
+  parseJSON = 
+    \x -> modifyFailure 
+            ((errorMessageReport "Failed to parse ValueIn " x )++ )
+            (parseJSONValueIn x)
+
+parseJSONValueIn = withObject "valuein" $ \o -> do 
+  __inputTxId <- o .:? "txid" 
+  __inputVout <- o .:? "vout"
+  __scriptSig <- o .:? "scriptSig"
+  __sequence <- o .:? "sequence"
+  return ValueIn{..}    
 
 
 class CSVFormatter a where 
@@ -184,7 +216,7 @@ mergeScriptAddresses (ScriptPubKey _ _ _ _ addresses) =
 
 instance FromJSON AccountAddress where
   parseJSON a = do 
-    v <- parseString a
+    v <- modifyFailure ("Failed to parse AccountAddress" ++) (parseString a)
     return $ AccountAddress v
 instance ToJSON AccountAddress where 
   toJSON (AccountAddress add) = String add

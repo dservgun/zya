@@ -219,6 +219,7 @@ transactionDetailsWithSession aSession anId = do
   let request = transactionDetailsRequest s c anId
   resp <- liftIO $ doPostWithS defaults aSession fullyFormedEndPoint request
   State.modify(\s -> s {nextRequestId = nReqId + 1})
+  debugMessage' (Text.pack $ show resp)
   return $ (anId, toTransaction resp)
 
 transactionDetailsInBulk :: [Text] -> Application[Result RawTransaction]
@@ -231,12 +232,14 @@ transactionDetailsInBulk requestIds = do
                   s'@(SessionState nReqId') <- State.get
                   let r = transactionDetailsRequest s c requestId
                   State.modify(\s -> s {nextRequestId = nReqId' + 1})
-                  return r
+                  return (r, requestId)
                   ) requestIds
   resp <- 
       liftIO $ WreqSession.withSession $ \session ->  
-                mapM (\requestObj -> do
-                            handle(\e@(SomeException exc) -> return Nothing) $  
+                mapM (\(requestObj, requestId) -> do
+                            debugMessage $ Text.pack $ show requestObj
+                            handle(\e@(SomeException exc) -> 
+                                          (debugMessage $ requestId <> ":" <> (Text.pack $ show e)) >> return Nothing) $  
                                 doPostWithS 
                                 defaults 
                                 session 
@@ -378,12 +381,16 @@ queryMatchesM = \q t -> do
   debugMessage' $ Text.pack $ "Querying " <> (show q) <> " : " <> (show t)
   return result 
 
+printDebugMessages :: (Show a) => [a] -> IO ()
+printDebugMessages aList = mapM_ (\x -> debugMessage $ Text.pack $ show x) aList 
+
 fetchBlockTransactionsWithSession :: BlockQuery -> Block -> Application [RawTransaction]
 fetchBlockTransactionsWithSession query aBlock = do
   let transactions = transactionList aBlock 
   list <- transactionDetailsInBulk transactions
   list2 <- return $ Prelude.filter(queryMatchesR query) list
-  debugMessage' $ Text.pack $ " after map " <> (show $ Prelude.take 10 list)
+  liftIO $ printDebugMessages list
+  liftIO $ printDebugMessages $ successR list2
   return $ successR list2
   
 

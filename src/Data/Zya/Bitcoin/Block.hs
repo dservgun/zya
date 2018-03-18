@@ -82,26 +82,31 @@ data Block = Block {
 
 
 instance FromJSON Block where 
-  parseJSON = withObject "parse block" $ \o -> do 
-    h <- o .: "hash"
-    conf <- o .: "confirmations"
-    str <- o .: "strippedsize"
-    size <- o .: "size"
-    weight <- o .: "weight"
-    height <- o .:"height"
-    vers <- o .: "version"
-    merkleRoot <- o .: "merkleroot"
-    txList <- o .: "tx"
-    time <- o .: "time"
-    medianT <- o .: "mediantime"
-    nonc <- o .: "nonce"
-    bits <- o .: "bits"
-    difficulty <- o .: "difficulty"
-    chainwork <- o .: "chainwork"
-    prevBlock <- o .: "previousblockhash"
-    nextBlock <- o .: "nextblockhash"
-    return $ Block h conf str 
-            size weight height vers 
-            merkleRoot txList time 
-            medianT nonc bits difficulty
-            chainwork prevBlock nextBlock
+  parseJSON = 
+      \x -> 
+        modifyFailure("Failed parsing block" ++) $ (parseBlockObject x)
+
+-- Reads better.
+parseBlockObject = withObject "parse block" $ \o -> do 
+      h <- o .: "hash"
+      conf <- o .: "confirmations"
+      str <- o .: "strippedsize"
+      size <- o .: "size"
+      weight <- o .: "weight"
+      height <- o .:"height"
+      vers <- o .: "version"
+      merkleRoot <- o .: "merkleroot"
+      txList <- o .: "tx"
+      time <- o .: "time"
+      medianT <- o .: "mediantime"
+      nonc <- o .: "nonce"
+      bits <- o .: "bits"
+      difficulty <- o .: "difficulty"
+      chainwork <- o .: "chainwork"
+      prevBlock <- o .: "previousblockhash"
+      nextBlock <- o .: "nextblockhash"
+      return $ Block h conf str 
+              size weight height vers 
+              merkleRoot txList time 
+              medianT nonc bits difficulty
+              chainwork prevBlock nextBlock
