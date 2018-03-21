@@ -125,41 +125,6 @@ transactionIds' =
 transactionIds = transactionIds'
 
 
-transactionDetailsWithDefaults = 
-    transactionDetails (UserName "loyakk_user1") (Password "loyakk_password1")
-
-
-
-
-format :: (AccountAddress, BCommon.Address, [Maybe (Result RawTransaction)]) -> [Text]
-format (account, address, transactions) = 
-  Prelude.map(\l -> case l of 
-                      Just (Success aTransaction) -> 
-                        rawTransactionAsCSV account address aTransaction
-                      _ -> 
-                          T.pack $ "Error in transaction for " <> (show account)
-                              <> " " <> (show address) <> ":" <> (show l)
-              ) transactions
-
--- All transaction details with account information
-f2 = do 
-  x <- transactionIds
-  case x of 
-    Just y -> do      
-      case y of 
-        Success aList -> do 
-          z1 <- mapM (\a@(x, addr, y) -> do 
-                z <- mapM transactionDetailsWithDefaults y 
-                return $ format (x, addr, z)) aList
-          return $ Prelude.concat z1
-    _ -> return $ []
-
-
-writeToFile aFile = do 
-  bracket (openFile aFile WriteMode) (hClose) $ \h -> do 
-    TextIO.hPutStrLn h "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
-    f <- f2
-    TextIO.hPutStrLn h (T.unlines f)
 
 
 

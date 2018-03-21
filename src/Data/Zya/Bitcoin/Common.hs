@@ -20,7 +20,7 @@ import Control.Exception(bracket)
 
 
 newtype RequestId = RequestId {id :: Integer} deriving(Show, Eq, Generic)
-newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq, Generic)
+newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq, Generic, Ord)
 newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic)
 newtype UserName = UserName {_uName :: String} deriving(Show) 
 newtype Password = Password {_uPassword :: String} deriving(Show)
@@ -181,6 +181,7 @@ class CSVFormatter a where
   -- | it. 
   prepareCSV :: a -> Map Int Text
 
+formatCSVWithM :: Map Int Text -> Text
 formatCSVWithM aRow = 
     Text.intercalate "," orderedList
     where

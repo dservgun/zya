@@ -3,8 +3,7 @@
 
 module Data.Zya.Bitcoin.BitcoinSession
 (
-  generalLedgerApplication
-  , HostEndPoint(..)
+  HostEndPoint(..)
   , GeneralSessionParameters(..)
   , addresses -- TODO remove this and read from a file.
   , searchTransactions
@@ -314,23 +313,6 @@ setupLogging = do
   addFileHandler "btc.info.log" INFO 
 
 
---generalLedgerApplication :: Traversable t => t AccountAddress -> IO [()]
-generalLedgerApplication inputFileConfig = do 
-  setupLogging
-  config <- defaultFileLocation >>= readConfig 
-  user <- btcUserName config
-  passwordL <- btcPassword config
-  port <- btcRpcPort config
-  let 
-    config1 = createConfig (Text.unpack user) (Text.unpack passwordL) (Text.unpack port)
-    initialState = createDefaultState
-  addressList <- readInputAccounts (inputFileConfig)
-  transactionIds <- fst <$> (runStateT (runReaderT (runA $ traverse processAccount addressList) config1) initialState)
-  messages <- return $ mapM (\y -> Prelude.map (\(x1, y1, z1) -> rawTransactionAsCSVR x1 y1 z1) y) transactionIds
-  writeToFileWM (outputFile config1) WriteMode header -- Write the header, append messsages.
-  mapM (\m -> writeToFile m (outputFile config1) AppendMode) messages
-  where 
-    header = "Account, Address, Confirmation, Time, BlockTime, Amount, Address"
 
 
 {-- | 
@@ -470,10 +452,11 @@ searchTransactions inputFileConfig blockQuery = do
   addressList <- readInputAccounts (inputFileConfig)
   result <- (runStateT (runReaderT (runA $ fetchBlockHash blockQuery) config1) initialState)
   infoMessage "--------------------------------"
-  infoMessage $ Text.pack $ show result
+  infoMessage $ Text.pack $ show result 
+  
   csvResults <- 
     return $ 
-        (Prelude.map(\s -> rawTransactionAsCSV (AccountAddress "t")(Address "a") s) $ fst result)
+        (Prelude.map(\s -> rawTransactionAsCSV addressList (AccountAddress "t")(Address "a") s) $ fst result)
   infoMessage $ Text.pack $ show csvResults
   writeToFileWM (outputFile config1) AppendMode header -- Write the header, append messsages.
   writeToFile csvResults (outputFile config1) AppendMode

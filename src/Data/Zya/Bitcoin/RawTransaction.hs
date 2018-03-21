@@ -5,6 +5,7 @@
 module Data.Zya.Bitcoin.RawTransaction where
 import Data.Aeson
 import Data.Map as Map
+import Data.Set as Set
 import Data.Scientific
 import Data.Text as Text
 import Data.Zya.Bitcoin.Common
@@ -87,13 +88,20 @@ instance ToJSON RawTransaction where
 
 
 
--- Need to understand how to fold this stuff.
-groupFormatCSV (AccountAddress acc) (Address addr) (RawTransaction t h v size vsize lT vin vout _ _ confirmations time blockTime) = 
-  --Prelude.map formatCSV (\a -> Map.union footer a) valueOuts
+groupFormatCSV :: [AccountAddress] -> AccountAddress -> Address -> RawTransaction -> [Text]
+groupFormatCSV 
+      (query)
+      (AccountAddress acc) 
+      (Address addr) (RawTransaction t h v size vsize lT vin vout _ _ confirmations time blockTime)
+      = 
   Prelude.map (\x -> formatCSVWithM x) valueOuts
   where
-    valueOuts = fmap (\a -> Map.union envelope a) 
-                  $ Prelude.map prepareCSV vout
+    querySet :: Set Text
+    querySet = Set.fromList $ Prelude.map (\a@(AccountAddress y) -> y) query
+    valueOuts :: [Map Int Text]
+    valueOuts = fmap 
+                    (\a -> Map.union envelope a) $ 
+                      Prelude.map (\x -> Map.filter (\y -> Set.member y querySet) $ prepareCSV x) vout
     footer :: Map Int Text
     footer = Map.fromList $ 
       Prelude.zipWith (,) [-5, -4, -3, -2, -1]
@@ -101,14 +109,10 @@ groupFormatCSV (AccountAddress acc) (Address addr) (RawTransaction t h v size vs
     envelope = footer
 
 
-rawTransactionAsCSV :: AccountAddress -> Address -> RawTransaction -> Text 
-rawTransactionAsCSV account address = \a -> Text.unlines $ groupFormatCSV account address a
 
-rawTransactionAsCSVR :: AccountAddress -> Address -> Result RawTransaction -> Text
-rawTransactionAsCSVR account address = \a -> 
-  case a of 
-    Success x -> rawTransactionAsCSV account address x 
-    Error y -> Text.pack y
+rawTransactionAsCSV :: [AccountAddress] -> AccountAddress -> Address -> RawTransaction -> Text 
+rawTransactionAsCSV filterAddresses account address = 
+    \a -> Text.unlines $ groupFormatCSV filterAddresses account address a
 
 
 hasVOAddress :: Address -> RawTransaction -> Bool

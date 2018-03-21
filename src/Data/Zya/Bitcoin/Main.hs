@@ -13,7 +13,7 @@ import System.Log.Logger
 import Data.Zya.Bitcoin.CommandLineParser(mainCLI)
 
 setupLogging = do 
-  setup DEBUG
+  setup INFO
   addFileHandler "btc.debug.log" DEBUG
   addFileHandler "btc.info.log" INFO 
 
