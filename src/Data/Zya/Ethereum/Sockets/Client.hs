@@ -30,7 +30,7 @@ import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Ethereum.Internal.Types.RPCResponse
 import Data.Zya.Ethereum.Internal.Types.Transaction
 import Data.Zya.Ethereum.Sockets.BrowseBlocks as BrowseBlocks
-import Data.Zya.Ethereum.Sockets.GethApplication
+import Data.Zya.Ethereum.Sockets.GethApplication as GethApplication
 import Data.Zya.Utils.FileUtil
 import Data.Zya.Utils.IPC
 import Data.Zya.Utils.JsonRPC
@@ -48,6 +48,19 @@ import System.Log.Logger
 import Text.Printf
 import Text.Printf 
 
+
+
+-- | Send a transaction request.
+sendTransactionMain :: (MonadIO m) => FilePath -> String -> TransactionRequest -> m ()
+sendTransactionMain filePath addressId transactionRequest = 
+  mapM 
+    (sendTransactionIOWithBracket filePath addressId) [transactionRequest] >> return ()
+
+
+queryTransactionIO :: 
+    (Traversable t, MonadIO m) => FilePath -> String -> t EthData -> m ()
+queryTransactionIO filePath addressId txId = 
+  mapM (GethApplication.queryTransactionWithBracket filePath addressId) txId >> return ()
 
 
 sendMessage :: Value -> FilePath -> IO (Maybe Value)
@@ -118,39 +131,6 @@ getAllFilteredTransactionsForAddress = do
 
 
 
-queryTransactionByHash :: 
-  (MonadReader SessionConfig m, MonadState SessionState m, MonadIO m) => EthData -> m (Result Transaction)
-queryTransactionByHash transactionHash = do 
-  sessionState <- get 
-  cfg <- ask 
-  let socket = sessionSocket cfg 
-  let requestId = nextRequestId sessionState 
-  liftIO $ getTransactionByHash socket requestId transactionHash 
-
-
-queryTransaction :: 
-  (MonadIO m) => Socket -> String -> Text -> m (Result Transaction, SessionState) 
-queryTransaction socket accountAddress transactionHash = do 
-  defFileHandle <- liftIO $ openFile "defaultQueryTransaction.csv" WriteMode
-  let 
-    config = SessionConfig 1 socket "tbd" defFileHandle (read accountAddress) 0 0
-    state = SessionState 0 Nothing 
-  liftIO $ runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
-
-
-queryTransactionWithBracket :: 
-  (MonadIO m) => FilePath -> String -> EthData -> m (Result Transaction, SessionState)
-queryTransactionWithBracket aFilePath accountAddress transactionHash = do 
-  liftIO $ 
-    bracket (domainSocket aFilePath) (\h -> closeHandle h ) $ \socket -> do 
-          debugMessage $ Text.pack $ "Processing transaction " <> (show transactionHash)
-          result <- queryTransaction socket accountAddress transactionHash
-          return result
-
-queryTransactionIO :: 
-    (Traversable t, MonadIO m) => FilePath -> String -> t EthData -> m ()
-queryTransactionIO filePath addressId txId = 
-  mapM (queryTransactionWithBracket filePath addressId) txId >> return ()
 
 
 runGethSession :: Socket -> Handle -> String -> (Integer, Integer) -> IO([Transaction], SessionState)
@@ -225,11 +205,5 @@ sendTransactionIOWithBracket aFilePath accountAddress transactionRequest = do
           result <- runSendTransaction socket accountAddress transactionRequest
           return result
 
-
--- | Send a transaction request.
-sendTransactionMain :: (MonadIO m) => FilePath -> String -> TransactionRequest -> m ()
-sendTransactionMain filePath addressId transactionRequest = 
-  mapM 
-    (sendTransactionIOWithBracket filePath addressId) [transactionRequest] >> return ()
 
 

@@ -32,9 +32,6 @@ import System.IO
 import Text.Printf (printf)
 import Data.List.Split
 
-type RequestId = Int
-type BlockIdAsInt = Integer
-type Account = T.Text 
 
 
 {-- | 
@@ -194,13 +191,6 @@ getBlockByHash aSocket aRequestId aBlockId = do
 
 
 
-getTransactionByHash :: 
-  (MonadIO m) => Socket -> RequestId -> EthData -> m (Result Transaction)
-getTransactionByHash aSocket aRequestId aTransactionHash = do  
-  let request = eth_getTransactionByHash aRequestId aTransactionHash 
-  result <- sendMessageWithSockets aSocket request 
-  debugMessage $ T.pack $  " Transaction returned " <> show result
-  return $ joinResponse $ fmap fromJSON result
 
 
 getTransactions :: (Result BlockByHash) -> [Transaction]
