@@ -44,7 +44,7 @@ extra-source-files:  Readme.md
 
 -- Constraint on the version of Cabal needed to build this package.
 cabal-version:       >=1.22
-Tested-With: GHC==8.0.1
+Tested-With: GHC == 8.0.1
 
 
 library
@@ -95,6 +95,7 @@ library
     Data.Zya.Utils.Logger
     Data.Zya.Utils.FileUtil
     Data.Zya.Utils.CommandHistory
+    Data.Zya.Utils.ComponentDetails
 
   -- Modules included in this library but not exported.
   other-modules:
@@ -112,7 +113,7 @@ library
     , async >= 2.1 && < 2.2
     , binary >= 0.8.1.0 && < 0.9
     , bytestring >= 0.10 && < 0.11
-    , cassava >= 0.5 && < 0.6
+    , cassava >= 0.4 && < 0.6
     , comonad >= 5.0 && < 5.1
     , conduit                        >= 1.2.4 && < 1.3
     , conduit-combinators            >= 1.1 && < 1.2
@@ -165,7 +166,7 @@ library
     , wai-websockets                 >= 3.0.0.5 && < 3.1
     , web3 >= 0.4 && < 0.6
     , websockets >= 0.12 && < 0.13
-    , wreq >= 0.5.2 && < 0.6
+    , wreq >= 0.5 && < 0.6
     , yesod-core                     >= 1.4 && < 1.5
     , yesod-websockets               >= 0.2.0 && < 0.3
   -- Directories containing source files.
@@ -244,6 +245,7 @@ executable zya_reference
     , yesod-core
     , yesod-websockets
     , web3
+    , zya
 
   ghc-options : -Wall -O2 -threaded "-with-rtsopts=-N -g1"
   default-language:   Haskell2010
@@ -267,6 +269,7 @@ executable zya_reference
         Data.Zya.Persistence.Internal.Sqlite
         Data.Zya.Persistence.Persistence
         Data.Zya.Utils.Logger
+        Data.Zya.Utils.ComponentDetails
         Data.Zya.Bitcoin.Client 
         Data.Zya.Bitcoin.Transaction
 

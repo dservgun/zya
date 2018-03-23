@@ -13,7 +13,6 @@ import Control.Exception.Safe
 import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
-import Control.Monad.Trans
 import Data.Monoid((<>))
 import Data.Text(pack, Text)
 import Data.Zya.Core.ComputeNodeService(computeService)

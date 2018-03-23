@@ -6,48 +6,33 @@ module Data.Zya.Core.TestWriter(
 
 
 
-import Control.Applicative((<$>), liftA2)
 import Control.Concurrent
-import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Distributed.Process
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Closure
-import Control.Distributed.Process.Node as Node
 import Control.Exception
 import Control.Lens
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.Reader
-import Control.Monad.State as State
-import Control.Monad.Trans
-import Control.Monad.Writer
 
-import Data.Binary
-import Data.Data
-import Data.Map
-import Data.Maybe
 import Data.Monoid((<>))
 import Data.Text(pack, unpack, Text)
-import Data.Time(UTCTime, getCurrentTime)
-import Data.Typeable
+import Data.Time(getCurrentTime)
 import Data.UUID.V1(nextUUID)
 import Data.Zya.Core.LocalMessageHandlingStrategy(runMessageWriter)
 import Data.Zya.Core.Service
-import Data.Zya.Core.ServiceTypes
 import Data.Zya.Utils.Logger as Logger
+import Data.Zya.Utils.ComponentDetails(ComponentName(..))
 
-import GHC.Generics (Generic)
-import System.Environment(getArgs)
-import Text.Printf
 
 newtype UUIDGenException =
     UUIDGenException{_unReason :: String} deriving Show
 instance Exception UUIDGenException
 
 
-componentName :: Text 
-componentName = "Zya.Core.TestWriter"
+newtype TestWriterComponent = TestWriterComponent {_uncomp :: Text} 
+
+instance ComponentName TestWriterComponent where 
+  componentName (TestWriterComponent _compName) = _compName
 
 
 {-| Test writer to send a few messages -}
@@ -55,22 +40,20 @@ componentName = "Zya.Core.TestWriter"
 -- If one found, send one or more test messages.
 testWriter :: ServerReaderT ()
 testWriter = do
+  let nSeconds = 10 :: Int
   initializeProcess
   eventLoop
-  liftIO $ threadDelay (10 ^ 6 * 10) -- add a delay
-
+  liftIO $ threadDelay $ nSeconds * (10 ^ (6 :: Int))  
 
 eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
   let server1 = serverConfiguration^.server
   let serviceNameStr = unpack $ serverConfiguration^.serviceName
-  let profile = serverConfiguration^.serviceProfile
   let messageCount = serverConfiguration^.numberOfTestMessages
   lift $ do
     let sName = serviceNameStr
-    selfPid <- getSelfPid
-    spawnLocal (proxyProcess server1)
+    _ <- spawnLocal (proxyProcess server1)
     forever $
       receiveWait
         [
@@ -83,29 +66,30 @@ eventLoop = do
 
 
 handleRemoteMessage :: Server -> Maybe Int -> PMessage -> Process ()
-handleRemoteMessage server aCount aMessage@(CreateTopic aTopic) = do
+handleRemoteMessage server' _ aMessage@(CreateTopic _) = do
   liftIO $ Logger.debugMessage  $ pack ("Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
-  availableWriter <- liftIO $ atomically $ findAvailableWriter server
+  availableWriter <- liftIO $ atomically $ findAvailableWriter server'
   case availableWriter of
-    Just a -> liftIO $ atomically $ sendRemote server a (aMessage, currentTime)
+    Just a -> liftIO $ atomically $ sendRemote server' a (aMessage, currentTime)
     Nothing -> liftIO $ debugMessage $ pack  $
                       "No writer found. Dropping this message " <> show aMessage <> "\n"
 
-handleRemoteMessage server aCount aMessage@(ServiceAvailable serviceProfile pid) = do
+handleRemoteMessage server' _ aMessage@(ServiceAvailable sProfile pid) = do
   liftIO $ Logger.debugMessage  $ pack ("TestWriter : Received message " <> show aMessage <> "\n")
   liftIO $ debugMessage $ pack  ("TestWriter : Received message " <> show aMessage <> "\n")
   currentTime <- liftIO getCurrentTime
   _ <- liftIO $ atomically $ do
-      myPid <- getMyPid server
-      addService server serviceProfile pid
-      sendRemote server pid (GreetingsFrom TestWriter myPid, currentTime)
+      myPid <- getMyPid server'
+      _ <- addService server' sProfile pid
+      sendRemote server' pid (GreetingsFrom TestWriter myPid, currentTime)
   return ()
 
-handleRemoteMessage server aCount aMessage@(QueryMessage (messageId, processId, message)) =
-  liftIO $ debugMessage $ pack  ("Query Message handler : Received message " <> show message <> "\n")
+handleRemoteMessage _ _ aMessage@(QueryMessage _) =
+  liftIO $ debugMessage $ 
+    pack  ("Query Message handler : Received message " <> show aMessage <> "\n")
 
-handleRemoteMessage serverL aCount aMessage@(MessageKeyStore (messageId, processId)) = do
+handleRemoteMessage serverL _ (MessageKeyStore (messageId, processId)) = do
   myPid <- getSelfPid
   liftIO $ debugMessage  $ pack ("Test writer : Updating process key " <> show messageId <> "->" <> show processId <> "\n")
   currentTime <- liftIO getCurrentTime
@@ -135,7 +119,7 @@ handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) 
   return ()
   where
     getNextMessage = do
-      myProcessId <- getSelfPid
+      selfPid'<- getSelfPid
       nextId <- liftIO nextUUID
       case nextId of
         Just nId -> do
@@ -144,7 +128,7 @@ handleRemoteMessage serverL aCount aMessage@(GreetingsFrom serviceProfileL pid) 
           return $
             WriteMessage
               (Publisher topic)
-              myProcessId
+              selfPid'
               (pack $ show nId , topic, pack ("This is a test " <> show nId <> " : " <> show pid))
         Nothing -> throw $ UUIDGenException "No next id."
 
