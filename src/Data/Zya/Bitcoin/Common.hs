@@ -11,6 +11,7 @@ import Data.Monoid((<>))
 import Data.Maybe
 import Data.Aeson.Types
 import Data.Map as Map
+import Data.Set as Set
 import Data.Scientific
 import Data.Text as Text
 import GHC.Generics
@@ -21,7 +22,7 @@ import Control.Exception(bracket)
 
 newtype RequestId = RequestId {id :: Integer} deriving(Show, Eq, Generic)
 newtype AccountAddress = AccountAddress {_accountAddress :: Text} deriving(Show, Eq, Generic, Ord)
-newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic)
+newtype Address = Address {_unaddress :: Text} deriving (Show, Eq, Generic, Ord)
 newtype UserName = UserName {_uName :: String} deriving(Show) 
 newtype Password = Password {_uPassword :: String} deriving(Show)
 
@@ -185,13 +186,13 @@ formatCSVWithM :: Map Int Text -> Text
 formatCSVWithM aRow = 
     Text.intercalate "," orderedList
     where
-      orderedList = snd <$> toAscList aRow
+      orderedList = snd <$> Map.toAscList aRow
 
 formatCSV :: (CSVFormatter a) => a -> Text
 formatCSV aRow = 
     Text.intercalate "," orderedList
     where
-      orderedList = snd <$> toAscList (prepareCSV aRow)
+      orderedList = snd <$> Map.toAscList (prepareCSV aRow)
 
 instance CSVFormatter AccountAddress where 
   prepareCSV (AccountAddress anAddress) = Map.fromList[(1, anAddress)]
@@ -210,10 +211,19 @@ instance CSVFormatter ValueOut where
 
 mergeScriptAddresses :: ScriptPubKey -> Text 
 mergeScriptAddresses (ScriptPubKey _ _ _ _ addresses) = 
-  Text.intercalate "," $ _unaddress <$> addresses
+  Text.intercalate "," $ _unaddress <$> Prelude.filter (\a@(Address add) -> add /= "") addresses
 
 
+filterAddresses :: [Address] -> ScriptPubKey -> ScriptPubKey 
+filterAddresses queryList (ScriptPubKey a b c d addresses) = 
+    ScriptPubKey a b c d $ Set.toList $ Set.intersection addressSet querySet
+    where
+      querySet = Set.fromList queryList 
+      addressSet = Set.fromList addresses
 
+filterAddressesValueOut :: [Address] -> ValueOut -> ValueOut 
+filterAddressesValueOut queryList (ValueOut n p scriptPubKey) = 
+    ValueOut n p $ filterAddresses queryList scriptPubKey
 
 instance FromJSON AccountAddress where
   parseJSON a = do 
@@ -230,3 +240,10 @@ readInputLines aFile = do
           (\_ -> return()) $ \h -> do 
             contents <- hGetContents h
             return $ Prelude.lines contents
+
+
+filterVOWithAddresses :: ValueOut -> Bool 
+filterVOWithAddresses (ValueOut a b (ScriptPubKey _ _ _ _ addresses)) = 
+  case addresses of
+    [] -> False
+    _ -> True

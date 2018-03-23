@@ -133,6 +133,7 @@ handleMonitorNotification serverL notificationMessage@(ProcessMonitorNotificatio
   liftIO $ debugMessage $ pack  ("Monitor notification " <> show notificationMessage <> "\n")
   void $ liftIO $ atomically $ removeProcess serverL pid
   terminate
+
 eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
@@ -156,11 +157,12 @@ eventLoop = do
                   liftIO $ debugMessage $ pack  ("Terminating process " <> show aText <> " " <> show sName <> "\n")
                   return ())
 
+
 webService :: ServerReaderT ()
 webService = do
   initializeProcess
-  Catch.catch startWebServer (\a@(SomeException e) -> lift $ liftIO $ debugMessage $ pack  $ "" <> show a <>"\n")
-
+  Catch.catch startWebServer 
+    (\a@(SomeException e) -> lift $ liftIO $ debugMessage $ pack  $ "" <> show a <>"\n")
   lift $ liftIO $ debugMessage $ pack  "Calling event loop \n"
   eventLoop
 

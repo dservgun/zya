@@ -346,6 +346,7 @@ successR :: [Result RawTransaction] -> [RawTransaction]
 successR aList = 
     Prelude.map(\x@(Success y) -> y) $ Prelude.filter(isSuccessR) aList
 
+
 queryMatches :: BlockQuery -> RawTransaction -> Bool
 queryMatches (BlockQuery (height, addresses)) aRawTransaction = 
     Prelude.foldr 
@@ -367,13 +368,22 @@ printDebugMessages :: (Show a) => [a] -> IO ()
 printDebugMessages aList = mapM_ (\x -> debugMessage $ Text.pack $ show x) aList 
 
 fetchBlockTransactionsWithSession :: BlockQuery -> Block -> Application [RawTransaction]
-fetchBlockTransactionsWithSession query aBlock = do
+fetchBlockTransactionsWithSession query@(BlockQuery (height, addresses)) aBlock = do
   let transactions = transactionList aBlock 
   list <- transactionDetailsInBulk transactions
   list2 <- return $ Prelude.filter(queryMatchesR query) list
-  liftIO $ printDebugMessages list
-  liftIO $ printDebugMessages $ successR list2
-  return $ successR list2
+  listTrimmed <- 
+    return $ fmap (\x -> fmap (\y -> filterVOAddresses addresses y) x) list2
+  listTrimmedWithAddresses <- 
+    return $ Prelude.filter (\y -> conv $ fmap filterTransactionsWithVoutAddresses y) listTrimmed
+  listTrimmedWithNoEmptyAddresses <-
+    return $ Prelude.map (\y -> fmap filterVOWithAddressesRawTrans y) listTrimmedWithAddresses
+  liftIO $ printDebugMessages $ successR listTrimmedWithNoEmptyAddresses
+  return $ successR listTrimmedWithNoEmptyAddresses
+  where 
+    conv :: Result Bool -> Bool
+    conv (Success True) = True 
+    conv _  = False
   
 
 fetchBlockTransactions :: BlockQuery -> Block -> Application [RawTransaction]
@@ -403,6 +413,7 @@ createAddress = do
           dumpPrivKey <- liftIO $ doPost opts fullyFormedEndPoint addressDetails
           return $ maybeToResult $ fromJSON <$> dumpPrivKey
   return (returnedAddress, responseAddress) 
+
 createAddressesM :: Int -> Application[(Result Address, Result Address)]
 createAddressesM n = replicateM n createAddress 
 
@@ -453,10 +464,10 @@ searchTransactions inputFileConfig blockQuery = do
   result <- (runStateT (runReaderT (runA $ fetchBlockHash blockQuery) config1) initialState)
   infoMessage "--------------------------------"
   infoMessage $ Text.pack $ show result 
-  
+
   csvResults <- 
     return $ 
-        (Prelude.map(\s -> rawTransactionAsCSV addressList (AccountAddress "t")(Address "a") s) $ fst result)
+        (Prelude.map(\s -> rawTransactionAsCSV (AccountAddress "t")(Address "a") s) $ fst result)
   infoMessage $ Text.pack $ show csvResults
   writeToFileWM (outputFile config1) AppendMode header -- Write the header, append messsages.
   writeToFile csvResults (outputFile config1) AppendMode

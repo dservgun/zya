@@ -88,20 +88,17 @@ instance ToJSON RawTransaction where
 
 
 
-groupFormatCSV :: [AccountAddress] -> AccountAddress -> Address -> RawTransaction -> [Text]
+groupFormatCSV :: AccountAddress -> Address -> RawTransaction -> [Text]
 groupFormatCSV 
-      (query)
       (AccountAddress acc) 
       (Address addr) (RawTransaction t h v size vsize lT vin vout _ _ confirmations time blockTime)
       = 
   Prelude.map (\x -> formatCSVWithM x) valueOuts
   where
-    querySet :: Set Text
-    querySet = Set.fromList $ Prelude.map (\a@(AccountAddress y) -> y) query
     valueOuts :: [Map Int Text]
     valueOuts = fmap 
                     (\a -> Map.union envelope a) $ 
-                      Prelude.map (\x -> Map.filter (\y -> Set.member y querySet) $ prepareCSV x) vout
+                      Prelude.map prepareCSV vout
     footer :: Map Int Text
     footer = Map.fromList $ 
       Prelude.zipWith (,) [-5, -4, -3, -2, -1]
@@ -110,9 +107,15 @@ groupFormatCSV
 
 
 
-rawTransactionAsCSV :: [AccountAddress] -> AccountAddress -> Address -> RawTransaction -> Text 
-rawTransactionAsCSV filterAddresses account address = 
-    \a -> Text.unlines $ groupFormatCSV filterAddresses account address a
+rawTransactionAsCSV :: AccountAddress -> Address -> RawTransaction -> Text 
+rawTransactionAsCSV account address = 
+    \a -> Text.unlines $ groupFormatCSV account address a
+
+
+
+filterVOAddresses :: [Address] -> RawTransaction -> RawTransaction 
+filterVOAddresses anAddressList aRawTransaction = 
+  aRawTransaction {__vout = Prelude.map (\x -> filterAddressesValueOut anAddressList x) $ __vout aRawTransaction}
 
 
 hasVOAddress :: Address -> RawTransaction -> Bool
@@ -123,3 +126,14 @@ hasVOAddress anAddress aTransaction =
     matches = Prelude.filter(\x -> x == anAddress) addresses
   in
     Prelude.length matches > 0
+
+filterTransactionsWithVoutAddresses :: RawTransaction -> Bool 
+filterTransactionsWithVoutAddresses aTransaction = 
+  Prelude.foldr 
+    (\ele acc -> ele || acc) 
+    False
+    (Prelude.map filterVOWithAddresses $ __vout aTransaction)
+
+filterVOWithAddressesRawTrans :: RawTransaction -> RawTransaction
+filterVOWithAddressesRawTrans aTransaction = 
+  aTransaction {__vout = Prelude.filter(\x -> filterVOWithAddresses x) $ __vout aTransaction}    
