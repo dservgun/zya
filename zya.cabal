@@ -53,12 +53,13 @@ library
     Data.Zya.Bitcoin.BitcoinSession
     Data.Zya.Bitcoin.Block
     Data.Zya.Bitcoin.Client 
-    Data.Zya.Bitcoin.Common
     Data.Zya.Bitcoin.CommandLineParser
+    Data.Zya.Bitcoin.Common
     Data.Zya.Bitcoin.Config
     Data.Zya.Bitcoin.JsonRPC
     Data.Zya.Bitcoin.RawTransaction
     Data.Zya.Bitcoin.Transaction
+    Data.Zya.Core.BitcoinService
     Data.Zya.Core.ComputeNodeService
     Data.Zya.Core.Internal.CSVFormatter
     Data.Zya.Core.Internal.LocalMessage
@@ -74,28 +75,29 @@ library
     Data.Zya.Core.TopicAllocator
     Data.Zya.Core.WebServerService
     Data.Zya.Core.Writer
+    Data.Zya.Ethereum.Internal.Bookeeping.ReconTransaction
     Data.Zya.Ethereum.Internal.Types.Common
     Data.Zya.Ethereum.Internal.Types.RPCRequest
     Data.Zya.Ethereum.Internal.Types.RPCResponse
     Data.Zya.Ethereum.Internal.Types.Transaction
-    Data.Zya.Ethereum.Internal.Bookeeping.ReconTransaction
-    Data.Zya.Ethereum.Sockets.Client
     Data.Zya.Ethereum.Sockets.BrowseBlocks
+    Data.Zya.Ethereum.Sockets.Client
     Data.Zya.Ethereum.Sockets.GethApplication
     Data.Zya.Ethereum.Utils.CommandLineParser
     Data.Zya.Kafka.Client 
     Data.Zya.Kafka.Util
     Data.Zya.Parsers.ServiceDescription
+    Data.Zya.Persistence.Internal.Common
     Data.Zya.Persistence.Internal.FileSystem
     Data.Zya.Persistence.Internal.Postgres
     Data.Zya.Persistence.Internal.Sqlite
     Data.Zya.Persistence.Persistence
+    Data.Zya.Utils.CommandHistory
+    Data.Zya.Utils.ComponentDetails
+    Data.Zya.Utils.FileUtil
     Data.Zya.Utils.IPC
     Data.Zya.Utils.JsonRPC
     Data.Zya.Utils.Logger
-    Data.Zya.Utils.FileUtil
-    Data.Zya.Utils.CommandHistory
-    Data.Zya.Utils.ComponentDetails
 
   -- Modules included in this library but not exported.
   other-modules:
@@ -265,6 +267,7 @@ executable zya_reference
         Data.Zya.Core.TopicAllocator
         Data.Zya.Core.WebServerService
         Data.Zya.Core.Writer
+        Data.Zya.Persistence.Internal.Common
         Data.Zya.Persistence.Internal.Postgres
         Data.Zya.Persistence.Internal.Sqlite
         Data.Zya.Persistence.Persistence

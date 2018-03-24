@@ -28,7 +28,7 @@ import Data.Time(UTCTime, getCurrentTime)
 import Data.Typeable
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
-import Data.Zya.Persistence.Persistence(DBType, persist)
+import Data.Zya.Persistence.Persistence(DBType, persist, ConnectionDetails(..))
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
 import Text.Printf

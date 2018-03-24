@@ -2,8 +2,6 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.Subscription where
 
-import System.Environment(getArgs)
-
 import Control.Concurrent.STM
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
@@ -22,7 +20,10 @@ import Data.Zya.Core.TestWriter
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.WebServerService(webService)
 import Data.Zya.Core.Writer
+import Data.Zya.Persistence.Persistence(DBType(..), ConnectionDetails(..), DBVendor(..), MessageT)
 import Data.Zya.Utils.Logger
+import System.Environment(getArgs)
+
 
 newtype UnsupportedServiceException = UnsupportedServiceException {_unServiceType :: Maybe ServiceProfile} deriving(Show)
 instance Exception UnsupportedServiceException

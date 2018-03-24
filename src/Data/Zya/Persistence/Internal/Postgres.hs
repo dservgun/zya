@@ -17,7 +17,7 @@ import Data.ByteString.Char8
 import Data.Monoid((<>))
 import Data.Text
 import Data.Time
-import Data.Zya.Core.Service
+import Data.Zya.Persistence.Internal.Common
 import Database.Persist
 import Database.Persist.Postgresql
 import Database.Persist.TH

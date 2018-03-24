@@ -30,7 +30,8 @@ import Data.Typeable
 import Data.Zya.Core.Service
 import Data.Zya.Core.ServiceTypes
 import Data.Zya.Utils.Logger
-import Data.Zya.Persistence.Persistence(DBType, persist)
+import Data.Zya.Persistence.Persistence(DBType, ConnectionDetails, MessageT, persist)
+
 import GHC.Generics (Generic)
 import System.Environment(getArgs)
 import Text.Printf

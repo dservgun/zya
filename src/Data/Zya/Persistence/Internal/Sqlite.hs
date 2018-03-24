@@ -9,13 +9,14 @@
 {-# LANGUAGE TypeFamilies               #-}
 
 module Data.Zya.Persistence.Internal.Sqlite where
+
 import Control.Monad.IO.Class(liftIO, MonadIO)
 import Control.Monad.Trans.Control
 import Control.Monad.Trans.Reader
 import Data.ByteString.Char8
 import Data.Text
 import Data.Time
-import Data.Zya.Core.Service
+import Data.Zya.Persistence.Internal.Common
 import Database.Persist
 import Database.Persist.Sqlite
 import Database.Persist.TH

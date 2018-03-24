@@ -29,10 +29,10 @@ newtype UUIDGenException =
 instance Exception UUIDGenException
 
 
-newtype TestWriterComponent = TestWriterComponent {_uncomp :: Text} 
+data TestWriterComponent = TestWriterComponent deriving (Show)
 
 instance ComponentName TestWriterComponent where 
-  componentName (TestWriterComponent _compName) = _compName
+  componentName TestWriterComponent = "Data.Zya.Core.TestWriter"
 
 
 {-| Test writer to send a few messages -}

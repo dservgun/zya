@@ -28,12 +28,12 @@ import Data.Text as Text (Text, unpack, pack)
 import Data.Time
 import Data.Zya.Core.Internal.WebserviceProtocolHandler
 import Data.Zya.Core.Service
+import Data.Zya.Persistence.Persistence(DBType, ConnectionDetails, MessageT)
 import Data.Zya.Utils.Logger
 import Network.WebSockets.Connection as WS (sendTextData, receiveData)
 import Text.Printf
 import Yesod.Core
 import Yesod.WebSockets
-
 
 newtype App = App Server
 

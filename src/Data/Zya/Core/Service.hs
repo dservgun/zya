@@ -53,11 +53,6 @@ module Data.Zya.Core.Service
     , startupException
     -- ** Some utility functions
     , proxyProcess
-    -- * Database constants
-    , DBType(..)
-    , ConnectionDetails(..)
-    , DBVendor(..)
-    , MessageT
     , CreateStatus(..)
     -- * Server configuration
     , ServerConfiguration
@@ -110,30 +105,17 @@ import Data.Zya.Utils.Logger(debugMessage)
 import GHC.Generics (Generic)
 import Network.WebSockets.Connection as WS (Connection)
 import Text.Printf
+import Data.Zya.Persistence.Persistence
 import Data.Zya.Core.Internal.MessageDistribution
 import Data.Zya.Core.Internal.LocalMessage
 import Data.Zya.Core.Internal.ServerTypes as ServerTypes
 
-
 -- TODO: Need to deal with this.
 type WebServerEndPoint = Int
-
-
 
 ------------ Constants --------------
 peerTimeout :: Int
 peerTimeout = 1000000
-
-
-
-
---- Database types
-data DBVendor = Postgresql | Sqlite deriving(Show)
-data DBType = FileSystem | RDBMS DBVendor deriving(Show)
-newtype ConnectionDetails = ConnectionDetails {unStr :: String} deriving (Show)
-newtype CreateStatus = CreateStatus {_un :: Text} deriving(Show)
-{-| Internal type for persisting process messages -}
-type MessageT = ReaderT (DBType, ConnectionDetails, PMessage) IO CreateStatus
 
 
 type ServerReaderT = ReaderT ServerConfiguration Process
@@ -194,18 +176,17 @@ initializeProcess :: ServerReaderT()
 initializeProcess = do
   serverConfiguration <- ask
   let server1 = view server serverConfiguration
-  let serviceName1 = view serviceName serverConfiguration
-  let serviceNameS = unpack serviceName1
+  let serviceNameS = unpack $ view serviceName serverConfiguration
   let backendl = view backend serverConfiguration
   let serviceProfileL = view serviceProfile serverConfiguration
   mynode <- lift getSelfNode
 
   peers0 <- liftIO $ findPeers backendl peerTimeout
-
   liftIO $ debugMessage $ pack ("Initializing process " <> show serviceNameS <> "\n")
-  let peers = List.filter (/= mynode) peers0
+  peers <- 
+    liftIO $ findPeers backendl peerTimeout >>= \x -> return $ List.filter (/= mynode) x
   mypid <- lift getSelfPid
-  lift $ register serviceNameS mypid
+  lift $ getSelfPid >>= register serviceNameS
   forM_ peers $ \peer -> lift $ whereisRemoteAsync peer serviceNameS
   liftIO $ atomically $ do
     _ <- addService server1 serviceProfileL mypid
@@ -328,7 +309,6 @@ getNextLocalMessage app clientIdentifier = do
         y <- readTBQueue queue
         return [y]
 
-
 -- When a service comes up, publish local state
 -- This presents a challenge: this snapshot needs to be backed by a
 -- persistent globally accessible store.
@@ -340,13 +320,9 @@ publishLocalSnapshot app targetProcessId = do
   mapM_ (\(messageId, processId) ->
             liftIO $
               atomically $
-                fireRemote app targetProcessId $ MessageKeyStore (messageId, processId)) messageAsList
-
+                fireRemote app targetProcessId $ 
+                  MessageKeyStore (messageId, processId)) messageAsList
   return ()
-
-
-
-
 
 -- Put the messages received till now in the queue.
 messagesTillNow :: Server -> ClientIdentifier -> MessageDistributionStrategy -> IO MessageDistributionStrategy
@@ -366,8 +342,6 @@ messagesTillNow server clientIdentifier strategy = do
           Begin -> Map.assocs aMap
           End -> Map.assocs Map.empty
           Last (n, Page p) -> List.take (n * p) $ Map.assocs aMap
-
-
 
 -- Query a process id for its service profile
 queryProcessId :: Server -> ProcessId -> STM(Maybe (ProcessId, ServiceProfile))
@@ -394,7 +368,6 @@ queryService aServer aProfile = do
   `remoteWriters` and `services`. The remote client list
   ought to be a superset of services and writers.
 -}
-
 remoteProcesses :: Server -> STM[ProcessId]
 remoteProcesses aServer = do
   myProcessIdL <- readTVar $ myProcessId aServer
@@ -416,7 +389,6 @@ defaultSimpleConfiguration = [(WebServer, (3, 10)), (QueryService, (3, 10)),
                         (Reader, (3, 10)),
                         (Writer, (3, 10))]
 
-
 {-|
   A global map indicating if a particular service is a singleton, ideally a leader should fix the
   need for this map.
@@ -431,7 +403,6 @@ isSingleton _ = False
 findAvailableWriter :: Server -> STM (Maybe ProcessId)
 findAvailableWriter serverL = findAvailableService serverL Writer RoundRobin
 
-
 queryFallbackservice :: Server -> ServiceProfile -> STM (Maybe ProcessId)
 queryFallbackservice serverL serviceProfileL =
   do
@@ -443,13 +414,9 @@ queryFallbackservice serverL serviceProfileL =
       h : t -> return $ Just $ fst h
       _ ->  return Nothing
 
-
-
-
 {--|
   Find a service to write to. Use a simple strategy
 --}
-
 findAvailableService :: Server -> ServiceProfile -> FairnessStrategy -> STM(Maybe ProcessId)
 findAvailableService aServer sP RoundRobin = do
   servicesL <- readTVar $ remoteServiceList aServer
@@ -463,22 +430,17 @@ findAvailableService aServer sP RoundRobin = do
 
 findAvailableService aServer sP FirstOne = queryFallbackservice aServer sP
 
-
-
 -- TODO: clean this up.
 removeProcess :: Server -> ProcessId -> STM ProcessId
 removeProcess aServer processId = do
   remoteClientsL <- readTVar $ remoteClients aServer
   writeTVar (remoteClients aServer) $
     Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteClientsL
-
   servicesL <- readTVar $ services aServer
   writeTVar (services aServer) $ Map.filterWithKey(\(prId, _) _ -> processId /= prId) servicesL
-
   remWriters <- readTVar $ remoteWriters aServer
   writeTVar (remoteWriters aServer) $
     Map.filterWithKey(\(prId, _) _ -> processId /= prId) remWriters
-
   remoteServiceQueue <- readTVar $ remoteServiceList aServer
   writeTVar (remoteServiceList aServer)
     $ Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteServiceQueue
@@ -523,7 +485,6 @@ updateMessageValue serverL messageId aMessage = do
       Map.insert messageId aMessage x
   return aMessage
 
-
 {-- | Update the connection information with queue to merge events.
 --}
 addConnection :: Server -> ClientIdentifier ->
@@ -543,7 +504,6 @@ deleteConnection serverL aClientIdentifier = do
   writeTVar (localTBQueue serverL) $
     Map.delete aClientIdentifier x
   return $ fmap fst connPair
-
 
 queryMessageValue :: Server -> MessageId -> STM (Maybe PMessage)
 queryMessageValue aServer messageKey1 =
@@ -579,7 +539,6 @@ publishMessageKey aServer processId messageId = do
     mapM_ (\pid -> fireRemote aServer pid (MessageKeyStore (messageId, processId)))
       rProcesses
     return processId
-
 
 startupException :: Text -> StartUpException
 startupException = StartUpException
