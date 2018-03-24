@@ -4,8 +4,6 @@ module Data.Zya.Core.TestWriter(
   testWriter
   ) where
 
-
-
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Distributed.Process
@@ -49,10 +47,9 @@ eventLoop :: ServerReaderT ()
 eventLoop = do
   serverConfiguration <- ask
   let server1 = serverConfiguration^.server
-  let serviceNameStr = unpack $ serverConfiguration^.serviceName
   let messageCount = serverConfiguration^.numberOfTestMessages
   lift $ do
-    let sName = serviceNameStr
+    let sName = unpack $ serverConfiguration^.serviceName
     _ <- spawnLocal (proxyProcess server1)
     forever $
       receiveWait

@@ -35,15 +35,6 @@ import Text.Printf
 import Data.Zya.Utils.Logger
 
 
-newtype RemoteMessageHandler a = RemoteMessageHandler {
-  runApp :: ReaderT (Server, DBType, ConnectionDetails, PMessage) Process a
-} deriving (
-    Functor,
-    Applicative,
-    Monad,
-    MonadIO
-  )
-
 handleRemoteMessage :: Server -> DBType -> ConnectionDetails -> Maybe Int -> PMessage -> Process ()
 handleRemoteMessage server dbType connectionString _ aMessage@(CreateTopic aTopic)  = do
   liftIO $ debugMessage $ pack ("Received message " <> show aMessage <> "\n")
