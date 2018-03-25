@@ -43,3 +43,6 @@ tags
 
 # some logs
 *.log
+
+# Tex files
+*.aux

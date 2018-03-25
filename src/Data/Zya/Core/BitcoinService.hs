@@ -1,10 +1,7 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Data.Zya.Core.BitcoinService(
-  -- * The cloud service used to test readers and writers.
-  
+  -- * The cloud service used to test readers and writers.  
   ) where
-
-
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -28,3 +25,7 @@ data BitcoinService = BitcoinService deriving (Show)
 instance ComponentName BitcoinService where 
   componentName BitcoinService = "Data.Zya.Core.BitcoinService"
 
+-- The purpose of this node is to listen to requests for interacting
+-- with a local block (perhaps remote in certain conditions)
+-- For example,
+-- querying a block for a set of transactions and publish them.

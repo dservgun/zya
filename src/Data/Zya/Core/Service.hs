@@ -546,5 +546,4 @@ startupException = StartUpException
 
 
 instance Binary PMessage
-instance Binary ServiceProfile
 instance Binary Publisher

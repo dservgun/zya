@@ -11,6 +11,7 @@ import Control.Distributed.Process
 import Control.Exception.Safe
 
 import Data.Aeson
+import Data.Binary
 import Data.Map as Map
 import Data.Text
 import Data.Time(UTCTime)
@@ -167,3 +168,4 @@ data Server = Server {
 }
 
 
+instance Binary ServiceProfile
