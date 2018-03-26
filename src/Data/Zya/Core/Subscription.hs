@@ -20,7 +20,7 @@ import Data.Zya.Core.TestWriter
 import Data.Zya.Core.TopicAllocator
 import Data.Zya.Core.WebServerService(webService)
 import Data.Zya.Core.Writer
-import Data.Zya.Persistence.Persistence(DBType(..), ConnectionDetails(..), DBVendor(..), MessageT)
+import Data.Zya.Persistence.Persistence(DBType(..), ConnectionDetails(..), DBVendor(..))
 import Data.Zya.Utils.Logger
 import System.Environment(getArgs)
 

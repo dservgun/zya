@@ -15,6 +15,11 @@
 \section {General responsibilities of a node}
 Common responsibilities of a node.
 \begin{itemize}
+  \item Some data types
+  \begin{lstlisting}[language=Haskell]
+      -- data WhereIsReply = WhereIsReply String (Maybe ProcessId)
+  \end{lstlisting}
+
   \item Initialize Node 
     \begin{lstlisting}[language=Haskell]
       -- getall peers other than me 
@@ -23,10 +28,22 @@ Common responsibilities of a node.
     \end{lstlisting}
   \item Handle WhereIs Reply
     \begin{lstlisting}[language=Haskell]
-        -- handle ServiceProfile messages. Ignore
-        -- the rest.
+        -- handle WhereIsReply
+        -- Throw exception when ProcessId is Nothing.
         handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
-
+    \end{lstlisting}
+  \item Broadcast local message 
+    \begin{lstlisting}[language=Haskell]
+      -- Broadcast local message by publishing to a local STM Bounded queue.
+      -- bMessage :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
+    \end{lstlisting}
+  \item Broadcast remote messages to local client. 
+    \begin{lstlisting}[language=Haskell]
+      -- sendWelcomeMessages :: (ProcessId, MessageId, Server) -> IO ()
+    \end{lstlisting}
+  \item Update remote service queue
+    \begin{lstlisting}[language=Haskell]
+      updateRemoteServiceQueue :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ProcessId
     \end{lstlisting}
 
 \end{itemize}

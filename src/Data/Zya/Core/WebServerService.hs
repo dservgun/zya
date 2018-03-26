@@ -24,9 +24,12 @@ import Control.Monad (forever, void)
 import Control.Monad.Catch as Catch
 import Control.Monad.Trans.Reader
 import Data.Monoid ((<>))
+import Data.Map as Map
 import Data.Text as Text (Text, unpack, pack)
 import Data.Time
+import Data.Zya.Core.Internal.ServerTypes
 import Data.Zya.Core.Internal.WebserviceProtocolHandler
+import Data.Zya.Core.Internal.LocalMessage
 import Data.Zya.Core.Service
 import Data.Zya.Persistence.Persistence(DBType, ConnectionDetails, MessageT)
 import Data.Zya.Utils.Logger
@@ -59,6 +62,11 @@ getHomeR = do
   webSockets app
   return ("Done processing." :: Text)
 
+
+
+
+sendWelcomeMessages :: (ProcessId, MessageId, Server) -> IO ()
+sendWelcomeMessages = runBroadcastMessage sendWelcomeMessage 
 
 startWebServer :: ServerReaderT ()
 startWebServer = do
@@ -96,37 +104,29 @@ handleRemoteMessage serverL _ _ _ aMessage@(GreetingsFrom serviceProfileL pid) =
 -- If the message has a tag, can cache and the server can also cache,
 -- perhaps we can cache the message.
 handleRemoteMessage serverL _ _ messageCount
-  aMessage@(CommittedWriteMessage publisher (messageId, topic, message)) = 
-    liftIO $ debugMessage $ pack  "Not handling this message. Not a writer.\n"
+  aMessage@(CommittedWriteMessage _ _) = 
+    liftIO $ debugMessage $ pack  "Webserver ignoring committed write message.\n"
 
 handleRemoteMessage serverL _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
-  myPid <- getSelfPid
-  currentTime <- liftIO getCurrentTime
-  liftIO $ atomically $ updateMessageKey serverL processId messageId
+  _ <- liftIO $ atomically $ updateMessageKey serverL processId messageId
   _ <- liftIO $ sendWelcomeMessages (processId, messageId, serverL)
   liftIO $ debugMessage $ pack  "Message key store message processed..\n"
   return()
 
-handleRemoteMessage serverL dbType connectionString messageCount
-  aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
+-- WriteMessage is not intended for a webserver service.
+handleRemoteMessage _ _ _ _
+  aMessage@(WriteMessage _ _ _) = do
   selfPid <- getSelfPid
   liftIO $ debugMessage $ pack  ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
   return ()
 
-
-handleRemoteMessage _ dbType connectionString _ aMessage@(QueryMessage (messageId, processId, message)) = do
+handleRemoteMessage _ _ _ _ aMessage@(QueryMessage _) = do
   liftIO $ debugMessage $ pack  ("Received message " <> show aMessage <> "\n")
   return ()
 
-
-handleRemoteMessage _ dbType connectionString _ aMessage@(TerminateProcess message) = do
+handleRemoteMessage _ _ _ _ aMessage = do
   liftIO $ debugMessage $ pack  ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
-
-
-handleRemoteMessage _ dbType connectionString unhandledMessage _ =
-  liftIO $ debugMessage $ pack  ("Received unhandled message  " <> show unhandledMessage <> "\n")
-
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification serverL notificationMessage@(ProcessMonitorNotification _ pid _) = do
@@ -143,7 +143,7 @@ eventLoop = do
     let dbTypeL = serverConfiguration^.dbType
     let connectionDetailsL = serverConfiguration^.connDetails
     let testMessageCount = serverConfiguration^.numberOfTestMessages
-    spawnLocal (proxyProcess serverL)
+    _ <- spawnLocal (proxyProcess serverL)
     forever
       (receiveWait
         [
@@ -153,7 +153,7 @@ eventLoop = do
                 handleWhereIsReply serverL WebServer
         , matchAny $ \_ -> return ()      -- discard unknown messages
         ]) `Process.catchExit`
-              (\pId (TerminateProcess aText) -> do
+              (\_ (TerminateProcess aText) -> do
                   liftIO $ debugMessage $ pack  ("Terminating process " <> show aText <> " " <> show sName <> "\n")
                   return ())
 
@@ -162,7 +162,7 @@ webService :: ServerReaderT ()
 webService = do
   initializeProcess
   Catch.catch startWebServer 
-    (\a@(SomeException e) -> lift $ liftIO $ debugMessage $ pack  $ "" <> show a <>"\n")
+    (\a@(SomeException _) -> lift $ liftIO $ debugMessage $ pack  $ "" <> show a <>"\n")
   lift $ liftIO $ debugMessage $ pack  "Calling event loop \n"
   eventLoop
 

@@ -169,3 +169,5 @@ data Server = Server {
 
 
 instance Binary ServiceProfile
+instance Binary PMessage
+instance Binary Publisher

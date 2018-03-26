@@ -10,7 +10,6 @@ module Data.Zya.Core.Service
         , newServer
         , newServerIO
         , Server
-        , sendWelcomeMessages -- useful for early tests of a connection.
         , proxyChannel
         , myProcessId
         , updateMyPid
@@ -35,6 +34,10 @@ module Data.Zya.Core.Service
         , putLocalMessage
         , publishLocalSnapshot
         , messagesTillNow
+        , bMessage
+        , runBroadcastMessage
+        , ProcessTriple
+        , sendWelcomeMessage
     -- * server reader
     , ServerReaderT
     -- * Message types.
@@ -82,6 +85,7 @@ module Data.Zya.Core.Service
     -- * Message distribution strategies
     , MessageDistributionStrategy(..)
     , Page(..)
+    , BroadcastMessageT(..)
     )
 where
 
@@ -205,7 +209,8 @@ proxyProcess :: Server -> Process ()
 proxyProcess aServer
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel aServer
 
-
+newtype InvalidProcessId = InvalidProcessId {_unp :: String} deriving (Show) 
+instance Exception InvalidProcessId
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
   --liftIO $ debugMessage $ pack ("Handling whereIsReply : "  <> (show serviceProfile) <> " " <> (show a) <> "\n")
@@ -219,23 +224,14 @@ handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
   liftIO $ debugMessage $ pack 
         ("Sending info about self " <> " " <> show mSpid <> ":" <> show pid <> show aServiceProfile
             <> "\n")
-handleWhereIsReply _ _ (WhereIsReply _ Nothing) = return ()
-
-
-
+handleWhereIsReply _ _ (WhereIsReply _ Nothing) = 
+    liftIO $ throwIO 
+      $ InvalidProcessId "handleWhereIsReply"
 
 type ProcessTriple = (ProcessId, MessageId, Server)
 newtype BroadcastMessageT a = BroadcastMessageT {
   _unServer :: ReaderT ProcessTriple IO a 
   } deriving (Functor, Applicative, Monad, MonadIO, MonadReader ProcessTriple)
-
-
-bMessage :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
-bMessage (conn, queue) constructor = do 
-  (processIdL, messageIdL, server) <- ask
-  let mess = constructor messageIdL processIdL 
-  liftIO $ atomically $ writeTBQueue queue $ mess 
-  return mess
 
 sendWelcomeMessage :: BroadcastMessageT () 
 sendWelcomeMessage = do 
@@ -243,13 +239,16 @@ sendWelcomeMessage = do
   localQueues <- liftIO $ atomically $ readTVar $ localTBQueue server 
   mapM_ (flip bMessage createMessageSummaryP) $ Map.elems localQueues
 
+bMessage :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
+bMessage (conn, queue) constructor = do 
+  (processIdL, messageIdL, server) <- ask
+  let mess = constructor messageIdL processIdL 
+  liftIO $ atomically $ writeTBQueue queue $ mess
+  return mess
 
 runBroadcastMessage :: BroadcastMessageT () -> (ProcessId, MessageId, Server) -> IO ()
-runBroadcastMessage broad (pId, messageId, server) = runReaderT (_unServer broad) (pId, messageId, server)
-
-
-sendWelcomeMessages :: (ProcessId, MessageId, Server) -> IO ()
-sendWelcomeMessages = runBroadcastMessage sendWelcomeMessage 
+runBroadcastMessage broad (pId, messageId, server) = 
+    runReaderT (_unServer broad) (pId, messageId, server)
 
 {--|
 Update a service queue for round robin or any other strategy.
@@ -432,19 +431,19 @@ findAvailableService aServer sP FirstOne = queryFallbackservice aServer sP
 
 -- TODO: clean this up.
 removeProcess :: Server -> ProcessId -> STM ProcessId
-removeProcess aServer processId = do
+removeProcess aServer processId' = do
   remoteClientsL <- readTVar $ remoteClients aServer
   writeTVar (remoteClients aServer) $
-    Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteClientsL
+    Map.filterWithKey(\(prId, _) _ -> prId /= processId') remoteClientsL
   servicesL <- readTVar $ services aServer
-  writeTVar (services aServer) $ Map.filterWithKey(\(prId, _) _ -> processId /= prId) servicesL
+  writeTVar (services aServer) $ Map.filterWithKey(\(prId, _) _ -> processId' /= prId) servicesL
   remWriters <- readTVar $ remoteWriters aServer
   writeTVar (remoteWriters aServer) $
-    Map.filterWithKey(\(prId, _) _ -> processId /= prId) remWriters
+    Map.filterWithKey(\(prId, _) _ -> processId' /= prId) remWriters
   remoteServiceQueue <- readTVar $ remoteServiceList aServer
   writeTVar (remoteServiceList aServer)
-    $ Map.filterWithKey(\(prId, _) _ -> prId /= processId) remoteServiceQueue
-  return processId
+    $ Map.filterWithKey(\(prId, _) _ -> prId /= processId') remoteServiceQueue
+  return processId'
 
 {-- |
   Add 'ServiceProfile' to the local map
@@ -534,9 +533,9 @@ fireRemote aServer pid pmsg = do
 
 -- Publish the key info to all the services other than self.
 publishMessageKey :: Server -> ProcessId -> MessageId -> STM ProcessId
-publishMessageKey aServer processId messageId = do
+publishMessageKey aServer processId messageId' = do
     rProcesses <- remoteProcesses aServer
-    mapM_ (\pid -> fireRemote aServer pid (MessageKeyStore (messageId, processId)))
+    mapM_ (\pid -> fireRemote aServer pid (MessageKeyStore (messageId', processId)))
       rProcesses
     return processId
 
@@ -545,5 +544,3 @@ startupException = StartUpException
 
 
 
-instance Binary PMessage
-instance Binary Publisher

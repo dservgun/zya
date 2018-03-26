@@ -27,11 +27,7 @@ import Data.Time(UTCTime)
 import Data.Text
 import Data.Zya.Core.Internal.MessageDistribution
 import Control.Distributed.Process
-import Control.Monad.Trans
-import Control.Monad.Reader
-import Control.Monad.State
 import Data.Aeson 
-import Data.Text.Encoding(encodeUtf8)
 import GHC.Generics (Generic)
 
 
@@ -89,7 +85,7 @@ commitMessage aUserName aDevice aTopic aMessageId timeStamp =
     Update any grey lists for the username device pair across the cloud.
 --}
 login :: UserName -> Device -> LocalMessage
-login aUser aDevice = undefined
+login _ _  = undefined
 
 
 
