@@ -65,8 +65,8 @@ getHomeR = do
 
 
 
-sendWelcomeMessages :: (ProcessId, MessageId, Server) -> IO ()
-sendWelcomeMessages = runBroadcastMessage sendWelcomeMessage 
+publishToLocalQueuesIO :: (ProcessId, MessageId, Server) -> IO ()
+publishToLocalQueuesIO = runBroadcastMessage publishToLocalQueues 
 
 startWebServer :: ServerReaderT ()
 startWebServer = do
@@ -109,7 +109,7 @@ handleRemoteMessage serverL _ _ messageCount
 
 handleRemoteMessage serverL _ _ _ aMessage@(MessageKeyStore (messageId, processId)) = do
   _ <- liftIO $ atomically $ updateMessageKey serverL processId messageId
-  _ <- liftIO $ sendWelcomeMessages (processId, messageId, serverL)
+  _ <- liftIO $ publishToLocalQueuesIO (processId, messageId, serverL)
   liftIO $ debugMessage $ pack  "Message key store message processed..\n"
   return()
 

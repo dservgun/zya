@@ -34,10 +34,11 @@ module Data.Zya.Core.Service
         , putLocalMessage
         , publishLocalSnapshot
         , messagesTillNow
-        , bMessage
+    -- * Publish message(s) to a local queue.
+        , publishToLocalQueue
         , runBroadcastMessage
         , ProcessTriple
-        , sendWelcomeMessage
+        , publishToLocalQueues
     -- * server reader
     , ServerReaderT
     -- * Message types.
@@ -89,7 +90,6 @@ module Data.Zya.Core.Service
     )
 where
 
-
 import Control.Applicative((<$>))
 import Control.Concurrent.STM
 import Control.Distributed.Process
@@ -121,7 +121,6 @@ type WebServerEndPoint = Int
 peerTimeout :: Int
 peerTimeout = 1000000
 
-
 type ServerReaderT = ReaderT ServerConfiguration Process
 
 data ServerConfiguration = ServerConfig{
@@ -140,6 +139,9 @@ makeLenses ''ServerConfiguration
 {--|
   * Initialization.
 --}
+
+newtype InvalidProcessId = InvalidProcessId {_unp :: String} deriving (Show) 
+instance Exception InvalidProcessId
 
 newServerIO :: ProcessId -> IO Server
 newServerIO m =
@@ -161,7 +163,6 @@ newServerIO m =
 newServer :: ProcessId -> Process Server
 newServer =  liftIO . newServerIO
 
-
 makeServerConfiguration ::
   Server -> Backend -> ServiceProfile ->
   ServiceName -> DBType -> ConnectionDetails -> Maybe Int ->
@@ -171,7 +172,6 @@ makeServerConfiguration = ServerConfig
 -- A dummy function to allow the service to run remotely.
 subscriptionService :: String -> Process ()
 subscriptionService aPort = return ()
-
 
 {--|
   Service initialization and generic handlers.
@@ -184,7 +184,6 @@ initializeProcess = do
   let backendl = view backend serverConfiguration
   let serviceProfileL = view serviceProfile serverConfiguration
   mynode <- lift getSelfNode
-
   peers0 <- liftIO $ findPeers backendl peerTimeout
   liftIO $ debugMessage $ pack ("Initializing process " <> show serviceNameS <> "\n")
   peers <- 
@@ -196,7 +195,6 @@ initializeProcess = do
     _ <- addService server1 serviceProfileL mypid
     updateMyPid server1 mypid
 
-
 {- | Terminate all processes calling exit on each -}
 terminateAllProcesses :: Server -> Process ()
 terminateAllProcesses lServer = do
@@ -204,13 +202,10 @@ terminateAllProcesses lServer = do
   remoteProcessesL <- liftIO $ atomically $ remoteProcesses lServer
   forM_ remoteProcessesL $ \peer -> exit peer $ TerminateProcess "Shutting down the cloud"
 
-
 proxyProcess :: Server -> Process ()
 proxyProcess aServer
   =  forever $ join $ liftIO $ atomically $ readTChan $ proxyChannel aServer
 
-newtype InvalidProcessId = InvalidProcessId {_unp :: String} deriving (Show) 
-instance Exception InvalidProcessId
 handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
 handleWhereIsReply aServer aServiceProfile a@(WhereIsReply _ (Just pid)) = do
   --liftIO $ debugMessage $ pack ("Handling whereIsReply : "  <> (show serviceProfile) <> " " <> (show a) <> "\n")
@@ -233,14 +228,25 @@ newtype BroadcastMessageT a = BroadcastMessageT {
   _unServer :: ReaderT ProcessTriple IO a 
   } deriving (Functor, Applicative, Monad, MonadIO, MonadReader ProcessTriple)
 
-sendWelcomeMessage :: BroadcastMessageT () 
-sendWelcomeMessage = do 
+publishToLocalQueues :: BroadcastMessageT () 
+publishToLocalQueues = do 
   (processIdL, messageIdL, server) <- ask 
   localQueues <- liftIO $ atomically $ readTVar $ localTBQueue server 
-  mapM_ (flip bMessage createMessageSummaryP) $ Map.elems localQueues
+  mapM_ (flip publishToLocalQueue createMessageSummaryP) $ Map.elems localQueues
 
-bMessage :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
-bMessage (conn, queue) constructor = do 
+
+{-- | Publish a remote message to a local queue. The reader will most likely terminate
+    | in a call write on a socket handle or a file handle.
+    | Lets consider the following scenario. 
+    | User sets up an alert for a symbol in his portfolio. 
+    | The alert requires some long running computations across multiple
+    | ComputeNode services. The compute node completes the computation and
+    | publishes the event. This method can be used to broadcasting the message to 
+    | all the members connected (as in perhaps a socket connection or a socket connection)
+    | to this node.
+--}
+publishToLocalQueue :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
+publishToLocalQueue (conn, queue) constructor = do 
   (processIdL, messageIdL, server) <- ask
   let mess = constructor messageIdL processIdL 
   liftIO $ atomically $ writeTBQueue queue $ mess

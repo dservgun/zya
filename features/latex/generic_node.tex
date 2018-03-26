@@ -32,18 +32,23 @@ Common responsibilities of a node.
         -- Throw exception when ProcessId is Nothing.
         handleWhereIsReply :: Server -> ServiceProfile -> WhereIsReply -> Process ()
     \end{lstlisting}
-  \item Broadcast local message 
+  \item Broadcast remote messages to local connections.
     \begin{lstlisting}[language=Haskell]
       -- Broadcast local message by publishing to a local STM Bounded queue.
       -- bMessage :: (WS.Connection, TBQueue LocalMessage) -> (Text -> ProcessId -> LocalMessage) -> BroadcastMessageT LocalMessage
     \end{lstlisting}
-  \item Broadcast remote messages to local client. 
+  \item Publish to local queues
     \begin{lstlisting}[language=Haskell]
-      -- sendWelcomeMessages :: (ProcessId, MessageId, Server) -> IO ()
+      -- Send all messages from the remote queue to the local queue. 
+      -- This function will most likely vary per node.
     \end{lstlisting}
   \item Update remote service queue
     \begin{lstlisting}[language=Haskell]
       updateRemoteServiceQueue :: Server -> ProcessId -> (PMessage, UTCTime) -> STM ProcessId
+    \end{lstlisting}
+  \item Handle Remote message 
+    \begin{lstlisting}[language=Haskell]
+      -- this is where each node handles most of the work.
     \end{lstlisting}
 
 \end{itemize}
