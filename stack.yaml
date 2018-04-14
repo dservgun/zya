@@ -64,6 +64,7 @@ extra-deps:
 - web3-0.4.1.0
 - websockets-0.12.2.0
 - generic-arbitrary-0.1.0
+- universum-1.1.0
 
 # Override default flag values for local packages and extra-deps
 flags: {}
