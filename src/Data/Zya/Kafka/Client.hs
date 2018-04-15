@@ -1,11 +1,9 @@
 module Data.Zya.Kafka.Client where
 
-import Data.Bits
 import Network.Socket
 import Network.Socket.ByteString
 import Data.ByteString
 import Data.Monoid
-import Control.Applicative
 import Data.Set as Set
 import Data.Zya.Kafka.Util
 import Data.Word
@@ -147,13 +145,15 @@ apiKeyFor :: String -> APIKey
 apiKeyFor aString = 
   Prelude.head (Set.elems filteredSet)
   where 
-    filteredSet = Set.filter (\a@(APIKey key val) -> aString == key) apiDictionary
+    filteredSet = Set.filter (\(APIKey k _) -> aString == k) apiDictionary
+
 data ErrorCodes = ErrorCode {code :: Int, meaning :: String} deriving (Show, Eq, Ord)
 
 errorCodes :: [(Int, String)] -> Set ErrorCodes
 errorCodes aList = 
   Set.fromList $ uncurry ErrorCode <$> aList
 
+knownErrors :: Set ErrorCodes
 knownErrors = 
   errorCodes 
     [
@@ -202,9 +202,10 @@ metadataRequestKey = key $ apiKeyFor "MetadataRequest"
 newtype CorrelationId = CorrelationId {_unCorr :: Int} deriving (Show, Ord, Eq)
 newtype ClientId = ClientId {_unClientId :: Int} deriving(Show, Ord, Eq)
 createMetadataRequest ::  CorrelationId -> ClientId -> ByteString
-createMetadataRequest cor@(CorrelationId corId) client@(ClientId clId) 
+createMetadataRequest cor client
   = pack $ createMetadataRequestBA cor client
 
+createMetadataRequestBA :: CorrelationId -> ClientId -> [Word8]
 createMetadataRequestBA (CorrelationId corId) (ClientId clId) =
     int16ToWord8Array(metadataRequestKey)
     <> int16ToWord8Array(preferredVersion)

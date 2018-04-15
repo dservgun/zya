@@ -1,9 +1,6 @@
 module Data.Zya.Parsers.ServiceDescription where 
-import Data.Generics 
 import Text.ParserCombinators.Parsec
 import Data.Text
-import Control.Monad.Cont 
-import Control.Monad.Logic
 
 {-data ServiceProfile =
     WebServer

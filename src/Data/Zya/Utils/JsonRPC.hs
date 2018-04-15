@@ -6,13 +6,6 @@ module Data.Zya.Utils.JsonRPC where
 import Data.Aeson
 import Data.Monoid
 
-
-
-{-- | Send and receive 
-
---}
-
-
 newtype Request = Request {_unRequest :: Int} deriving(Show)
 newtype StoragePosition = StoragePosition {_unSP :: Integer} deriving(Show)
 
@@ -39,8 +32,12 @@ data DefaultParameters = DefaultParameters {
 
 --}
 
+defaultParameters :: DefaultParameters
 defaultParameters = DefaultParameters "2.0" "web3"
+
+defaultNetMethodParameters :: DefaultParameters
 defaultNetMethodParameters = DefaultParameters "2.0" "net"
+defaultEthMethodParameters :: DefaultParameters
 defaultEthMethodParameters = DefaultParameters "2.0" "eth"
 
 createRPCRequest :: DefaultParameters -> Method -> Int -> [Param] -> Value
@@ -56,7 +53,7 @@ createRPCRequest defaultParams method requestId params =
     methodWithPrefix = (defaultMethodPrefix defaultParams) <> "_" <> method
     rpcVersionL = defaultRpcVersion defaultParams
 
-
+createRPCRequestWithDefaults :: Method -> Int -> [Param] -> Value
 createRPCRequestWithDefaults = createRPCRequest defaultParameters 
 
 

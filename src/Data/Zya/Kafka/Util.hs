@@ -2,7 +2,6 @@ module Data.Zya.Kafka.Util where
 
 import Data.Word
 import Data.Bits
-import qualified Data.ByteString.Lazy.Char8 as L8
 
 int16ToWord8Array :: Int -> [Word8] 
 int16ToWord8Array aNumber = 

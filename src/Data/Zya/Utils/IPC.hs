@@ -1,24 +1,17 @@
 module Data.Zya.Utils.IPC where
 
 import Control.Monad.Trans
-import Control.Exception(SomeException(..), handle)
+import Control.Exception(SomeException(..), handle, Exception)
 import Data.Aeson
 import Data.ByteString hiding (hPutStrLn, hGetLine)
 import Data.ByteString.Lazy as L hiding(hGetContents)
 import Data.Monoid((<>))
 import Data.Text as Text
-import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage)
+import Data.Zya.Utils.Logger (debugMessage, infoMessage, errorMessage)
 import Network.BSD 
 import Network.Socket
 import Network.Socket.ByteString
 import qualified Data.Text as T
-import qualified Data.Text.IO as T 
-import System.IO(Handle, IOMode(..), hSetBuffering, BufferMode(..))
-import System.Log.Formatter
-import System.Log.Handler (setFormatter)
-import System.Log.Handler.Simple
-import System.Log.Handler.Syslog
-import System.Log.Logger
 
 
 domainSocket :: (MonadIO m) => FilePath -> m Socket
@@ -30,23 +23,26 @@ domainSocket filePath = do
   return sock
 
 plainOldSocket :: HostName -> ServiceName -> IO Socket
-plainOldSocket hostName portNumber = do 
-    addrInfos <- getAddrInfo Nothing (Just hostName) (Just portNumber)
+plainOldSocket hostName' portNumber' = do 
+    addrInfos <- getAddrInfo Nothing (Just hostName') (Just portNumber')
     -- Empty list will throw an exception, we dont need 
     -- to check for a safe head in this case.
     let serverAddr = Prelude.head addrInfos
     sock <- socket(addrFamily serverAddr) Stream defaultProtocol 
     setSocketOption sock KeepAlive 1
     connect sock (addrAddress serverAddr)
-    infoMessage (Text.pack $ "Connected to " <> (show hostName) <> ":" <> (show portNumber))
+    infoMessage (Text.pack $ "Connected to " <> (show hostName') <> ":" <> (show portNumber'))
     return sock
 
 
+monadIOHandle :: (Exception e, MonadIO m) =>
+                 (e -> IO a) -> IO a -> m a
 monadIOHandle excHandler safeFunction = liftIO $ handle excHandler safeFunction
+
 sendMessageWithSockets :: (MonadIO m) => Socket -> Value -> m (Maybe Value)
 sendMessageWithSockets sock request =
   monadIOHandle
-    (\e@(SomeException exception) -> 
+    (\e@(SomeException _) -> 
         (errorMessage $ T.pack $ "Exception " <> show e) >> return Nothing) $ do 
     let requestBS = L.toStrict . encode $ request 
     debugMessage  $ T.pack $ " Sending " <>  (show $ Data.ByteString.length requestBS)

@@ -2,10 +2,10 @@ module Data.Zya.Utils.Logger
   (
     setup
     , addFileHandler
+    , addSysLogHandler
     , errorMessage
     , infoMessage
     , debugMessage
-    , addFileHandler
   )
  where
 
@@ -23,16 +23,16 @@ updateGlobalLoggerMIO :: (MonadIO m) => String -> (Logger -> Logger) -> m ()
 updateGlobalLoggerMIO loggerName logTrans = liftIO $ updateGlobalLogger loggerName logTrans
 
 setup :: (MonadIO m) => Priority-> m ()
-setup priority = do 
-  updateGlobalLoggerMIO rootLoggerName (setLevel priority)
+setup = \pri -> updateGlobalLoggerMIO rootLoggerName (setLevel pri)
 
-
-addSysLogHandler priority = do
-  l <- openlog "Data.Zya.Utils.Logger" [PID] USER priority
+addSysLogHandler :: Priority -> IO ()
+addSysLogHandler pri = do
+  l <- openlog "Data.Zya.Utils.Logger" [PID] USER pri
   updateGlobalLogger rootLoggerName (addHandler l)
 
-addFileHandler fileName priority = do
-  h <- fileHandler fileName priority >>= \lh -> return $
+addFileHandler :: FilePath -> Priority -> IO ()
+addFileHandler fileName pri = do
+  h <- fileHandler fileName pri >>= \lh -> return $
       setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg") 
   updateGlobalLogger rootLoggerName (addHandler h)
 

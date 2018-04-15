@@ -5,21 +5,18 @@ module Data.Zya.Ethereum.Internal.Types.Common (
   Transaction(to, from)
   , OutputFormat(..)
   , transactionOutput
-  , BlockQuantity
   , BlockByHash(..)
   , BlockQuantity(..)
   , EthParameter(..)
   ) where
 import Data.Aeson
-import Data.Aeson.Types(modifyFailure)
+import Data.Aeson.Types(modifyFailure, Parser)
 import GHC.Generics
 import Data.Text
 import Text.Printf
 import Test.QuickCheck
 import Data.Zya.Ethereum.Internal.Types.Transaction
 
-
-type Quantity = Integer
 
 data BlockQuantity = Earliest | Latest | Pending | BlockId Integer
 
@@ -119,60 +116,61 @@ instance FromJSON BlockByHash where
     modifyFailure 
       ("Parsing BlockByHash failed " ++ )
       (parseJSONBlock x)
+parseJSONBlock :: Value -> Parser BlockByHash
 parseJSONBlock = withObject "BlockByHash" $ \w -> do
   v <- w .: "result"
-  number <- v .: "number" 
-  hash <- v .: "hash" 
-  parentHash <- v .: "parentHash"
-  nonce <- v .: "nonce"
-  sha3Uncles <- v .: "sha3Uncles" 
-  logsBloom <- v .: "logsBloom" 
-  transactionsRoot <- v .: "transactionsRoot"
-  stateRoot <- v .: "stateRoot" 
-  receiptsRoot <- v .: "receiptsRoot"
-  miner <- v .: "miner" 
-  difficulty <- v .: "difficulty" 
-  totalDifficulty <- v .: "totalDifficulty" 
-  extraData <- v .: "extraData"
-  size <- v .: "size" 
-  gasLimit <- v .: "gasLimit"
-  gasUsed <- v .: "gasUsed" 
-  timestamp <- v .: "timestamp" 
-  transactions <- v .: "transactions"
-  uncles <- v .: "uncles"
+  number' <- v .: "number" 
+  hash' <- v .: "hash" 
+  parentHash' <- v .: "parentHash"
+  nonce' <- v .: "nonce"
+  sha3Uncles' <- v .: "sha3Uncles" 
+  logsBloom' <- v .: "logsBloom" 
+  transactionsRoot' <- v .: "transactionsRoot"
+  stateRoot' <- v .: "stateRoot" 
+  receiptsRoot' <- v .: "receiptsRoot"
+  miner' <- v .: "miner" 
+  difficulty' <- v .: "difficulty" 
+  totalDifficulty' <- v .: "totalDifficulty" 
+  extraData' <- v .: "extraData"
+  size' <- v .: "size" 
+  gasLimit' <- v .: "gasLimit"
+  gasUsed' <- v .: "gasUsed" 
+  timestamp' <- v .: "timestamp" 
+  transactions' <- v .: "transactions"
+  uncles' <- v .: "uncles"
   return $ BlockByHash 
-            (number)
-            (hash) (parentHash)
-            (nonce) (sha3Uncles)
-            (logsBloom) (read transactionsRoot) 
-            (read stateRoot) (read receiptsRoot)
-            (read miner) (difficulty) (totalDifficulty) 
-            (read extraData) (size) (gasLimit) (gasUsed)
-            (timestamp) transactions uncles
+            (number')
+            (hash') (parentHash')
+            (nonce') (sha3Uncles')
+            (logsBloom') (read transactionsRoot') 
+            (read stateRoot') (read receiptsRoot')
+            (read miner') (difficulty') (totalDifficulty') 
+            (read extraData') (size') (gasLimit') (gasUsed')
+            (timestamp') transactions' uncles'
 
 instance ToJSON BlockByHash where 
-  toJSON (BlockByHash number hash parentHash nonce sha3Uncles 
-            logsBloom transactionsRoot stateRoot
-            receiptsRoot miner difficulty totalDifficulty
-            extraData size gasLimit gasUsed timestamp transactions uncles) = 
+  toJSON (BlockByHash number' hash' parentHash' nonce' sha3Uncles'
+            logsBloom' transactionsRoot' stateRoot'
+            receiptsRoot' miner' difficulty' totalDifficulty'
+            extraData' size' gasLimit' gasUsed' timestamp' transactions' _) = 
       object [
-          "number" .= number
-          , "hash" .= (String . pack $ printf "0x%x" hash)
-          , "parentHash" .= (String . pack $ printf "0x%x" parentHash)
-          , "nonce" .= (String . pack $ printf "0x%x" nonce)
-          , "sha3Uncles" .= (String . pack $ printf "0x%x" sha3Uncles)
-          , "logsBloom" .= (String . pack $ printf "0x%x" logsBloom)
-          , "transactionsRoot" .= (String . pack $ printf "0x%x" transactionsRoot)
-          , "stateRoot" .= (String . pack $ printf "0x%x" stateRoot)
-          , "receiptsRoot" .= (String . pack $ printf "0x%x" receiptsRoot) 
-          , "miner" .= (String . pack $ printf "0x%x" miner)
-          , "difficulty" .= (String . pack $ show difficulty) 
-          , "totalDifficulty" .= (String . pack $ show totalDifficulty) 
-          , "extraData" .= (String . pack $ printf "0x%x" extraData)
-          , "size" .= (String . pack $ show size)
-          , "gasLimit" .= (String . pack $ show gasLimit)
-          , "gasUsed" .= (String . pack $ show gasUsed)
-          , "timestamp" .= (String . pack $ show timestamp)
-          , "transactions" .= transactions
+          "number" .= number'
+          , "hash" .= (String . pack $ printf "0x%x" hash')
+          , "parentHash" .= (String . pack $ printf "0x%x" parentHash')
+          , "nonce" .= (String . pack $ printf "0x%x" nonce')
+          , "sha3Uncles" .= (String . pack $ printf "0x%x" sha3Uncles')
+          , "logsBloom" .= (String . pack $ printf "0x%x" logsBloom')
+          , "transactionsRoot" .= (String . pack $ printf "0x%x" transactionsRoot')
+          , "stateRoot" .= (String . pack $ printf "0x%x" stateRoot')
+          , "receiptsRoot" .= (String . pack $ printf "0x%x" receiptsRoot') 
+          , "miner" .= (String . pack $ printf "0x%x" miner')
+          , "difficulty" .= (String . pack $ show difficulty') 
+          , "totalDifficulty" .= (String . pack $ show totalDifficulty') 
+          , "extraData" .= (String . pack $ printf "0x%x" extraData')
+          , "size" .= (String . pack $ show size')
+          , "gasLimit" .= (String . pack $ show gasLimit')
+          , "gasUsed" .= (String . pack $ show gasUsed')
+          , "timestamp" .= (String . pack $ show timestamp')
+          , "transactions" .= transactions'
       ] 
 

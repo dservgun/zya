@@ -46,8 +46,6 @@ getJSONRpcResponse hostName' serviceName' (UserName userName') (Password passwor
       (\e@(SomeException s) -> return $ Just $ String $ T.pack $ show e) 
       $ return Nothing
 
-
-
 someDefaults :: (String, String)
 someDefaults = ("127.0.0.1", "8332")
 

@@ -24,4 +24,5 @@ saveToLocation directory file = do
     (openFile (directory <> "/" <> file) AppendMode)
     (hClose) $ \fileHandle -> hPutStrLn fileHandle $ show  argString
 
+save :: IO ()
 save = saveToLocation ".zya" "history.txt"

@@ -20,10 +20,7 @@ module Data.Zya.Ethereum.Sockets.GethApplication
   )
  where 
 
-import Control.Applicative
-import Control.Concurrent(forkIO)
-import Control.Exception(bracket, handle, SomeException(..), catch)
-import Control.Monad(forever, unless)
+import Control.Exception(bracket)
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Trans(liftIO)
@@ -33,17 +30,12 @@ import Data.Zya.Ethereum.Internal.Types.Common
 import Data.Zya.Ethereum.Internal.Types.RPCRequest
 import Data.Zya.Utils.IPC (sendMessageWithSockets, domainSocket, closeHandle)
 import Data.Zya.Utils.JsonRPC
-import Data.Zya.Utils.Logger(setup, debugMessage, infoMessage, errorMessage)
-import Network.Socket(Socket, close)
-import Network.Socket.ByteString
+import Network.Socket(Socket)
+import Data.Zya.Utils.Logger(debugMessage)
 import qualified Data.Text as T
-import qualified Data.Text.IO as T 
 import System.IO
-import Text.Printf
 
 type RequestId = Int
-type BlockIdAsInt = Integer
-type Account = T.Text 
 
 --- Design
 --- The application session contains a read only socket
@@ -86,21 +78,22 @@ queryTransactionByHash transactionHash = do
 
 queryTransaction :: 
   (MonadIO m) => Socket -> String -> T.Text -> m (Result Transaction, SessionState) 
-queryTransaction socket accountAddress transactionHash = do 
+queryTransaction socket accountAddress' transactionHash = do 
   defFileHandle <- liftIO $ openFile "defaultQueryTransaction.csv" WriteMode
   let 
-    config = SessionConfig 1 socket "tbd" defFileHandle (read accountAddress) 0 0
-    state = SessionState 0 Nothing 
-  liftIO $ runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state
+    config = SessionConfig 1 socket "tbd" defFileHandle (read accountAddress') 0 0
+    state' = SessionState 0 Nothing 
+  liftIO $ 
+    runStateT (runReaderT (runA (queryTransactionByHash transactionHash)) config) state'
 
 
 queryTransactionWithBracket :: 
   (MonadIO m) => FilePath -> String -> EthData -> m (Result Transaction, SessionState)
-queryTransactionWithBracket aFilePath accountAddress transactionHash = do 
+queryTransactionWithBracket aFilePath accountAddress' transactionHash = do 
   liftIO $ 
     bracket (domainSocket aFilePath) (\h -> closeHandle h ) $ \socket -> do 
           debugMessage $ T.pack $ "Processing transaction " <> (show transactionHash)
-          result <- queryTransaction socket accountAddress transactionHash
+          result <- queryTransaction socket accountAddress' transactionHash
           return result
 
 getTransactionByHash :: 

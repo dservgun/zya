@@ -9,17 +9,20 @@ module Data.Zya.Ethereum.Internal.Types.Transaction
   )
 where
 import Data.Aeson
+import Data.Aeson.Text as AText (encodeToLazyText)
 import Data.Aeson.Types
 import Data.Monoid
 import GHC.Generics
 import Data.HashMap.Strict as HM
 import Data.Text as Text
+import Data.Text.Lazy as L
 import Text.Printf 
-data OutputFormat = CSV Text | JSON deriving (Show)
+data OutputFormat = CSV Text.Text | JSON deriving (Show)
 
 
+-- TODO: To be implemented.
 confirmations :: Transaction -> Integer 
-confirmations aTransaction = -1 -- blockNumber aTransaction - transactionIndex aTransaction
+confirmations _ = -1 -- blockNumber aTransaction - transactionIndex aTransaction
 
 
 data Transaction = 
@@ -60,6 +63,7 @@ instance FromJSON Transaction where
       ("Parsing transaction failed " ++)
       (parseJSONTransactionObject x)
 
+parseJSONTransactionObject :: Value -> Parser Transaction
 parseJSONTransactionObject =  
   withObject "Transaction" $ \vOuter -> do
     let rField = HM.lookup "result" vOuter
@@ -135,28 +139,32 @@ parseJSONTransactionObject =
 
 instance ToJSON Transaction
 
+currency :: String
 currency = "ETH"
 
 wei :: Int
 wei = 1000000000000000000
 
-transactionOutput :: Transaction -> OutputFormat -> Text
+transactionOutput :: Transaction -> OutputFormat -> Text.Text
 transactionOutput = 
-  \t format -> Text.pack $ 
+  \t _ -> Text.pack $ 
       (printf "0x%040x" $ hash $ t) <> "," <> currency <> "," <> 
       (printf "0x%040x" $ Data.Zya.Ethereum.Internal.Types.Transaction.to t) <> "," 
       <> (printf "0x%040x" $ Data.Zya.Ethereum.Internal.Types.Transaction.from t) 
-      <> "," <> show (tValue t)
+      <> "," <> show ( tValue t)
       <> "," <> show (tGasPrice t)
       <> "," <> show (tGas t)
       <> "," <> (show $ confirmations t)
       <> "," <> (show $ blockNumber t)
   where 
+    tValue :: Transaction -> Double
     tValue t  = (fromIntegral (value t)) / fromIntegral wei
     tGasPrice t = gasPrice t 
     tGas t = gas t
 
 -- | Print transactions as text.
-printTransactions :: [Transaction] -> OutputFormat -> [Text]
-printTransactions transactionList (a@(CSV ",")) = 
+printTransactions :: [Transaction] -> OutputFormat -> [Text.Text]
+printTransactions transactionList (a@(CSV _)) = 
   Prelude.map (\t -> transactionOutput t a) transactionList
+
+printTransactions transactionList JSON = Prelude.map (toStrict . encodeToLazyText) transactionList
