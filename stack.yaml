@@ -54,6 +54,7 @@ extra-deps:
 - criterion-1.2.3.0
 - distributed-process-0.7.3
 - distributed-process-simplelocalnet-0.2.4
+- haskakafka-1.2.0
 - network-transport-0.5.2
 - network-transport-tcp-0.6.0
 - statistics-0.14.0.2

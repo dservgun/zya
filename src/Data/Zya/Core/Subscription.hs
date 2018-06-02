@@ -62,7 +62,7 @@ subscription backendL (sP, params, dbTypeL, dbConnection, count, portNumber) = d
   n <- newServer myPid
   let readerParams = makeServerConfiguration n backendL sP params dbTypeL dbConnection count portNumber
 
-  liftIO $ debugMessage $ pack  $ "Starting subscrpition " <> show sP <> " " <> show params <> "\n"
+  liftIO $ debugMessage $ pack  $ "Starting subscription " <> show sP <> " " <> show params <> "\n"
   case sP of
     Writer -> runReaderT writer readerParams
     Reader -> Control.Exception.Safe.throw $ UnsupportedServiceException $ Just Reader

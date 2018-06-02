@@ -129,6 +129,7 @@ library
     , exceptions >= 0.8 && < 0.9
     , generic-arbitrary == 0.1.0
     , haskeline >= 0.7 && < 0.8
+    , haskakafka >= 1.2.0 && < 1.3
     , hslogger >= 1.2 && < 1.3
     , http-client >= 0.5 && < 0.6
     , io-streams >= 1.4 && < 1.6
@@ -178,6 +179,8 @@ library
   ghc-options : -Wall
   -- Base language which the package is written in.
   default-language:    Haskell2010
+  extra-lib-dirs : /usr/local/lib
+  include-dirs : /usr/local/include
 
 executable zya_client_reference
   main-is : ReferenceClient.hs 
@@ -185,6 +188,7 @@ executable zya_client_reference
     base
     , aeson
     , async
+    , haskakafka
     , monad-control
     , monad-logger
     , mtl
@@ -217,6 +221,7 @@ executable zya_reference
     , distributed-process-simplelocalnet
     , distributed-static
     , exceptions
+    , haskakafka
     , haskeline
     , hslogger
     , lens
@@ -294,6 +299,7 @@ test-suite Tasty
     , distributed-process-simplelocalnet
     , distributed-static
     , generic-arbitrary
+    , haskakafka
     , heap
     , hslogger
     , mtl
@@ -322,6 +328,7 @@ executable zya_ethereum_client
     , async
     , bytestring
     , generic-arbitrary
+    , haskakafka
     , hslogger
     , monad-control
     , monad-logger
@@ -349,6 +356,7 @@ executable zya_btc_client
     , async
     , bytestring
     , generic-arbitrary
+    , haskakafka
     , hslogger
     , monad-control
     , monad-logger
@@ -366,4 +374,32 @@ executable zya_btc_client
   ghc-options : -Wall
   default-language:   Haskell2010
   hs-source-dirs : src/Data/Zya/Bitcoin
+  other-modules :  
+
+executable zya_kafka_client 
+  main-is : Main.hs
+  build-depends : 
+    base
+    , aeson
+    , async
+    , bytestring
+    , generic-arbitrary
+    , haskakafka
+    , hslogger
+    , monad-control
+    , monad-logger
+    , mtl
+    , network
+    , optparse-applicative
+    , tasty 
+    , tasty-hunit
+    , tasty-quickcheck
+    , tasty-smallcheck
+    , text
+    , websockets
+    , zya
+
+  ghc-options : -Wall
+  default-language:   Haskell2010
+  hs-source-dirs : src/Data/Zya/Kafka
   other-modules :  
