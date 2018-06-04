@@ -70,3 +70,12 @@ Install stack and run the following
 ``` stack install stack-run ```
 
 The onboarding may be a bit more smoother.
+
+#### Installing ceph_deploy
+[Ceph deploy](http://docs.ceph.com/docs/master/start/quick-start-preflight/) is a ceph installation to enable local development. 
+```
+  wget -q -O- 'https://download.ceph.com/keys/release.asc' | sudo apt-key add -
+  echo deb https://download.ceph.com/debian-{ceph-stable-release}/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+  sudo apt update
+  sudo apt install ceph-deploy
+  ```
