@@ -12,7 +12,7 @@ type CommitOffset = Integer
 newtype Topic = Topic {unTopic :: Text} deriving (Show, Ord, Eq, Generic, ToJSON, FromJSON)
 
 {-- |
-  Begin -> All messages in some order, need not be timeordered.
+  Begin -> All messages in some order, need not be time ordered.
   End -> All new messages from now.
   Last n -> A few messages to get some context on the topic.
 --}

@@ -17,6 +17,7 @@ import Data.Text
 import Data.Time(UTCTime)
 import Data.Zya.Core.Internal.MessageDistribution
 import Data.Zya.Core.Internal.LocalMessage
+import Data.Zya.Core.Internal.RemoteCommand
 import GHC.Generics (Generic)
 import Network.WebSockets as WS (Connection)
 
@@ -61,10 +62,12 @@ data PMessage =
   | GreetingsFrom ServiceProfile ProcessId
   -- Send the message back to the process id
   | QueryMessage (MessageId, ProcessId, Maybe PMessage)
-  | ComputeNodeEvent (MessageId, ProcessId, Text)
+  -- Run a command.
+  | ComputeNodeEvent (MessageId, ProcessId, RemoteCommand)
   deriving (Typeable, Generic, Show)
 
 data FairnessStrategy = RoundRobin | FirstOne deriving (Show)
+
 
 
 {--|
