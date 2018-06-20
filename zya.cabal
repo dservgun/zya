@@ -96,6 +96,7 @@ library
     Data.Zya.Utils.IPC
     Data.Zya.Utils.JsonRPC
     Data.Zya.Utils.Logger
+    Data.Zya.Utils.REPL
 
   -- Modules included in this library but not exported.
   other-modules:
