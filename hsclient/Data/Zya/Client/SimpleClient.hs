@@ -13,8 +13,19 @@ import Data.Monoid
 import Data.Aeson
 import Data.Text.Encoding(encodeUtf8)
 import System.Environment(getArgs)
+
+
 parseJson :: T.Text -> Either String Value 
 parseJson = eitherDecodeStrict . encodeUtf8 
+
+
+-- integrate haskeline and create an interpreter
+-- to interact with zya.
+-- commands:
+-- upload file
+-- algorithm to run.
+
+
 app :: WS.ClientApp () 
 app conn = do 
   putStrLn "Connected!"

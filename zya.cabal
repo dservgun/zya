@@ -84,8 +84,6 @@ library
     Data.Zya.Ethereum.Sockets.Client
     Data.Zya.Ethereum.Sockets.GethApplication
     Data.Zya.Ethereum.Utils.CommandLineParser
-    Data.Zya.Kafka.Client 
-    Data.Zya.Kafka.Util
     Data.Zya.Parsers.ServiceDescription
     Data.Zya.Persistence.Internal.Common
     Data.Zya.Persistence.Internal.FileSystem

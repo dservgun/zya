@@ -25,7 +25,6 @@ data KafkaStream a b =
   messagePair :: TBQueue (KafkaStreamMessage a, KafkaStreamResult a b)
 }
 
-
 foldStream :: KafkaStreamMessage a -> KafkaStreamResult a b -> KafkaStreamResult a b 
 foldStream 
   (KafkaStreamMessage m2 mapF)
@@ -39,6 +38,7 @@ computeStream foldFunction (KafkaStream mQ) = do
   let result = foldStream message prevResult
   writeTBQueue mQ (message, result)
   return ()
+
 
 
 
