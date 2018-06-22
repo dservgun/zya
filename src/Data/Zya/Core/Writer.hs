@@ -6,9 +6,6 @@ module Data.Zya.Core.Writer(
   ) where
 
 
-
-
-
 import Control.Applicative((<$>))
 import Control.Concurrent.STM
 import Control.Distributed.Process hiding(catch)

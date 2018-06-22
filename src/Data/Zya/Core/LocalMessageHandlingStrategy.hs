@@ -127,7 +127,6 @@ handlePublish aLocalMessage = undefined
 handleCommit aLocalMessage = undefined 
 handleMessageSummary aLocalMessage = undefined    
 
-
 handleMessages :: Command -> LocalMessageHandler Command
 handleMessages messageL = do 
     (command, pProcessId, sServer, mMessageDistributionStrategy) <- ask

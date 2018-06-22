@@ -402,11 +402,12 @@ isSingleton :: ServiceProfile -> Bool
 isSingleton TopicAllocator = True
 isSingleton _ = False
 
-{- | Find an available writer or return None. Find the first writer
+{-| Find an available writer or return None. Find the first writer
   , though find the one with the least number of topics or messages or both.
 -}
 findAvailableWriter :: Server -> STM (Maybe ProcessId)
 findAvailableWriter serverL = findAvailableService serverL Writer RoundRobin
+
 
 queryFallbackservice :: Server -> ServiceProfile -> STM (Maybe ProcessId)
 queryFallbackservice serverL serviceProfileL =
