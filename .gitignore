@@ -46,3 +46,6 @@ tags
 
 # Tex files
 *.aux
+
+# Out directories or files
+out
