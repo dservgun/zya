@@ -8,6 +8,14 @@ import Data.Binary
 import Data.Text
 import Data.Typeable
 import GHC.Generics (Generic)
+import System.Process (CreateProcess
+    , proc
+    , CreateProcess
+    , StdStream(..)
+    , createProcess
+    , callProcess
+    , std_out
+    , cwd)
 
 
 newtype Name = Name {_unName :: Text} deriving (Typeable, Generic, Show) 
@@ -38,6 +46,12 @@ defaultCommand anId = RemoteCommand {
   , commandId = anId
   , libraries = []
 }
+
+execute :: RemoteCommand -> IO () 
+execute r@(RemoteCommand commandLine env commandId libraries) = do
+  _ <- createProcess (proc (Data.Text.unpack commandLine) [])
+  return ()
+  
 instance Binary RemoteCommand
 instance Binary Library
 instance Binary Distribution 

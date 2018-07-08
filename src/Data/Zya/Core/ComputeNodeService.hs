@@ -34,7 +34,7 @@ import Text.Printf
 import Data.Array.Accelerate as A
 import Data.Array.Accelerate.Interpreter as I
 import Data.Zya.Utils.Logger
-
+import Data.Zya.Core.Internal.RemoteCommand as RemoteCommand
 
 componentName :: Text 
 componentName = "Data.Zya.Core.ComputeNodeService"
@@ -74,7 +74,9 @@ handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess me
   getSelfPid >>= flip exit (show aMessage)
 
 handleRemoteMessage server dbType connectionString aMessage@(ComputeNodeEvent(mesageId, processId, rCommand)) = do 
-  liftIO $ debugMessage $ pack ("Compute node event : " <> show rCommand)
+  liftIO $ do 
+    debugMessage $ pack ("Compute node event : " <> show rCommand)
+    RemoteCommand.execute rCommand
 
 handleRemoteMessage server dbType connectionString unhandledMessage =
   liftIO $ debugMessage  $ pack ("Received unhandled message  " <> show unhandledMessage <> "\n")
