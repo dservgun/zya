@@ -76,7 +76,8 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
 
 -- When the write succeeds, find a query service to send the entire message to.
 -- Update a map with writer information for a process.
-handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
+handleRemoteMessage server dbType connectionString 
+    aMessage@(WriteMessage publisher processId (messageId, topic, message, Nothing)) = do
   selfPid <- getSelfPid
   time <- liftIO getCurrentTime
   say $  printf ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")

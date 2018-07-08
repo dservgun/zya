@@ -12,11 +12,14 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Reader
 
+import Data.Zya.Core.Internal.RemoteCommand as RemoteCommand
 import Data.Monoid((<>))
 import Data.Text(pack, unpack, Text)
 import Data.Time(getCurrentTime)
 import Data.UUID.V1(nextUUID)
-import Data.Zya.Core.LocalMessageHandlingStrategy(runMessageWriter)
+import Data.UUID.Types(UUID)
+import Data.Zya.Core.LocalMessageHandlingStrategy
+  (runMessageWriter, runComputeNodeEvent)
 import Data.Zya.Core.Service as ZService
 import Data.Zya.Utils.Logger as Logger
 import Data.Zya.Utils.ComponentDetails(ComponentName(..))
@@ -99,29 +102,45 @@ handleRemoteMessage serverL aCount aMessage@(ZService.GreetingsFrom serviceProfi
   p <- liftIO $ atomically $ ZService.addService serverL serviceProfileL pid
   liftIO $ debugMessage $ pack ("Added service " <> show p <> show serviceProfileL <> "\n")
   case serviceProfileL of
-    ZService.Writer -> 
+    ZService.ComputeNode -> 
       case aCount of
         Just count -> 
           forM_ [1..count] $ \currentCount -> do
             liftIO $ debugMessage $ pack ("Test Writer -> Writing message " <> show currentCount <> "\n")
-            getNextMessage >>= flip runMessageWriter serverL
+            --getNextMessage >>= flip runMessageWriter serverL
+            getNextRemoteCommand >>= flip runComputeNodeEvent serverL
         Nothing -> return ()
     _ -> return ()
   return ()
   where
+    getIdPair :: Process (ProcessId, Text)
+    getIdPair = do 
+      pid <- getSelfPid 
+      uuid <- liftIO nextUUID
+      case uuid of 
+        Just nid -> return (pid, pack . show $ nid) 
+        Nothing -> throw $ UUIDGenException "No next id."
+
+    getNextRemoteCommand = do 
+      (selfPId, nextId) <- getIdPair 
+      let remoteCommand = RemoteCommand.defaultCommand nextId
+      return $ 
+        ZService.ComputeNodeEvent (nextId, selfPId, remoteCommand)
     getNextMessage = do
       selfPid'<- getSelfPid
       nextId <- liftIO nextUUID
       case nextId of
         Just nId -> do
           let topic = ZService.Topic $ pack "TestTopic"
-          liftIO $ debugMessage $ pack  "Writing message \n"
           return $
             ZService.WriteMessage
               (ZService.Publisher topic)
               selfPid'
-              (pack $ show nId , topic, pack ("This is a test " <> show nId <> " : " <> show pid))
+              (pack $ show nId , topic, 
+                pack ("This is a test " <> show nId <> " : " <> show pid)
+                , Nothing)
         Nothing -> throw $ UUIDGenException "No next id."
+
 
 handleRemoteMessage _ _ unhandledMessage =
   liftIO $ debugMessage $ pack  ("Received unhandled message  " <> show unhandledMessage <> "\n")

@@ -4,7 +4,10 @@
 
 -- Each service manages its own service access strategy. This
 -- might still result in a global storm on any one instance.
-module Data.Zya.Core.LocalMessageHandlingStrategy (sendMessage, runMessageWriter) where
+module Data.Zya.Core.LocalMessageHandlingStrategy 
+  (sendMessage
+    , runMessageWriter
+    , runComputeNodeEvent) where
 
 
 import Control.Applicative((<$>), liftA2)
@@ -68,8 +71,12 @@ sendMessage aMessage server = do
   let sticky = stickyProcess prevWriter current
   when sticky $ liftLiftIO $ infoMessage $ pack ("Sticky process.." <> show prevWriter <> " : " <> show current)
   case current of
-    Just x -> liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
-    Nothing -> liftLiftIO $ debugMessage $ pack ("No writer found " <> show prevWriter <> " : " <> show current)
+    Just x -> 
+      liftLiftIO $ atomically $ sendRemote server x (aMessage, currentTime)
+    Nothing -> 
+      liftLiftIO $ debugMessage $ 
+        pack ("No writer found " <> 
+                show prevWriter <> " : " <> show current <> " : " <> show aMessage)
 
   State.put current
   return ()
@@ -80,13 +87,23 @@ sendMessage aMessage server = do
 stickyProcess :: Maybe ProcessId -> Maybe ProcessId -> Bool
 stickyProcess a b = fromMaybe False $ liftA2 (==) a b
 
+
+--runReaderT (runStateT (runServerState $ sendMessage aMessage server) initWriter) (Writer, RoundRobin)
+runMessage :: PMessage -> Server -> ServiceProfile -> Process () 
+runMessage aMessage aServer aServiceProfile = do
+  publisher <- liftIO $ atomically $ findAvailableService aServer aServiceProfile RoundRobin 
+  void $
+    runReaderT 
+      (runStateT 
+      (runServerState $ sendMessage aMessage aServer) publisher) 
+      (aServiceProfile, RoundRobin)
+
+runComputeNodeEvent :: PMessage -> Server -> Process () 
+runComputeNodeEvent aMessage server = runMessage aMessage server ComputeNode
+
 -- We first like to write and then read (or should we read first?)
 runMessageWriter :: PMessage -> Server -> Process ()
-runMessageWriter aMessage server = do
-  initWriter <- liftIO $ atomically $ findAvailableWriter server
-  void $
-    runReaderT (runStateT (runServerState $ sendMessage aMessage server) initWriter) (Writer, RoundRobin)
-
+runMessageWriter aMessage server = runMessage aMessage server Writer
 
 
 type CPSM = (Command, ProcessId, Server, MessageDistributionStrategy)

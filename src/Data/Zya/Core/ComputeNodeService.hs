@@ -6,10 +6,6 @@ module Data.Zya.Core.ComputeNodeService(
   , handleRemoteMessage
   ) where
 
-
-
-
-
 import Control.Applicative((<$>))
 import Control.Concurrent.STM
 import Control.Distributed.Process
@@ -56,7 +52,6 @@ handleRemoteMessage server dbType connectionString aMessage@(ServiceAvailable se
       fireRemote server pid $
                 GreetingsFrom ComputeNode myPid
 
-
 handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom serviceProfile pid) = do
   liftIO $ debugMessage  $ pack ("ComputeNode : Received message " <> show aMessage <> "\n")
   liftIO $ atomically $ addService server serviceProfile pid
@@ -67,7 +62,8 @@ handleRemoteMessage server dbType connectionString aMessage@(GreetingsFrom servi
 
 
 
-handleRemoteMessage server dbType connectionString aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
+handleRemoteMessage server dbType connectionString 
+  aMessage@(WriteMessage publisher processId (messageId, topic, message, paylaod)) = do
   selfPid <- getSelfPid
   time <- liftIO getCurrentTime
   liftIO $ debugMessage  $ pack ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
@@ -77,9 +73,11 @@ handleRemoteMessage server dbType connectionString aMessage@(TerminateProcess me
   liftIO $ debugMessage  $ pack ("Terminating self " <> show aMessage <> "\n")
   getSelfPid >>= flip exit (show aMessage)
 
+handleRemoteMessage server dbType connectionString aMessage@(ComputeNodeEvent(mesageId, processId, rCommand)) = do 
+  liftIO $ debugMessage $ pack ("Compute node event : " <> show rCommand)
+
 handleRemoteMessage server dbType connectionString unhandledMessage =
   liftIO $ debugMessage  $ pack ("Received unhandled message  " <> show unhandledMessage <> "\n")
-
 
 handleMonitorNotification :: Server -> ProcessMonitorNotification -> Process ()
 handleMonitorNotification server notificationMessage@(ProcessMonitorNotification _ pid _) = do

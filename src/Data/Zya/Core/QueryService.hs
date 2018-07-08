@@ -71,7 +71,7 @@ handleRemoteMessage server dbType connectionString messageCount
 
 
 handleRemoteMessage server dbType connectionString messageCount
-  aMessage@(WriteMessage publisher processId (messageId, topic, message)) = do
+  aMessage@(WriteMessage publisher processId (messageId, topic, message, payload)) = do
   selfPid <- getSelfPid
   liftIO $ debugMessage $ pack  ("Received message " <> "Processor " <> show selfPid <> " " <> show aMessage <> "\n")
   return ()

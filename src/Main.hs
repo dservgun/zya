@@ -43,7 +43,7 @@ startServices =  do
   test <- testBackend
   --ta <- async $ cloudEntryPoint test (TopicAllocator, debugServiceName, fst debugConnStr, snd debugConnStr, Nothing)
   let nWriters = 6
-  let messages = 1000 -- Messages to be published.
+  let messages = 10 -- Messages to be published.
   let startPort = 30000
   let nWebServers = 5
   let nQueryServices = 3 :: Int
@@ -51,7 +51,9 @@ startServices =  do
     forM[1..nQueryServices] $ \_ ->
         async $ cloudEntryPoint test (QueryService, debugServiceName, fst debugConnStr, snd debugConnStr, Just (nWriters * messages), -1)
 
-  threadDelay(10 ^ 6 * 3 :: Int)
+  computeNode <- async $ cloudEntryPoint test (ComputeNode, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
+
+  threadDelay(10 ^ 6 * 10 :: Int)
   writers <- forM [1..nWriters] $ \_ -> async $ cloudEntryPoint test (Writer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, -1)
 
   testWriter <- async $ cloudEntryPoint test (TestWriter, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
@@ -60,7 +62,6 @@ startServices =  do
       async $ cloudEntryPoint test (WebServer, debugServiceName, fst debugConnStr, snd debugConnStr, Just messages, startPort + i)
 
 
-  computeNode <- async $ cloudEntryPoint test (ComputeNode, debugServiceName, fst debugConnStr,  snd debugConnStr, Just messages, -1)
 
   void . waitAny $ writers <> webServers <> [testWriter] <> queryServices
 

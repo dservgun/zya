@@ -46,7 +46,7 @@ data PMessage =
   -- * Notifies a subscriber of the next message.
   | NotifyMessage Subscriber (MessageId, Text)
   -- * Writes a message on a topic.
-  | WriteMessage Publisher ProcessId (MessageId, Topic, Text)
+  | WriteMessage Publisher ProcessId (MessageId, Topic, Text, Maybe PMessage)
   -- * Message Key store information.
   -- UTCTime should probably be replaced with a vector clock.
   | MessageKeyStore (MessageId, ProcessId)
